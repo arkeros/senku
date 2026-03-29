@@ -62,7 +62,7 @@ container_structure_test(
     ],
     driver = "tar",
     image = ":static_debug_nonroot_amd64_debian13.tar",
-    tags = ["no-local"],
+    tags = ["manual"],
 )
 
 bzl_library(

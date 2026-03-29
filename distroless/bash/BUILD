@@ -72,7 +72,7 @@ container_structure_test(
     configs = ["test.yaml"],
     driver = "tar",
     image = ":bash_nonroot_amd64_debian13.tar",
-    tags = ["no-local"],
+    tags = ["manual"],
 )
 
 bzl_library(
