@@ -70,9 +70,9 @@ container_structure_test(
     name = "bash_test",
     size = "small",
     configs = ["test.yaml"],
-    driver = "tar",
-    image = ":bash_nonroot_amd64_debian13.tar",
-    tags = ["manual"],
+    driver = "docker",
+    image = ":bash_nonroot_amd64_debian13.oci_layout",
+    tags = ["requires-docker"],
 )
 
 bzl_library(

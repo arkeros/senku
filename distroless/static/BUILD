@@ -58,11 +58,10 @@ container_structure_test(
     configs = [
         "test.yaml",
         "test_debug.yaml",
-        "test_nonroot.yaml",
     ],
-    driver = "tar",
-    image = ":static_debug_nonroot_amd64_debian13.tar",
-    tags = ["manual"],
+    driver = "docker",
+    image = ":static_debug_nonroot_amd64_debian13.oci_layout",
+    tags = ["requires-docker"],
 )
 
 bzl_library(

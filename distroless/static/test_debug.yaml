@@ -3,7 +3,7 @@ metadataTest:
   entrypoint: ['/busybox/sh']
   envVars:
     - key: PATH
-      value: $PATH:/busybox
+      value: '$PATH:/busybox'
 fileExistenceTests:
   - name: 'busybox shell'
     path: '/busybox/sh'

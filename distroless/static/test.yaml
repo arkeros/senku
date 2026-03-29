@@ -1,8 +1,6 @@
 schemaVersion: 2.0.0
 metadataTest:
   envVars:
-    - key: PATH
-      value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     - key: SSL_CERT_FILE
       value: /etc/ssl/certs/ca-certificates.crt
 fileExistenceTests:

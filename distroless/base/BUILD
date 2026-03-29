@@ -40,9 +40,9 @@ container_structure_test(
     name = "base_test",
     size = "small",
     configs = ["test.yaml"],
-    driver = "tar",
-    image = ":base_nonroot_amd64_debian13.tar",
-    tags = ["manual"],
+    driver = "docker",
+    image = ":base_nonroot_amd64_debian13.oci_layout",
+    tags = ["requires-docker"],
 )
 
 bzl_library(
