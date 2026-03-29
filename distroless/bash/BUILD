@@ -58,7 +58,7 @@ package(default_visibility = ["//visibility:public"])
         stamp = "enabled",
         tag_list = [
             "debug" if mode else "latest",
-            "{{.STABLE_MONOREPO_VERSION}}",
+            "{{.STABLE_MONOREPO_IMAGE_TAG_VERSION}}",
             "{{.STABLE_MONOREPO_SHORT_VERSION}}",
         ],
         tags = ["manual"],
