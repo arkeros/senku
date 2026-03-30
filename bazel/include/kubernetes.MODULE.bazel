@@ -4,7 +4,7 @@ bazel_dep(name = "helm.bzl", version = "0.0.0")
 
 git_override(
     module_name = "kustomize.bzl",
-    commit = "b6e60a3",
+    commit = "922b808",
     remote = "https://github.com/arkeros/kustomize.bzl.git",
 )
 
