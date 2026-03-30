@@ -153,13 +153,20 @@ jobs:
           push-to-registry: true
 
   deploy:
-    name: Deploy registry
+    name: Deploy ${{ matrix.service }}
     if: github.event_name == 'push'
     needs: [push]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
+    strategy:
+      matrix:
+        service: [registry]
+        include:
+          - service: registry
+            target: //oci/cmd/registry/k8s
+      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -189,8 +196,8 @@ jobs:
         id: render
         run: |
           set -euxo pipefail
-          bazel build //oci/cmd/registry/k8s
-          echo "path=$(bazel cquery --output=files //oci/cmd/registry/k8s)" >> "$GITHUB_OUTPUT"
+          bazel build ${{ matrix.target }}
+          echo "path=$(bazel cquery --output=files ${{ matrix.target }})" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
