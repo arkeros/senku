@@ -15,6 +15,10 @@ def bash_image_index(name, distro, architectures):
     [
         image_index(
             name = name + mode + "_" + user + "_" + distro,
+            annotations = {
+                "org.opencontainers.image.description": "Distroless bash image" + (" (debug)" if mode else ""),
+                "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/distroless/bash/BUILD",
+            },
             manifests = [
                 name + mode + "_" + user + "_" + arch + "_" + distro
                 for arch in architectures
