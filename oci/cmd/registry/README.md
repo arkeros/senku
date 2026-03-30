@@ -21,45 +21,34 @@ and GHCR.
 
 Manifests and tags are proxied (small metadata):
 
-```
-Client                    Proxy (Cloud Run)              GHCR
-  |                           |                            |
-  |  GET /v2/redis/           |                            |
-  |  manifests/latest         |                            |
-  |-------------------------->|                            |
-  |                           |  GET /v2/arkeros/senku/    |
-  |                           |  redis/manifests/latest    |
-  |                           |--------------------------->|
-  |                           |                            |
-  |                           |  200 OK + manifest         |
-  |                           |<---------------------------|
-  |  200 OK + manifest        |                            |
-  |<--------------------------|                            |
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Proxy as Proxy (Cloud Run)
+    participant GHCR
+
+    Client->>Proxy: GET /v2/redis/manifests/latest
+    Proxy->>GHCR: GET /v2/arkeros/senku/redis/manifests/latest
+    GHCR-->>Proxy: 200 OK + manifest
+    Proxy-->>Client: 200 OK + manifest
 ```
 
 Blobs are redirected (large layer data never flows through the proxy).
 GHCR redirects to `pkg-containers.githubusercontent.com`:
 
-```
-Client                    Proxy (Cloud Run)              GHCR              CDN
-  |                           |                            |                |
-  |  GET /v2/redis/           |                            |                |
-  |  blobs/sha256:abc...      |                            |                |
-  |-------------------------->|                            |                |
-  |                           |  GET /v2/arkeros/senku/    |                |
-  |                           |  redis/blobs/sha256:abc... |                |
-  |                           |--------------------------->|                |
-  |                           |                            |                |
-  |                           |  307 Location: CDN         |                |
-  |                           |<---------------------------|                |
-  |  307 Location: CDN        |                            |                |
-  |<--------------------------|                            |                |
-  |                                                                         |
-  |  GET blob data (direct, bypasses proxy)                                 |
-  |------------------------------------------------------------------------>|
-  |                                                                         |
-  |  200 OK + blob data                                                     |
-  |<------------------------------------------------------------------------|
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Proxy as Proxy (Cloud Run)
+    participant GHCR
+    participant CDN
+
+    Client->>Proxy: GET /v2/redis/blobs/sha256:deadbeef
+    Proxy->>GHCR: GET /v2/arkeros/senku/redis/blobs/sha256:deadbeef
+    GHCR-->>Proxy: 307 Location: CDN
+    Proxy-->>Client: 307 Location: CDN
+    Client->>CDN: GET blob data (direct, bypasses proxy)
+    CDN-->>Client: 200 OK + blob data
 ```
 
 The proxy:
