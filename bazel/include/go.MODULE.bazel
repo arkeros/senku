@@ -39,4 +39,7 @@ use_repo(
     "com_github_google_go_containerregistry",
     "com_github_google_go_containerregistry_cmd_krane",
     "com_github_mikefarah_yq_v4",
+    "com_github_yannh_kubeconform",
+    "io_k8s_sigs_kustomize_kustomize_v5",
+    "sh_helm_helm_v3",
 )

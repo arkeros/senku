@@ -151,3 +151,50 @@ jobs:
           subject-digest: ${{ matrix.digest }}
           sbom-path: sbom.spdx.json
           push-to-registry: true
+
+  deploy:
+    name: Deploy registry
+    if: github.event_name == 'push'
+    needs: [push]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-version: v1.27.0
+          bazelisk-cache: true
+          repository-cache: true
+          external-cache: true
+          cache-save: false
+          bazelrc: |
+            common --config=ci
+            common --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+            build --stamp
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/874944788122/locations/global/workloadIdentityPools/github/providers/github-oidc
+          service_account: github-actions-senku@senku-prod.iam.gserviceaccount.com
+
+      - name: Render manifests
+        id: render
+        run: |
+          set -euxo pipefail
+          bazel build //oci/cmd/registry/k8s
+          echo "path=$(bazel cquery --output=files //oci/cmd/registry/k8s)" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          metadata: ${{ steps.render.outputs.path }}
+          region: europe-west3
+          project_id: senku-prod
