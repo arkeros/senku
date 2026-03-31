@@ -43,7 +43,7 @@ def frontend_image(
         owner = str(NONROOT),
         ownername = "nonroot",
         strip_prefix = None,
-        ignore_cves = None):
+        **kwargs):
     """Build a single-arch frontend image serving static files with nginx.
 
     Provide either srcs (static files) or statics_layer (pre-built tar layer).
@@ -58,7 +58,7 @@ def frontend_image(
         owner: uid for static files (default: 65532/nonroot), only used with srcs
         ownername: uname for static files (default: nonroot), only used with srcs
         strip_prefix: prefix to strip from file paths, only used with srcs
-        ignore_cves: list of CVE IDs to ignore in scanning
+        **kwargs: passed to oci_image (ignore_cves, env, etc.)
     """
     if srcs and statics_layer:
         fail("srcs and statics_layer are mutually exclusive")
@@ -73,7 +73,7 @@ def frontend_image(
         base = base or "//distroless/nginx:nginx_mainline_nonroot_" + arch + "_" + distro,
         layers = [statics_layer],
         platform = ARCHITECTURE_PLATFORMS[arch],
-        ignore_cves = ignore_cves,
+        **kwargs
     )
 
 def frontend_images_all_arch(name, srcs, base = None, distro = "debian13", **kwargs):
