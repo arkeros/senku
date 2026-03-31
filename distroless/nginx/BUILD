@@ -118,6 +118,18 @@ bzl_library(
 )
 
 bzl_library(
+    name = "frontend",
+    srcs = ["frontend.bzl"],
+    deps = [
+        ":config",
+        "//distroless:distro",
+        "//distroless/common:variables",
+        "//oci",
+        "@rules_img//img:image",
+    ],
+)
+
+bzl_library(
     name = "config",
     srcs = ["config.bzl"],
 )
