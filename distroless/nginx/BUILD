@@ -9,7 +9,7 @@ load(":config.bzl", "NGINX_ARCHITECTURES", "NGINX_DISTROS", "NGINX_TAGS", "NGINX
 load(":nginx.bzl", "nginx_image", "nginx_image_index")
 
 # CVE-2022-4899: libzstd, disputed - fixed in 2022 (https://github.com/facebook/zstd/issues/3200)
-# CVE-2026-1642: nginx stable only, fix in mainline 1.29.5+
+# CVE-2026-1642: nginx HTTP/2 HEADERS frame DoS, stable only - fixed in mainline 1.29.5+ (https://nvd.nist.gov/vuln/detail/CVE-2026-1642)
 NGINX_IGNORE_CVES = {
     "stable": [
         "CVE-2022-4899",
