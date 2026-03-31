@@ -38,7 +38,7 @@ def nginx_image(
     [
         oci_image(
             name = name + "_" + version_label + mode + "_" + user + "_" + arch + "_" + distro,
-            base = "//distroless/bash:bash" + mode + "_" + user + "_" + arch + "_" + distro,
+            base = "//distroless/base:base" + mode + "_" + user + "_" + arch + "_" + distro,
             entrypoint = ["/usr/sbin/nginx", "-e", "/dev/stderr", "-g", "daemon off;"],
             ignore_cves = ignore_cves,
             layers = [
