@@ -84,8 +84,7 @@ def frontend_images_all_arch(
         ownername = "nonroot",
         strip_prefix = None,
         distro = "debian13",
-        ignore_cves = None,
-        visibility = None):
+        ignore_cves = None):
     """Build frontend images for all architectures serving static files with nginx.
 
     Static files are placed in /var/www/html on top of the nginx base image.
@@ -101,7 +100,6 @@ def frontend_images_all_arch(
             Defaults to the current package name.
         distro: distribution to use (default: debian13)
         ignore_cves: list of CVE IDs to ignore in scanning
-        visibility: target visibility
     """
     architectures = NGINX_ARCHITECTURES[distro]
 

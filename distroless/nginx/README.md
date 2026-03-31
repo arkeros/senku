@@ -45,31 +45,47 @@ docker run --rm -p 8080:8080 \
 
 ## Frontend Images
 
-Use the `frontend_image` macro to build images for static frontends (SPAs, static sites):
+Use the macros in `frontend.bzl` to build images for static frontends (SPAs, static sites).
+Static files are placed in `/var/www/html` on top of the nginx mainline nonroot base.
+
+### Multi-arch (recommended)
+
+```starlark
+load("//distroless/nginx:frontend.bzl", "frontend_images_all_arch")
+
+frontend_images_all_arch(
+    name = "my_app",
+    srcs = [":build"],
+)
+```
+
+Creates `my_app_amd64`, `my_app_arm64`, and `my_app` (multi-arch index).
+
+### Single-arch
 
 ```starlark
 load("//distroless/nginx:frontend.bzl", "frontend_image")
 
 frontend_image(
     name = "my_app",
-    srcs = [":build"],  # your built frontend assets
+    srcs = [":build"],
+    arch = "amd64",
 )
 ```
 
-This creates multi-arch images with your static files served from `/var/www/html`. Available targets:
+Creates `my_app_amd64`.
 
-- `my_app_nonroot` / `my_app_root` - multi-arch index
-- `my_app_nonroot_amd64` / `my_app_nonroot_arm64` - per-arch images
-- `my_app_debug_nonroot` - debug variants with shell
+### Options
 
-Options:
-
-| Parameter       | Default      | Description                              |
-|-----------------|--------------|------------------------------------------|
-| `srcs`          | required     | Static files to serve                    |
-| `strip_prefix`  | package name | Prefix to strip from file paths          |
-| `version_label` | `"mainline"` | Nginx channel: `"mainline"` or `"stable"` |
-| `ignore_cves`   | `None`       | CVE IDs to ignore in scanning            |
+| Parameter       | Default           | Description                              |
+|-----------------|-------------------|------------------------------------------|
+| `srcs`          | —                 | Static files to serve                    |
+| `statics_layer` | —                 | Pre-built tar layer (alternative to srcs)|
+| `base`          | mainline nonroot  | Custom base image (dict for all_arch)    |
+| `owner`         | `"65532"`         | UID for static files                     |
+| `ownername`     | `"nonroot"`       | Username for static files                |
+| `strip_prefix`  | package name      | Prefix to strip from file paths          |
+| `ignore_cves`   | `None`            | CVE IDs to ignore in scanning            |
 
 ## Variants
 
