@@ -9,11 +9,16 @@ load(":config.bzl", "NGINX_ARCHITECTURES", "NGINX_DISTROS", "NGINX_TAGS", "NGINX
 load(":nginx.bzl", "nginx_image", "nginx_image_index")
 
 # CVE-2022-4899: libzstd, disputed - fixed in 2022 (https://github.com/facebook/zstd/issues/3200)
-# CVE-2026-1642: nginx stable, fix only in mainline 1.29.5+
-NGINX_IGNORE_CVES = [
-    "CVE-2022-4899",
-    "CVE-2026-1642",
-]
+# CVE-2026-1642: nginx stable only, fix in mainline 1.29.5+
+NGINX_IGNORE_CVES = {
+    "stable": [
+        "CVE-2022-4899",
+        "CVE-2026-1642",
+    ],
+    "mainline": [
+        "CVE-2022-4899",
+    ],
+}
 
 package(default_visibility = ["//visibility:public"])
 
@@ -49,7 +54,7 @@ tar(
         name = "nginx",
         arch = arch,
         distro = distro,
-        ignore_cves = NGINX_IGNORE_CVES,
+        ignore_cves = NGINX_IGNORE_CVES[version_label],
         version_label = version_label,
     )
     for version_label in NGINX_VERSIONS

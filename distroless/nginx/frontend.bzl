@@ -8,18 +8,20 @@ load(":config.bzl", "NGINX_ARCHITECTURES")
 def frontend_image(
         name,
         srcs,
+        base = None,
         strip_prefix = None,
         distro = "debian13",
         ignore_cves = None,
         visibility = None):
     """Build a multi-arch frontend image serving static files with nginx.
 
-    Static files are placed in /var/www/html on top of the nginx mainline
-    nonroot base image.
+    Static files are placed in /var/www/html on top of the nginx base image.
 
     Args:
         name: target name
         srcs: static files to serve (e.g., a filegroup of built frontend assets)
+        base: base image per arch, as a dict {"amd64": "//my:image_amd64", ...}.
+            Defaults to nginx mainline nonroot.
         strip_prefix: prefix to strip from file paths before placing in /var/www/html.
             Defaults to the current package name.
         distro: distribution to use (default: debian13)
@@ -27,6 +29,11 @@ def frontend_image(
         visibility: target visibility
     """
     architectures = NGINX_ARCHITECTURES[distro]
+    if not base:
+        base = {
+            arch: "//distroless/nginx:nginx_mainline_nonroot_" + arch + "_" + distro
+            for arch in architectures
+        }
 
     tar(
         name = name + "_statics_layer",
@@ -42,7 +49,7 @@ def frontend_image(
     [
         oci_image(
             name = name + "_" + arch,
-            base = "//distroless/nginx:nginx_mainline_nonroot_" + arch + "_" + distro,
+            base = base[arch],
             layers = [name + "_statics_layer"],
             platform = ARCHITECTURE_PLATFORMS[arch],
             ignore_cves = ignore_cves,
