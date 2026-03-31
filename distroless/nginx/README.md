@@ -85,7 +85,7 @@ Creates `my_app_amd64`.
 | `owner`         | `"65532"`         | UID for static files                     |
 | `ownername`     | `"nonroot"`       | Username for static files                |
 | `strip_prefix`  | package name      | Prefix to strip from file paths          |
-| `ignore_cves`   | `None`            | CVE IDs to ignore in scanning            |
+| `**kwargs`      | —                 | Passed to `oci_image` (e.g., `ignore_cves`, `env`) |
 
 ## Variants
 
