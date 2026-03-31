@@ -32,9 +32,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	proxy := proxy.New(*upstream, *repositoryPrefix)
+	handler := proxy.New(*upstream, *repositoryPrefix)
 	server := &http.Server{
-		Handler: proxy,
+		Handler: handler,
 	}
 
 	listener, err := net.Listen("tcp", ":"+*port)
