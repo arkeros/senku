@@ -20,13 +20,54 @@ def frontend_image_index(name, architectures):
         ],
     )
 
+def _statics_layer(name, srcs, owner, ownername, strip_prefix):
+    tar(
+        name = name + "_statics_layer",
+        srcs = srcs,
+        mutate = mutate(
+            owner = owner,
+            ownername = ownername,
+            package_dir = "/var/www/html",
+            strip_prefix = strip_prefix or native.package_name(),
+        ),
+    )
+    return name + "_statics_layer"
+
 def frontend_image(
         name,
-        distro,
         arch,
-        statics_layer,
+        distro = "debian13",
+        srcs = None,
+        statics_layer = None,
         base = None,
+        owner = str(NONROOT),
+        ownername = "nonroot",
+        strip_prefix = None,
         ignore_cves = None):
+    """Build a single-arch frontend image serving static files with nginx.
+
+    Provide either srcs (static files) or statics_layer (pre-built tar layer).
+
+    Args:
+        name: target name
+        arch: target architecture (e.g., "amd64")
+        distro: distribution to use (default: debian13)
+        srcs: static files to serve
+        statics_layer: pre-built tar layer (mutually exclusive with srcs)
+        base: base image. Defaults to nginx mainline nonroot.
+        owner: uid for static files (default: 65532/nonroot), only used with srcs
+        ownername: uname for static files (default: nonroot), only used with srcs
+        strip_prefix: prefix to strip from file paths, only used with srcs
+        ignore_cves: list of CVE IDs to ignore in scanning
+    """
+    if srcs and statics_layer:
+        fail("srcs and statics_layer are mutually exclusive")
+    if not srcs and not statics_layer:
+        fail("one of srcs or statics_layer is required")
+
+    if srcs:
+        statics_layer = _statics_layer(name, srcs, owner, ownername, strip_prefix)
+
     oci_image(
         name = name + "_" + arch,
         base = base or "//distroless/nginx:nginx_mainline_nonroot_" + arch + "_" + distro,
@@ -64,24 +105,14 @@ def frontend_images_all_arch(
     """
     architectures = NGINX_ARCHITECTURES[distro]
 
-    tar(
-        name = name + "_statics_layer",
-        srcs = srcs,
-        mutate = mutate(
-            owner = owner,
-            ownername = ownername,
-            package_dir = "/var/www/html",
-            strip_prefix = strip_prefix or native.package_name(),
-        ),
-        visibility = visibility,
-    )
+    layer = _statics_layer(name, srcs, owner, ownername, strip_prefix)
 
     [
         frontend_image(
             name = name,
             distro = distro,
             arch = arch,
-            statics_layer = name + "_statics_layer",
+            statics_layer = layer,
             base = base.get(arch) if base else None,
             ignore_cves = ignore_cves,
         )
