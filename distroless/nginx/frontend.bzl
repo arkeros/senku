@@ -60,6 +60,8 @@ def frontend_image(
         strip_prefix: prefix to strip from file paths, only used with srcs
         **kwargs: passed to oci_image (ignore_cves, env, etc.)
     """
+    if distro not in NGINX_ARCHITECTURES:
+        fail("unknown distro %r, expected one of: %s" % (distro, ", ".join(NGINX_ARCHITECTURES.keys())))
     if srcs and statics_layer:
         fail("srcs and statics_layer are mutually exclusive")
     if not srcs and not statics_layer:
@@ -89,9 +91,6 @@ def frontend_images_all_arch(name, srcs, base = None, distro = "debian13", **kwa
         distro: distribution to use (default: debian13)
         **kwargs: passed to frontend_image (owner, ownername, strip_prefix, ignore_cves)
     """
-    if distro not in NGINX_ARCHITECTURES:
-        fail("unknown distro %r, expected one of: %s" % (distro, ", ".join(NGINX_ARCHITECTURES.keys())))
-
     architectures = NGINX_ARCHITECTURES[distro]
 
     layer = _statics_layer(
