@@ -5,28 +5,55 @@ load("//distroless/common:variables.bzl", "NONROOT")
 load("//oci:oci.bzl", "oci_image")
 load(":config.bzl", "NGINX_ARCHITECTURES")
 
+def frontend_image_index(name, architectures):
+    """frontend image index
+
+    Args:
+        name: base name of image
+        architectures: all architectures included in index
+    """
+    image_index(
+        name = name,
+        manifests = [
+            name + "_" + arch
+            for arch in architectures
+        ],
+    )
+
 def frontend_image(
+        name,
+        distro,
+        arch,
+        statics_layer,
+        base = None,
+        ignore_cves = None):
+    oci_image(
+        name = name + "_" + arch,
+        base = base or "//distroless/nginx:nginx_mainline_nonroot_" + arch + "_" + distro,
+        layers = [statics_layer],
+        platform = ARCHITECTURE_PLATFORMS[arch],
+        ignore_cves = ignore_cves,
+    )
+
+def frontend_images_all_arch(
         name,
         srcs,
         base = None,
-        architectures = None,
         owner = str(NONROOT),
         ownername = "nonroot",
         strip_prefix = None,
         distro = "debian13",
         ignore_cves = None,
         visibility = None):
-    """Build frontend image(s) serving static files with nginx.
+    """Build frontend images for all architectures serving static files with nginx.
 
     Static files are placed in /var/www/html on top of the nginx base image.
-    When multiple architectures are specified, a multi-arch index is also created.
 
     Args:
         name: target name
         srcs: static files to serve (e.g., a filegroup of built frontend assets)
         base: base image per arch, as a dict {"amd64": "//my:image_amd64", ...}.
             Defaults to nginx mainline nonroot.
-        architectures: list of architectures to build for (default: all from distro config)
         owner: uid for static files (default: 65532/nonroot)
         ownername: uname for static files (default: nonroot)
         strip_prefix: prefix to strip from file paths before placing in /var/www/html.
@@ -35,7 +62,7 @@ def frontend_image(
         ignore_cves: list of CVE IDs to ignore in scanning
         visibility: target visibility
     """
-    architectures = architectures or NGINX_ARCHITECTURES[distro]
+    architectures = NGINX_ARCHITECTURES[distro]
 
     tar(
         name = name + "_statics_layer",
@@ -46,23 +73,22 @@ def frontend_image(
             package_dir = "/var/www/html",
             strip_prefix = strip_prefix or native.package_name(),
         ),
+        visibility = visibility,
     )
 
     [
-        oci_image(
-            name = name + "_" + arch,
-            base = base[arch] if base else "//distroless/nginx:nginx_mainline_nonroot_" + arch + "_" + distro,
-            layers = [name + "_statics_layer"],
-            platform = ARCHITECTURE_PLATFORMS[arch],
+        frontend_image(
+            name = name,
+            distro = distro,
+            arch = arch,
+            statics_layer = name + "_statics_layer",
+            base = base.get(arch) if base else None,
             ignore_cves = ignore_cves,
-            visibility = visibility,
         )
         for arch in architectures
     ]
 
-    if len(architectures) > 1:
-        image_index(
-            name = name,
-            manifests = [name + "_" + arch for arch in architectures],
-            visibility = visibility,
-        )
+    frontend_image_index(
+        name = name,
+        architectures = architectures,
+    )
