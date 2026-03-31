@@ -89,6 +89,9 @@ def frontend_images_all_arch(name, srcs, base = None, distro = "debian13", **kwa
         distro: distribution to use (default: debian13)
         **kwargs: passed to frontend_image (owner, ownername, strip_prefix, ignore_cves)
     """
+    if distro not in NGINX_ARCHITECTURES:
+        fail("unknown distro %r, expected one of: %s" % (distro, ", ".join(NGINX_ARCHITECTURES.keys())))
+
     architectures = NGINX_ARCHITECTURES[distro]
 
     layer = _statics_layer(
