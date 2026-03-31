@@ -76,15 +76,7 @@ def frontend_image(
         ignore_cves = ignore_cves,
     )
 
-def frontend_images_all_arch(
-        name,
-        srcs,
-        base = None,
-        owner = str(NONROOT),
-        ownername = "nonroot",
-        strip_prefix = None,
-        distro = "debian13",
-        ignore_cves = None):
+def frontend_images_all_arch(name, srcs, base = None, distro = "debian13", **kwargs):
     """Build frontend images for all architectures serving static files with nginx.
 
     Static files are placed in /var/www/html on top of the nginx base image.
@@ -94,16 +86,18 @@ def frontend_images_all_arch(
         srcs: static files to serve (e.g., a filegroup of built frontend assets)
         base: base image per arch, as a dict {"amd64": "//my:image_amd64", ...}.
             Defaults to nginx mainline nonroot.
-        owner: uid for static files (default: 65532/nonroot)
-        ownername: uname for static files (default: nonroot)
-        strip_prefix: prefix to strip from file paths before placing in /var/www/html.
-            Defaults to the current package name.
         distro: distribution to use (default: debian13)
-        ignore_cves: list of CVE IDs to ignore in scanning
+        **kwargs: passed to frontend_image (owner, ownername, strip_prefix, ignore_cves)
     """
     architectures = NGINX_ARCHITECTURES[distro]
 
-    layer = _statics_layer(name, srcs, owner, ownername, strip_prefix)
+    layer = _statics_layer(
+        name,
+        srcs,
+        kwargs.pop("owner", str(NONROOT)),
+        kwargs.pop("ownername", "nonroot"),
+        kwargs.pop("strip_prefix", None),
+    )
 
     [
         frontend_image(
@@ -112,7 +106,7 @@ def frontend_images_all_arch(
             arch = arch,
             statics_layer = layer,
             base = base.get(arch) if base else None,
-            ignore_cves = ignore_cves,
+            **kwargs
         )
         for arch in architectures
     ]
