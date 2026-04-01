@@ -1,4 +1,4 @@
-package updatesnapshots
+package snapshots
 
 import (
 	"fmt"
@@ -12,22 +12,22 @@ import (
 	"github.com/arkeros/senku/distroless/pkg/snapshot"
 )
 
-type Options struct {
+type updateOptions struct {
 	Path string
 }
 
-func NewCmdUpdateSnapshots() *cobra.Command {
-	o := &Options{}
+func newCmdUpdate() *cobra.Command {
+	o := &updateOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "update-snapshots <yaml-file>",
+		Use:   "update <yaml-file>",
 		Short: "Update Debian snapshot timestamps in a manifest YAML file",
 		Long: `Updates the Debian snapshot timestamps to the latest available by:
   1. Fetching the latest snapshot timestamp from snapshot.debian.org
   2. Updating all source URLs in the specified YAML file with the new timestamp
 
 Examples:
-  knife update-snapshots distroless/debian13.yaml`,
+  knife snapshots update distroless/debian13.yaml`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Path = args[0]
@@ -38,7 +38,7 @@ Examples:
 	return cmd
 }
 
-func (o *Options) Run() error {
+func (o *updateOptions) Run() error {
 	path := o.Path
 
 	// Resolve path relative to BUILD_WORKSPACE_DIRECTORY if available

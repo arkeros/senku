@@ -3,8 +3,11 @@ module github.com/arkeros/senku
 go 1.26.1
 
 require (
+	github.com/anchore/grype v0.110.0
+	github.com/bazelbuild/buildtools v0.0.0-20260319080235-05d2ebe49b0f
 	github.com/google/go-containerregistry v0.21.3
 	github.com/hashicorp/hcl/v2 v2.24.0
+	github.com/spf13/cobra v1.10.2
 	github.com/zclconf/go-cty v1.18.0
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	k8s.io/api v0.35.0
@@ -71,7 +74,6 @@ require (
 	github.com/anchore/go-struct-converter v0.1.0 // indirect
 	github.com/anchore/go-sync v0.0.0-20250714163430-add63db73ad1 // indirect
 	github.com/anchore/go-version v1.2.2-0.20210903204242-51efa5b487c4 // indirect
-	github.com/anchore/grype v0.110.0 // indirect
 	github.com/anchore/packageurl-go v0.1.1-0.20250220190351-d62adb6e1115 // indirect
 	github.com/anchore/stereoscope v0.1.22 // indirect
 	github.com/anchore/syft v1.42.3 // indirect
@@ -105,7 +107,6 @@ require (
 	github.com/awslabs/amazon-ecr-credential-helper/ecr-login v0.12.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bazelbuild/bazel-watcher v0.28.1 // indirect
-	github.com/bazelbuild/buildtools v0.0.0-20260319080235-05d2ebe49b0f // indirect
 	github.com/becheran/wildmatch-go v1.0.0 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/bitnami/go-version v0.0.0-20250505154626-452e8c5ee607 // indirect
@@ -337,7 +338,6 @@ require (
 	github.com/spdx/tools-golang v0.5.7 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
-	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spf13/viper v1.21.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect

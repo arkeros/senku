@@ -5,8 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/arkeros/senku/bazel/cmd/knife/cmd/debversions"
-	"github.com/arkeros/senku/bazel/cmd/knife/cmd/updatesnapshots"
+	"github.com/arkeros/senku/bazel/cmd/knife/cmd/debian"
+	"github.com/arkeros/senku/bazel/cmd/knife/cmd/grype"
+	"github.com/arkeros/senku/bazel/cmd/knife/cmd/snapshots"
 )
 
 var rootCmd = &cobra.Command{
@@ -16,8 +17,9 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(debversions.NewCmdDebVersions())
-	rootCmd.AddCommand(updatesnapshots.NewCmdUpdateSnapshots())
+	rootCmd.AddCommand(debian.NewCmdDebian())
+	rootCmd.AddCommand(grype.NewCmdGrype())
+	rootCmd.AddCommand(snapshots.NewCmdSnapshots())
 }
 
 func Execute(ctx context.Context) error {

@@ -1,4 +1,4 @@
-package debversions
+package debian
 
 import (
 	"fmt"
@@ -9,22 +9,22 @@ import (
 	"github.com/arkeros/senku/distroless/pkg/lockfile"
 )
 
-type Options struct {
+type versionsOptions struct {
 	Arch string
 	Path string
 }
 
-func NewCmdDebVersions() *cobra.Command {
-	o := &Options{}
+func newCmdVersions() *cobra.Command {
+	o := &versionsOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "deb-versions <lock-file>",
+		Use:   "versions <lock-file>",
 		Short: "Display package versions from a Debian lock file",
 		Long: `Extracts and displays package name and version pairs from a Debian lock file.
 
 Examples:
-  knife deb-versions distroless/debian13.lock.json
-  knife deb-versions --arch amd64 distroless/debian13.lock.json`,
+  knife deb versions distroless/debian13.lock.json
+  knife deb versions --arch amd64 distroless/debian13.lock.json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Path = args[0]
@@ -37,7 +37,7 @@ Examples:
 	return cmd
 }
 
-func (o *Options) Run() error {
+func (o *versionsOptions) Run() error {
 	lock, err := lockfile.ParseFile(o.Path)
 	if err != nil {
 		return err

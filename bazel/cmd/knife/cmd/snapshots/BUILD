@@ -1,9 +1,12 @@
 load("@rules_go//go:def.bzl", "go_library")
 
 go_library(
-    name = "updatesnapshots",
-    srcs = ["updatesnapshots.go"],
-    importpath = "github.com/arkeros/senku/bazel/cmd/knife/cmd/updatesnapshots",
+    name = "snapshots",
+    srcs = [
+        "snapshots.go",
+        "update.go",
+    ],
+    importpath = "github.com/arkeros/senku/bazel/cmd/knife/cmd/snapshots",
     visibility = ["//bazel/cmd/knife:__subpackages__"],
     deps = [
         "//distroless/pkg/snapshot",

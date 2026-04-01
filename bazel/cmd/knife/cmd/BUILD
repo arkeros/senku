@@ -6,8 +6,9 @@ go_library(
     importpath = "github.com/arkeros/senku/bazel/cmd/knife/cmd",
     visibility = ["//bazel/cmd/knife:__pkg__"],
     deps = [
-        "//bazel/cmd/knife/cmd/debversions",
-        "//bazel/cmd/knife/cmd/updatesnapshots",
+        "//bazel/cmd/knife/cmd/debian",
+        "//bazel/cmd/knife/cmd/grype",
+        "//bazel/cmd/knife/cmd/snapshots",
         "@com_github_spf13_cobra//:cobra",
     ],
 )

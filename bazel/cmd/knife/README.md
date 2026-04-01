@@ -2,6 +2,12 @@
 
 A command-line tool for managing Bazel build infrastructure tasks.
 
+The tool uses the familiar `<context> <noun> <verb>` style of CLI interactions. For example, to update the grype database, you would run:
+
+```bash
+knife grype update
+```
+
 ## Setup
 
 See the repo [Setup section](../../../README.md) for Bazelisk installation, `direnv`, `bazel run //tools:dev`, and `direnv allow`.
@@ -10,26 +16,40 @@ After that, `knife` is available from the repo root.
 
 ## Usage
 
-### deb-versions
+### deb versions
 
 Display package versions from a Debian lock file:
 
 ```bash
-knife deb-versions distroless/debian13.lock.json
+knife debian versions distroless/debian13.lock.json
 ```
 
 Filter by architecture:
 
 ```bash
-knife deb-versions --arch amd64 distroless/debian13.lock.json
+knife debian versions --arch amd64 distroless/debian13.lock.json
 ```
 
-### update-snapshots
+### grype-db update
+
+Update the grype vulnerability database to the latest version:
+
+```bash
+knife grype update
+```
+
+This command:
+
+1. Fetches the latest database metadata from grype.anchore.io
+2. Updates `bazel/include/oci.MODULE.bazel` with the new URL and SHA256
+3. Runs `bazel mod tidy` to update the lockfile
+
+### snapshots update
 
 Update Debian snapshot timestamps in a manifest YAML file:
 
 ```bash
-knife update-snapshots distroless/debian13.yaml
+knife snapshots update distroless/debian13.yaml
 ```
 
 This command:
@@ -40,12 +60,15 @@ This command:
 
 ## Architecture
 
-Commands follow the [kubectl pattern](https://github.com/kubernetes/kubectl/tree/master/pkg/cmd) with separate packages per command:
+Commands use a noun-based package structure:
 
-- `cmd/debversions/` - `deb-versions` subcommand
-- `cmd/updatesnapshots/` - `update-snapshots` subcommand
+- `cmd/debian/` - `debian` noun (verbs: `versions`)
+- `cmd/grype/` - `grype` noun (verbs: `update`)
+- `cmd/snapshots/` - `snapshots` noun (verbs: `update`)
 
-Domain logic lives in `//distroless/pkg/`:
+Shared libraries:
 
+- `bazel/pkg/grypedb` - grype database MODULE.bazel updater (via buildtools AST)
+- `bazel/pkg/mod` - `bazel mod tidy` helper
 - `distroless/pkg/lockfile` - Debian lock file parsing
-- `distroless/pkg/snapshot` - Manifest parsing and snapshot fetching
+- `distroless/pkg/snapshot` - manifest parsing and snapshot fetching

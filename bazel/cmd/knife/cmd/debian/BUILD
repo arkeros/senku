@@ -1,9 +1,12 @@
 load("@rules_go//go:def.bzl", "go_library")
 
 go_library(
-    name = "debversions",
-    srcs = ["debversions.go"],
-    importpath = "github.com/arkeros/senku/bazel/cmd/knife/cmd/debversions",
+    name = "debian",
+    srcs = [
+        "debian.go",
+        "versions.go",
+    ],
+    importpath = "github.com/arkeros/senku/bazel/cmd/knife/cmd/debian",
     visibility = ["//bazel/cmd/knife:__subpackages__"],
     deps = [
         "//distroless/pkg/lockfile",
