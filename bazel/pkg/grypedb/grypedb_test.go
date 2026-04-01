@@ -7,21 +7,15 @@ import (
 	"testing"
 )
 
-const testModuleContent = `bazel_dep(name = "grype.bzl", version = "0.1.0")
-
-grype_db = use_extension("@grype.bzl//grype:extensions.bzl", "grype_database")
-grype_db.database(
-    name = "grype_database",
-    sha256 = "oldsha256hash",
-    url = "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.3_2026-03-20T00:00:00Z_1234567890.tar.zst",
-)
-use_repo(grype_db, "grype_database")
-`
-
 func TestUpdateModuleFile(t *testing.T) {
+	// Copy fixture to tmpdir since UpdateModuleFile modifies the file in place
+	fixture, err := os.ReadFile("testdata/module.bazel")
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "oci.MODULE.bazel")
-	if err := os.WriteFile(path, []byte(testModuleContent), 0o644); err != nil {
+	if err := os.WriteFile(path, fixture, 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 

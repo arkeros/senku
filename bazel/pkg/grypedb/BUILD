@@ -14,5 +14,6 @@ go_library(
 go_test(
     name = "grypedb_test",
     srcs = ["grypedb_test.go"],
+    data = glob(["testdata/**"]),
     embed = [":grypedb"],
 )

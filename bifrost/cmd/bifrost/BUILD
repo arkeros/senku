@@ -35,9 +35,5 @@ go_test(
     srcs = ["bifrost_test.go"],
     data = glob(["testdata/**"]),
     embed = [":bifrost_lib"],
-    embedsrcs = [
-        "testdata/cronjob.yaml",
-        "testdata/service.yaml",
-    ],
     deps = ["//bifrost/pkg/api/v1alpha1"],
 )

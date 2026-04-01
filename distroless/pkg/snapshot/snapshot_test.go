@@ -51,30 +51,7 @@ func TestUpdateSnapshotURL(t *testing.T) {
 }
 
 func TestParseManifest(t *testing.T) {
-	content := `version: 1
-sources:
-  - channel: trixie main contrib
-    urls:
-      - https://snapshot-cloudflare.debian.org/archive/debian/20260320T143128Z
-      - https://snapshot.debian.org/archive/debian/20260320T143128Z
-  - channel: trixie-security main
-    url: https://snapshot-cloudflare.debian.org/archive/debian-security/20260320T001422Z
-  - channel: trixie-updates main
-    url: https://snapshot.debian.org/archive/debian/20260320T143128Z/
-archs:
-  - amd64
-  - arm64
-packages:
-  - base-files
-  - libc6
-`
-	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "test.yaml")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("failed to write test file: %v", err)
-	}
-
-	manifest, err := ParseManifest(path)
+	manifest, err := ParseManifest("testdata/manifest.yaml")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -97,31 +74,14 @@ packages:
 }
 
 func TestUpdateManifestTimestamps(t *testing.T) {
-	content := `#  Anytime this file is changed, the lockfile needs to be regenerated.
-#
-#  To generate the trixie.lock.json run the following command
-#
-#     bazel run @trixie//:lock
-version: 1
-sources:
-  - channel: trixie main contrib
-    urls:
-      - https://snapshot-cloudflare.debian.org/archive/debian/20260320T143128Z
-      - https://snapshot.debian.org/archive/debian/20260320T143128Z
-  - channel: trixie-security main
-    url: https://snapshot-cloudflare.debian.org/archive/debian-security/20260320T001422Z
-  - channel: trixie-updates main
-    url: https://snapshot.debian.org/archive/debian/20260320T143128Z/
-archs:
-  - amd64
-  - arm64
-packages:
-  - base-files
-  - libc6
-`
+	// Copy fixture to tmpdir since WriteFile modifies the file in place
+	fixture, err := os.ReadFile("testdata/manifest_with_header.yaml")
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "test.yaml")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(path, fixture, 0o644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 

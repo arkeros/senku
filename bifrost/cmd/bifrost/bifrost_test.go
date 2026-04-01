@@ -1,19 +1,12 @@
 package main
 
 import (
-	_ "embed"
 	"os"
 	"strings"
 	"testing"
 
 	bifrostv1alpha1 "github.com/arkeros/senku/bifrost/pkg/api/v1alpha1"
 )
-
-//go:embed testdata/service.yaml
-var serviceFixture string
-
-//go:embed testdata/cronjob.yaml
-var cronJobFixture string
 
 func TestRenderCloudRun(t *testing.T) {
 	t.Parallel()
@@ -303,12 +296,9 @@ spec:
 }
 
 func loadSpecFixture(name string) (bifrostv1alpha1.Workload, error) {
-	switch name {
-	case "service.yaml":
-		return bifrostv1alpha1.Parse(strings.NewReader(serviceFixture))
-	case "cronjob.yaml":
-		return bifrostv1alpha1.Parse(strings.NewReader(cronJobFixture))
-	default:
-		return bifrostv1alpha1.Workload{}, os.ErrNotExist
+	data, err := os.ReadFile("testdata/" + name)
+	if err != nil {
+		return bifrostv1alpha1.Workload{}, err
 	}
+	return bifrostv1alpha1.Parse(strings.NewReader(string(data)))
 }
