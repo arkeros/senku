@@ -153,8 +153,8 @@ func (s *Workload) Validate() error {
 	} else if projectID != s.Spec.GCP.ProjectID {
 		return fmt.Errorf("spec.serviceAccountName project %q does not match spec.gcp.projectId %q", projectID, s.Spec.GCP.ProjectID)
 	}
-	if s.Kind == KindService && s.Spec.Port <= 0 {
-		return fmt.Errorf("spec.port must be greater than zero")
+	if s.Kind == KindService && (s.Spec.Port < 1 || s.Spec.Port > 65535) {
+		return fmt.Errorf("spec.port must be between 1 and 65535")
 	}
 	if s.Spec.Resources.Limits == nil {
 		s.Spec.Resources.Limits = corev1.ResourceList{}
@@ -185,6 +185,12 @@ func (s *Workload) Validate() error {
 	}
 	if err := validateResourceQuantity("spec.resources.limits.memory", s.Spec.Resources.Limits[corev1.ResourceMemory]); err != nil {
 		return err
+	}
+	if reqCPU := s.Spec.Resources.Requests[corev1.ResourceCPU]; reqCPU.Cmp(s.Spec.Resources.Limits[corev1.ResourceCPU]) > 0 {
+		return fmt.Errorf("spec.resources.requests.cpu must be <= spec.resources.limits.cpu")
+	}
+	if reqMem := s.Spec.Resources.Requests[corev1.ResourceMemory]; reqMem.Cmp(s.Spec.Resources.Limits[corev1.ResourceMemory]) > 0 {
+		return fmt.Errorf("spec.resources.requests.memory must be <= spec.resources.limits.memory")
 	}
 	if s.Spec.GCP.CloudRun.Region == "" {
 		return fmt.Errorf("spec.gcp.cloudRun.region is required")
