@@ -29,7 +29,6 @@ metadata:
   name: registry
 spec:
   image: registry
-  serviceAccountName: registry-sa@senku-prod.iam.gserviceaccount.com
   args:
     - --upstream=ghcr.io
     - --repository-prefix=arkeros/senku
@@ -133,15 +132,15 @@ This separation is deliberate. Anything that means the same thing on both platfo
 
 ## Explicit Identity
 
-`serviceAccountName` is required and must be a Google service account email.
+`serviceAccountName` is optional. If omitted, `bifrost` generates a default Google service account email from `metadata.name` and `gcp.projectId`.
 
-This is a security decision, so `bifrost` does not invent it automatically. The identity must be visible in the source spec for review.
+You can still set it explicitly when the workload must run as a specific identity.
 
 Why:
 
-- runtime identity should be explicit
+- the common case becomes zero-config
 - deploy and infra ownership stay separate
-- Terraform can create the GSA while deploy artifacts simply reference it
+- Terraform can create the GSA while deploy artifacts reference the resulting identity
 - the model avoids silent fallback to default service accounts
 
 Identity is rendered differently by target:
@@ -262,9 +261,8 @@ Examples:
 
 - `metadata.name` is required
 - `spec.image` is required
-- `spec.serviceAccountName` is required
-- `spec.serviceAccountName` must be a GSA email
 - `spec.port` must be positive
+- `spec.serviceAccountName`, if set, must be a GSA email
 - CPU and memory limits are required
 - CPU and memory requests default to limits when omitted
 - `gcp.projectId` is required
@@ -281,7 +279,7 @@ Defaults are only applied for low-risk operational knobs:
 The general rule is:
 
 - default convenience settings
-- require explicit security and identity settings
+- require explicit project and platform settings
 
 ## Current Scope
 

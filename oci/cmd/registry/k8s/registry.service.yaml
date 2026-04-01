@@ -38,7 +38,7 @@ spec:
           httpGet:
             path: /v2/
             port: 8080
-      serviceAccountName: registry-sa@senku-prod.iam.gserviceaccount.com
+      serviceAccountName: svc-registry@senku-prod.iam.gserviceaccount.com
   traffic:
   - latestRevision: true
     percent: 100

@@ -14,7 +14,6 @@ metadata:
   name: registry
 spec:
   image: registry
-  serviceAccountName: registry-sa@senku-prod.iam.gserviceaccount.com
   args:
     - --upstream=ghcr.io
     - --repository-prefix=arkeros/senku
@@ -55,7 +54,7 @@ func TestRenderCloudRun(t *testing.T) {
 		"apiVersion: serving.knative.dev/v1",
 		"kind: Service",
 		"name: registry",
-		"serviceAccountName: registry-sa@senku-prod.iam.gserviceaccount.com",
+		"serviceAccountName: svc-registry@senku-prod.iam.gserviceaccount.com",
 		"containerConcurrency: 80",
 		"minScale: \"0\"",
 		"run.googleapis.com/execution-environment: gen2",
@@ -90,7 +89,7 @@ func TestRenderKubernetes(t *testing.T) {
 		"kind: HorizontalPodAutoscaler",
 		"kind: Service",
 		"namespace: default",
-		"iam.gke.io/gcp-service-account: registry-sa@senku-prod.iam.gserviceaccount.com",
+		"iam.gke.io/gcp-service-account: svc-registry@senku-prod.iam.gserviceaccount.com",
 		"serviceAccountName: registry",
 		"requests:",
 		"cpu: 250m",
@@ -120,10 +119,10 @@ func TestRenderTerraform(t *testing.T) {
 		t.Fatalf("RenderTerraform() error = %v", err)
 	}
 	for _, want := range []string{
-		`resource "google_service_account" "registry_sa" {`,
-		`resource "google_service_account_iam_member" "registry_sa_workload_identity" {`,
+		`resource "google_service_account" "svc_registry" {`,
+		`resource "google_service_account_iam_member" "svc_registry_workload_identity" {`,
 		`project      = var.project_id`,
-		`account_id   = "registry-sa"`,
+		`account_id   = "svc-registry"`,
 		`display_name = "Runtime identity for registry"`,
 		`role               = "roles/iam.workloadIdentityUser"`,
 		`member             = format("serviceAccount:%s.svc.id.goog[%s/%s]", var.project_id, "default", "registry")`,
@@ -150,12 +149,11 @@ spec:
       cpu: 1000m
       memory: 256Mi
   gcp:
-    projectId: senku-prod
     cloudRun:
       region: europe-west3
 `))
-	if err == nil || !strings.Contains(err.Error(), "serviceAccountName") {
-		t.Fatalf("ParseServiceSpec() error = %v, want serviceAccountName validation", err)
+	if err == nil || !strings.Contains(err.Error(), "projectId") {
+		t.Fatalf("ParseServiceSpec() error = %v, want projectId validation", err)
 	}
 }
 
@@ -181,5 +179,8 @@ func TestParseServiceSpecAppliesDefaults(t *testing.T) {
 	}
 	if got, want := spec.Spec.Kubernetes.Namespace, "default"; got != want {
 		t.Fatalf("spec.Spec.Kubernetes.Namespace = %q, want %q", got, want)
+	}
+	if got, want := spec.Spec.ServiceAccountName, "svc-registry@senku-prod.iam.gserviceaccount.com"; got != want {
+		t.Fatalf("spec.Spec.ServiceAccountName = %q, want %q", got, want)
 	}
 }

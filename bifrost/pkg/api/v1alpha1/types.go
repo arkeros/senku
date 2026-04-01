@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -95,14 +96,18 @@ func (s *Service) Validate() error {
 	if s.Spec.Image == "" {
 		return fmt.Errorf("spec.image is required")
 	}
+	if s.Spec.GCP.ProjectID == "" {
+		return fmt.Errorf("spec.gcp.projectId is required")
+	}
 	if s.Spec.ServiceAccountName == "" {
-		return fmt.Errorf("spec.serviceAccountName is required")
+		accountID, err := defaultServiceAccountAccountID(s.Metadata.Name)
+		if err != nil {
+			return err
+		}
+		s.Spec.ServiceAccountName = fmt.Sprintf("%s@%s.iam.gserviceaccount.com", accountID, s.Spec.GCP.ProjectID)
 	}
 	if !strings.Contains(s.Spec.ServiceAccountName, "@") {
 		return fmt.Errorf("spec.serviceAccountName must be a Google service account email")
-	}
-	if s.Spec.GCP.ProjectID == "" {
-		return fmt.Errorf("spec.gcp.projectId is required")
 	}
 	if projectID, err := projectIDFromServiceAccountEmail(s.Spec.ServiceAccountName); err != nil {
 		return err
@@ -192,4 +197,26 @@ func projectIDFromServiceAccountEmail(email string) (string, error) {
 		return "", fmt.Errorf("spec.serviceAccountName must be a Google service account email")
 	}
 	return strings.TrimSuffix(domain, suffix), nil
+}
+
+func defaultServiceAccountAccountID(serviceName string) (string, error) {
+	var out strings.Builder
+	for _, r := range strings.TrimSpace(serviceName) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			out.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			out.WriteRune(unicode.ToLower(r))
+		case r == '-', r == '.':
+			out.WriteByte('-')
+		}
+	}
+	if out.Len() == 0 {
+		return "", fmt.Errorf("metadata.name does not produce a valid default service account")
+	}
+	accountID := "svc-" + strings.Trim(out.String(), "-")
+	if len(accountID) < 6 || len(accountID) > 30 {
+		return "", fmt.Errorf("default service account account ID %q must be between 6 and 30 characters", accountID)
+	}
+	return accountID, nil
 }

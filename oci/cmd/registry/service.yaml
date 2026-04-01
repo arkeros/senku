@@ -4,7 +4,6 @@ metadata:
   name: registry
 spec:
   image: registry
-  serviceAccountName: registry-sa@senku-prod.iam.gserviceaccount.com
   args:
     - --upstream=ghcr.io
     - --repository-prefix=arkeros/senku
