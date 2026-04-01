@@ -28,13 +28,13 @@ func newCmdUpdate() *cobra.Command {
 		Use:   "update",
 		Short: "Update the grype vulnerability database to the latest version",
 		Long: `Updates the grype vulnerability database to the latest version by:
-  1. Fetching the latest database metadata from grype.anchore.io
-  2. Downloading the database tarball and computing its SHA256
-  3. Updating the MODULE.bazel include file with the new URL and SHA256
+  1. Fetching the latest database metadata (URL and SHA256) from grype.anchore.io
+  2. Updating the MODULE.bazel include file with the new URL and SHA256
+  3. Running bazel mod tidy to update the lockfile
 
 Examples:
-  knife grype-db update
-  knife grype-db update --module-file bazel/include/oci.MODULE.bazel`,
+  knife grype update
+  knife grype update --module-file bazel/include/oci.MODULE.bazel`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return o.Run(cmd.Context())
 		},
