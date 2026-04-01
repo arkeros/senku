@@ -36,6 +36,7 @@ lazy_bazel_env(
         "gazelle": "//:gazelle",
         # "flake8": "@pip//flake8:pkg",
         # "prettier": "//tools/format:prettier",
+        "bifrost": "//bifrost/cmd/bifrost",
     } | {
         t: "@multitool//tools/" + t
         for t in MULTITOOLS

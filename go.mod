@@ -2,7 +2,16 @@ module github.com/arkeros/senku
 
 go 1.26.1
 
-require github.com/google/go-containerregistry v0.21.3
+require (
+	github.com/google/go-containerregistry v0.21.3
+	github.com/hashicorp/hcl/v2 v2.24.0
+	github.com/zclconf/go-cty v1.18.0
+	go.yaml.in/yaml/v4 v4.0.0-rc.4
+	k8s.io/api v0.35.0
+	k8s.io/apimachinery v0.35.0
+	knative.dev/serving v0.48.1
+	sigs.k8s.io/yaml v1.6.0
+)
 
 require (
 	cel.dev/expr v0.25.1 // indirect
@@ -102,6 +111,7 @@ require (
 	github.com/bitnami/go-version v0.0.0-20250505154626-452e8c5ee607 // indirect
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/blendle/zapdriver v1.3.1 // indirect
 	github.com/bmatcuk/doublestar/v2 v2.0.4 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
@@ -159,6 +169,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
+	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/facebookincubator/nvdtools v0.1.5 // indirect
 	github.com/fatih/color v1.18.0 // indirect
@@ -181,7 +192,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
-	github.com/go-openapi/jsonreference v0.20.2 // indirect
+	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-restruct/restruct v1.2.0-alpha // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
@@ -219,7 +230,6 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	github.com/hashicorp/go-version v1.8.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
-	github.com/hashicorp/hcl/v2 v2.24.0 // indirect
 	github.com/henvic/httpretty v0.1.4 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
@@ -349,22 +359,22 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yannh/kubeconform v0.7.0 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
-	github.com/zclconf/go-cty v1.18.0 // indirect
 	github.com/zyedidia/generic v1.2.2-0.20230320175451-4410d2372cb1 // indirect
 	go.etcd.io/bbolt v1.4.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.39.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0 // indirect
 	go.opentelemetry.io/otel v1.40.0 // indirect
 	go.opentelemetry.io/otel/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.40.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	go.yaml.in/yaml/v4 v4.0.0-rc.3 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
@@ -378,6 +388,7 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
+	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 	google.golang.org/api v0.267.0 // indirect
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
@@ -392,9 +403,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/gorm v1.31.1 // indirect
 	helm.sh/helm/v3 v3.20.0 // indirect
-	k8s.io/api v0.35.0 // indirect
 	k8s.io/apiextensions-apiserver v0.35.0 // indirect
-	k8s.io/apimachinery v0.35.0 // indirect
 	k8s.io/apiserver v0.35.0 // indirect
 	k8s.io/cli-runtime v0.35.0 // indirect
 	k8s.io/client-go v0.35.0 // indirect
@@ -403,6 +412,8 @@ require (
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect
 	k8s.io/kubectl v0.35.0 // indirect
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
+	knative.dev/networking v0.0.0-20260120131110-a7cdca238a0d // indirect
+	knative.dev/pkg v0.0.0-20260120122510-4a022ed9999a // indirect
 	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
@@ -415,7 +426,6 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
-	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
 tool (
