@@ -165,7 +165,7 @@ jobs:
         service: [registry]
         include:
           - service: registry
-            target: //oci/cmd/registry/k8s
+            target: //oci/deploy:k8s
       fail-fast: false
     steps:
       - name: Checkout
@@ -203,5 +203,3 @@ jobs:
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           metadata: ${{ steps.render.outputs.path }}
-          region: europe-west3
-          project_id: senku-prod

@@ -11,7 +11,6 @@ go_library(
     deps = [
         "//bifrost/pkg/api/v1alpha1",
         "@com_github_hashicorp_hcl_v2//:hcl",
-        "@com_github_hashicorp_hcl_v2//hclsyntax",
         "@com_github_hashicorp_hcl_v2//hclwrite",
         "@com_github_zclconf_go_cty//cty",
         "@dev_knative_serving//pkg/apis/serving/v1:serving",

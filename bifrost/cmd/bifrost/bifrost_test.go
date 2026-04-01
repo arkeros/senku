@@ -54,6 +54,7 @@ func TestRenderCloudRun(t *testing.T) {
 		"apiVersion: serving.knative.dev/v1",
 		"kind: Service",
 		"name: registry",
+		"namespace: senku-prod",
 		"serviceAccountName: svc-registry@senku-prod.iam.gserviceaccount.com",
 		"containerConcurrency: 80",
 		"minScale: \"0\"",
@@ -114,18 +115,18 @@ func TestRenderTerraform(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseServiceSpec() error = %v", err)
 	}
-	got, err := RenderTerraform(spec, "var.project_id")
+	got, err := RenderTerraform(spec)
 	if err != nil {
 		t.Fatalf("RenderTerraform() error = %v", err)
 	}
 	for _, want := range []string{
 		`resource "google_service_account" "svc_registry" {`,
 		`resource "google_service_account_iam_member" "svc_registry_workload_identity" {`,
-		`project      = var.project_id`,
+		`project      = "senku-prod"`,
 		`account_id   = "svc-registry"`,
 		`display_name = "Runtime identity for registry"`,
 		`role               = "roles/iam.workloadIdentityUser"`,
-		`member             = format("serviceAccount:%s.svc.id.goog[%s/%s]", var.project_id, "default", "registry")`,
+		`member             = "serviceAccount:senku-prod.svc.id.goog[default/registry]"`,
 	} {
 		if !strings.Contains(string(got), want) {
 			t.Fatalf("terraform output missing %q\n%s", want, got)

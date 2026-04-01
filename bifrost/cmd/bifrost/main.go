@@ -12,15 +12,13 @@ import (
 
 func main() {
 	if len(os.Args) < 3 || os.Args[1] != "render" {
-		log.Fatalf("usage: bifrost render <cloudrun|k8s|terraform> -f <service.yaml>")
+		log.Fatalf("usage: bifrost render <cloudrun|k8s|terraform> -f <service.{yaml,json}>")
 	}
 
 	target := os.Args[2]
 	fs := flag.NewFlagSet("render", flag.ExitOnError)
 	var inputPath string
-	var projectExpr string
-	fs.StringVar(&inputPath, "f", "", "Path to the service spec YAML")
-	fs.StringVar(&projectExpr, "project_expr", "", "Optional Terraform expression used for the GCP project instead of spec.gcp.projectId")
+	fs.StringVar(&inputPath, "f", "", "Path to the service spec YAML or JSON")
 	if err := fs.Parse(os.Args[3:]); err != nil {
 		log.Fatal(err)
 	}
@@ -48,7 +46,7 @@ func main() {
 	case "k8s":
 		out, err = RenderKubernetes(spec)
 	case "terraform":
-		out, err = RenderTerraform(spec, projectExpr)
+		out, err = RenderTerraform(spec)
 	default:
 		log.Fatalf("unsupported render target %q", target)
 	}

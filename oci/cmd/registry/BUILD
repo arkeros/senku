@@ -4,7 +4,10 @@ load("//distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE")
 load("//distroless/go:go.bzl", "go_images_all_arch")
 load("//oci:config.bzl", "OCI_REGISTRY", "OCI_REPOSITORY_PREFIX")
 
-package(default_visibility = ["//oci/cmd/registry:__subpackages__"])
+package(default_visibility = [
+    "//oci/cmd/registry:__subpackages__",
+    "//oci/deploy:__pkg__",
+])
 
 go_library(
     name = "registry_lib",
