@@ -502,8 +502,6 @@ func containerForSpec(spec bifrostv1alpha1.Spec, includePorts bool, includeProbe
 		VolumeMounts: slicesCloneVolumeMounts(spec.VolumeMounts),
 		SecurityContext: &corev1.SecurityContext{
 			RunAsNonRoot:             &trueVal,
-			RunAsUser:                int64Ptr(65534),
-			RunAsGroup:               int64Ptr(65534),
 			AllowPrivilegeEscalation: &falseVal,
 			ReadOnlyRootFilesystem:   &trueVal,
 			Capabilities: &corev1.Capabilities{
@@ -651,17 +649,10 @@ func int32Ptr(v int32) *int32 {
 	return &v
 }
 
-func int64Ptr(v int64) *int64 {
-	return &v
-}
-
 func podSpecWithSecurityContext(spec corev1.PodSpec) corev1.PodSpec {
 	trueVal := true
 	spec.SecurityContext = &corev1.PodSecurityContext{
 		RunAsNonRoot: &trueVal,
-		RunAsUser:    int64Ptr(65534),
-		RunAsGroup:   int64Ptr(65534),
-		FSGroup:      int64Ptr(65534),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
