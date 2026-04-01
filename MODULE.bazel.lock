@@ -405,7 +405,7 @@
     },
     "@@aspect_rules_py+//uv/private/tomltool:extension.bzl%tomltool": {
       "general": {
-        "bzlTransitiveDigest": "9vt5DM848gBSxQ0T+sjZbTbMJJV0ZXAd7Mx89jwI3Yc=",
+        "bzlTransitiveDigest": "mbjw0uU9T58FYI30+rYWIEXcP4orWqCECfegiaPCN5E=",
         "usagesDigest": "tjvxKH1kGH8p25YnsJXWGlEXUtfmcvSKHUtTKCM1HYs=",
         "recordedInputs": [
           "REPO_MAPPING:aspect_rules_py+,bazel_tools bazel_tools"
@@ -771,7 +771,7 @@
     },
     "@@protobuf+//python/dist:system_python.bzl%system_python_extension": {
       "general": {
-        "bzlTransitiveDigest": "qh0n9IrXU/xS94wxKQrG1J63zrLkA1Wy2Y3BQxptPcI=",
+        "bzlTransitiveDigest": "XIzUjPrPvfZw+ee/BZaUhkKywlpB0qAKyTi/+DyC/XI=",
         "usagesDigest": "AF5a9lHFrJtHw1GTt3jJOs7ZYl1+N2bkn1LbPFLoguA=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
@@ -786,11 +786,11 @@
     },
     "@@pybind11_bazel+//:internal_configure.bzl%internal_configure_extension": {
       "general": {
-        "bzlTransitiveDigest": "06cynZ1bCvvy8zHPrrDlXq+Z68xmjctHpfFxi+zEpJY=",
+        "bzlTransitiveDigest": "53kgvDiJoicCJNGFz6d2h61Tuh/fKfR+BEDbe+9/8SY=",
         "usagesDigest": "D1r3lfzMuUBFxgG8V6o0bQTLMk3GkaGOaPzw53wrwyw=",
         "recordedInputs": [
           "REPO_MAPPING:pybind11_bazel+,bazel_tools bazel_tools",
-          "FILE:@@pybind11_bazel+//MODULE.bazel e6f4c20442eaa7c90d7190d8dc539d0ab422f95c65a57cc59562170c58ae3d34"
+          "FILE:@@pybind11_bazel+//MODULE.bazel 45d98c531db5f8430f847b195357dca36665d9c926cbbee77a85105fc6865d27"
         ],
         "generatedRepoSpecs": {
           "pybind11": {
@@ -808,7 +808,7 @@
     },
     "@@rules_android+//bzlmod_extensions:apksig.bzl%apksig_extension": {
       "general": {
-        "bzlTransitiveDigest": "KrgiB8lWxqVdbipL9YIYOuGjS80xlZIM/EBvUg8SVd0=",
+        "bzlTransitiveDigest": "QzE5n3a0ZNwDIAfX/Q++VwbTWQIY01JPBzCwBrUscn0=",
         "usagesDigest": "zr/niBQ/s2fHozWAsg4vI70wAxcuFjG+QtM15qGkq9o=",
         "recordedInputs": [
           "REPO_MAPPING:rules_android+,bazel_tools bazel_tools"
@@ -826,7 +826,7 @@
     },
     "@@rules_android+//bzlmod_extensions:com_android_dex.bzl%com_android_dex_extension": {
       "general": {
-        "bzlTransitiveDigest": "WYXjwqaZbEnV+ZWsKE3oDMpF5XVw8hxzet83NtyT8TM=",
+        "bzlTransitiveDigest": "W9wAo4mHGeY9AuYu7VXzxhBl3ZO/Q7hdw7wafzxshwg=",
         "usagesDigest": "c1Y/KGGjUYCyd8zNIVTUh1bynVXRFz6xGKaSCBpQANM=",
         "recordedInputs": [
           "REPO_MAPPING:rules_android+,bazel_tools bazel_tools"
