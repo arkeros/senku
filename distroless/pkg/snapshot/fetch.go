@@ -12,7 +12,8 @@ func FetchLatestSnapshot(archiveURL string) (string, error) {
 	now := time.Now().UTC()
 	url := fmt.Sprintf("%s?year=%d&month=%d", archiveURL, now.Year(), int(now.Month()))
 
-	resp, err := http.Get(url)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch %s: %w", url, err)
 	}
