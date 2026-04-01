@@ -95,6 +95,9 @@ func (m *Manifest) WriteFile(path string) error {
 	if err := enc.Encode(m); err != nil {
 		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
+	if err := enc.Close(); err != nil {
+		return fmt.Errorf("failed to close yaml encoder: %w", err)
+	}
 
 	var content string
 	if m.header != "" {
