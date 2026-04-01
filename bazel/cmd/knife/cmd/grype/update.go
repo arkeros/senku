@@ -88,11 +88,9 @@ func (o *updateOptions) Run(ctx context.Context) error {
 	// Update lockfile
 	slog.Info("Updating MODULE.bazel.lock")
 	if err := mod.Tidy(ctx); err != nil {
-		fmt.Printf("\n⚠ Warning: Failed to update MODULE.bazel.lock: %v\n", err)
-		fmt.Printf("  You may need to run: bazel mod tidy\n")
-	} else {
-		fmt.Printf("✓ Updated MODULE.bazel.lock\n")
+		return fmt.Errorf("failed to update lockfile: %w", err)
 	}
+	fmt.Printf("✓ Updated MODULE.bazel.lock\n")
 
 	return nil
 }
