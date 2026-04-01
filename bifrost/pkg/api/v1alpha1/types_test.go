@@ -67,6 +67,37 @@ func TestValidate_Port(t *testing.T) {
 	}
 }
 
+func TestParse_RejectsUnknownFields(t *testing.T) {
+	t.Parallel()
+
+	yaml := `
+apiVersion: bifrost.arkeros.dev/v1alpha1
+kind: Service
+metadata:
+  name: test-svc
+spec:
+  image: test-image
+  port: 8080
+  servceAccountName: typo@my-project.iam.gserviceaccount.com
+  resources:
+    limits:
+      cpu: "1"
+      memory: 256Mi
+  gcp:
+    projectId: my-project
+    projectNumber: "123456"
+    cloudRun:
+      region: us-central1
+`
+	_, err := Parse(strings.NewReader(yaml))
+	if err == nil {
+		t.Fatal("expected error for unknown field servceAccountName, got nil")
+	}
+	if !strings.Contains(err.Error(), "servceAccountName") {
+		t.Fatalf("error should mention the unknown field, got: %v", err)
+	}
+}
+
 func TestValidate_CloudRunIngress(t *testing.T) {
 	t.Parallel()
 

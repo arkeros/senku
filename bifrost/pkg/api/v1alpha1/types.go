@@ -18,86 +18,86 @@ const (
 )
 
 type Workload struct {
-	APIVersion string     `yaml:"apiVersion"`
-	Kind       string     `yaml:"kind"`
-	Metadata   ObjectMeta `yaml:"metadata"`
-	Spec       Spec       `yaml:"spec"`
+	APIVersion string     `json:"apiVersion"`
+	Kind       string     `json:"kind"`
+	Metadata   ObjectMeta `json:"metadata"`
+	Spec       Spec       `json:"spec"`
 }
 
 type Service = Workload
 
 type ObjectMeta struct {
-	Name   string            `yaml:"name"`
-	Labels map[string]string `yaml:"labels"`
+	Name   string            `json:"name"`
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 type Spec struct {
-	Image              string                      `yaml:"image"`
-	ServiceAccountName string                      `yaml:"serviceAccountName"`
-	Args               []string                    `yaml:"args"`
-	Port               int32                       `yaml:"port"`
-	Resources          corev1.ResourceRequirements `yaml:"resources"`
-	VolumeMounts       []corev1.VolumeMount        `yaml:"volumeMounts"`
-	Volumes            []corev1.Volume             `yaml:"volumes"`
-	Probes             ProbeSpec                   `yaml:"probes"`
-	Autoscaling        AutoscalingSpec             `yaml:"autoscaling"`
-	Schedule           ScheduleSpec                `yaml:"schedule"`
-	Job                JobSpec                     `yaml:"job"`
-	GCP                GCPSpec                     `yaml:"gcp"`
-	Kubernetes         KubernetesSpec              `yaml:"kubernetes"`
+	Image              string                      `json:"image"`
+	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
+	Args               []string                    `json:"args,omitempty"`
+	Port               int32                       `json:"port,omitempty"`
+	Resources          corev1.ResourceRequirements `json:"resources"`
+	VolumeMounts       []corev1.VolumeMount        `json:"volumeMounts,omitempty"`
+	Volumes            []corev1.Volume             `json:"volumes,omitempty"`
+	Probes             ProbeSpec                   `json:"probes,omitempty"`
+	Autoscaling        AutoscalingSpec             `json:"autoscaling,omitempty"`
+	Schedule           ScheduleSpec                `json:"schedule,omitempty"`
+	Job                JobSpec                     `json:"job,omitempty"`
+	GCP                GCPSpec                     `json:"gcp"`
+	Kubernetes         KubernetesSpec              `json:"kubernetes,omitempty"`
 }
 
 type GCPSpec struct {
-	ProjectID      string             `yaml:"projectId"`
-	ProjectNumber  string             `yaml:"projectNumber"`
-	CloudScheduler CloudSchedulerSpec `yaml:"cloudScheduler"`
-	CloudRun       CloudRunSpec       `yaml:"cloudRun"`
+	ProjectID      string             `json:"projectId"`
+	ProjectNumber  string             `json:"projectNumber"`
+	CloudScheduler CloudSchedulerSpec `json:"cloudScheduler,omitempty"`
+	CloudRun       CloudRunSpec       `json:"cloudRun"`
 }
 
 type ProbeSpec struct {
-	StartupPath  string `yaml:"startupPath"`
-	LivenessPath string `yaml:"livenessPath"`
+	StartupPath  string `json:"startupPath,omitempty"`
+	LivenessPath string `json:"livenessPath,omitempty"`
 }
 
 type CloudRunSpec struct {
-	Region               string `yaml:"region"`
-	Ingress              string `yaml:"ingress"`
-	ExecutionEnvironment string `yaml:"executionEnvironment"`
-	Public               bool   `yaml:"public"`
-	VPCAccessEgress      string `yaml:"vpcAccessEgress"`
-	VPCAccessConnector   string `yaml:"vpcAccessConnector"`
-	Secrets              string `yaml:"secrets"`
+	Region               string `json:"region"`
+	Ingress              string `json:"ingress,omitempty"`
+	ExecutionEnvironment string `json:"executionEnvironment,omitempty"`
+	Public               bool   `json:"public,omitempty"`
+	VPCAccessEgress      string `json:"vpcAccessEgress,omitempty"`
+	VPCAccessConnector   string `json:"vpcAccessConnector,omitempty"`
+	Secrets              string `json:"secrets,omitempty"`
 }
 
 type KubernetesSpec struct {
-	ServiceType string `yaml:"serviceType"`
-	Namespace   string `yaml:"namespace"`
+	ServiceType string `json:"serviceType,omitempty"`
+	Namespace   string `json:"namespace,omitempty"`
 }
 
 type ScheduleSpec struct {
-	Cron     string `yaml:"cron"`
-	TimeZone string `yaml:"timeZone"`
+	Cron     string `json:"cron,omitempty"`
+	TimeZone string `json:"timeZone,omitempty"`
 }
 
 type JobSpec struct {
-	Parallelism    int32 `yaml:"parallelism"`
-	Completions    int32 `yaml:"completions"`
-	MaxRetries     int32 `yaml:"maxRetries"`
-	TimeoutSeconds int64 `yaml:"timeoutSeconds"`
+	Parallelism    int32 `json:"parallelism,omitempty"`
+	Completions    int32 `json:"completions,omitempty"`
+	MaxRetries     int32 `json:"maxRetries,omitempty"`
+	TimeoutSeconds int64 `json:"timeoutSeconds,omitempty"`
 }
 
 type CloudSchedulerSpec struct {
-	Region                 string `yaml:"region"`
-	TimeZone               string `yaml:"timeZone"`
-	RetryCount             int32  `yaml:"retryCount"`
-	AttemptDeadlineSeconds int64  `yaml:"attemptDeadlineSeconds"`
+	Region                 string `json:"region,omitempty"`
+	TimeZone               string `json:"timeZone,omitempty"`
+	RetryCount             int32  `json:"retryCount,omitempty"`
+	AttemptDeadlineSeconds int64  `json:"attemptDeadlineSeconds,omitempty"`
 }
 
 type AutoscalingSpec struct {
-	MinReplicas          int32 `yaml:"min"`
-	MaxReplicas          int32 `yaml:"max"`
-	Concurrency          int64 `yaml:"concurrency"`
-	TargetCPUUtilization int32 `yaml:"targetCPUUtilization"`
+	MinReplicas          int32 `json:"min,omitempty"`
+	MaxReplicas          int32 `json:"max,omitempty"`
+	Concurrency          int64 `json:"concurrency,omitempty"`
+	TargetCPUUtilization int32 `json:"targetCPUUtilization,omitempty"`
 }
 
 func Parse(r io.Reader) (Workload, error) {
@@ -106,7 +106,7 @@ func Parse(r io.Reader) (Workload, error) {
 		return Workload{}, err
 	}
 	var spec Workload
-	if err := yaml.Unmarshal(data, &spec); err != nil {
+	if err := yaml.UnmarshalStrict(data, &spec); err != nil {
 		return Workload{}, err
 	}
 	if err := spec.Validate(); err != nil {
