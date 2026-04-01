@@ -192,8 +192,18 @@ func (s *Workload) Validate() error {
 	if s.Spec.GCP.CloudRun.Ingress == "" {
 		s.Spec.GCP.CloudRun.Ingress = "all"
 	}
+	switch s.Spec.GCP.CloudRun.Ingress {
+	case "all", "internal", "internal-and-cloud-load-balancing":
+	default:
+		return fmt.Errorf("spec.gcp.cloudRun.ingress %q is not valid, must be one of: all, internal, internal-and-cloud-load-balancing", s.Spec.GCP.CloudRun.Ingress)
+	}
 	if s.Spec.GCP.CloudRun.ExecutionEnvironment == "" {
 		s.Spec.GCP.CloudRun.ExecutionEnvironment = "gen2"
+	}
+	switch s.Spec.GCP.CloudRun.ExecutionEnvironment {
+	case "gen1", "gen2":
+	default:
+		return fmt.Errorf("spec.gcp.cloudRun.executionEnvironment %q is not valid, must be one of: gen1, gen2", s.Spec.GCP.CloudRun.ExecutionEnvironment)
 	}
 	if s.Spec.Kubernetes.ServiceType == "" {
 		s.Spec.Kubernetes.ServiceType = "ClusterIP"

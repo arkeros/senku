@@ -174,11 +174,11 @@ func renderKubernetesService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
-				Spec: corev1.PodSpec{
+				Spec: podSpecWithSecurityContext(corev1.PodSpec{
 					ServiceAccountName: kubernetesServiceAccountName,
 					Containers:         []corev1.Container{containerForSpec(spec.Spec, true, true)},
 					Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
-				},
+				}),
 			},
 		},
 	}
@@ -311,12 +311,12 @@ func renderKubernetesCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labels,
 						},
-						Spec: corev1.PodSpec{
+						Spec: podSpecWithSecurityContext(corev1.PodSpec{
 							RestartPolicy:      corev1.RestartPolicyNever,
 							ServiceAccountName: kubernetesServiceAccountName,
 							Containers:         []corev1.Container{containerForSpec(spec.Spec, false, true)},
 							Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
-						},
+						}),
 					},
 				},
 			},
@@ -492,12 +492,27 @@ func renderTerraformCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 
 func containerForSpec(spec bifrostv1alpha1.Spec, includePorts bool, includeProbes bool) corev1.Container {
 	resources := *spec.Resources.DeepCopy()
+	trueVal := true
+	falseVal := false
 	container := corev1.Container{
 		Name:         "app",
 		Image:        spec.Image,
 		Args:         slicesClone(spec.Args),
 		Resources:    resources,
 		VolumeMounts: slicesCloneVolumeMounts(spec.VolumeMounts),
+		SecurityContext: &corev1.SecurityContext{
+			RunAsNonRoot:             &trueVal,
+			RunAsUser:                int64Ptr(65534),
+			RunAsGroup:               int64Ptr(65534),
+			AllowPrivilegeEscalation: &falseVal,
+			ReadOnlyRootFilesystem:   &trueVal,
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
+		},
 	}
 	if includePorts && spec.Port > 0 {
 		container.Ports = []corev1.ContainerPort{{
@@ -634,6 +649,24 @@ func prefixedAccountID(prefix, name string) (string, error) {
 
 func int32Ptr(v int32) *int32 {
 	return &v
+}
+
+func int64Ptr(v int64) *int64 {
+	return &v
+}
+
+func podSpecWithSecurityContext(spec corev1.PodSpec) corev1.PodSpec {
+	trueVal := true
+	spec.SecurityContext = &corev1.PodSecurityContext{
+		RunAsNonRoot: &trueVal,
+		RunAsUser:    int64Ptr(65534),
+		RunAsGroup:   int64Ptr(65534),
+		FSGroup:      int64Ptr(65534),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+	return spec
 }
 
 func stringPtr(v string) *string {

@@ -101,6 +101,13 @@ func TestRenderKubernetes(t *testing.T) {
 		"maxReplicas: 3",
 		"averageUtilization: 80",
 		"type: ClusterIP",
+		"runAsNonRoot: true",
+		"runAsUser: 65534",
+		"runAsGroup: 65534",
+		"fsGroup: 65534",
+		"allowPrivilegeEscalation: false",
+		"readOnlyRootFilesystem: true",
+		"- ALL",
 	} {
 		if !strings.Contains(string(got), want) {
 			t.Fatalf("k8s output missing %q\n%s", want, got)
@@ -134,6 +141,12 @@ func TestRenderKubernetesCronJob(t *testing.T) {
 		"activeDeadlineSeconds: 600",
 		"mountPath: /run/secrets",
 		"secretName: stock-flow-env",
+		"runAsNonRoot: true",
+		"runAsUser: 65534",
+		"fsGroup: 65534",
+		"allowPrivilegeEscalation: false",
+		"readOnlyRootFilesystem: true",
+		"- ALL",
 	} {
 		if !strings.Contains(string(got), want) {
 			t.Fatalf("k8s cronjob output missing %q\n%s", want, got)
