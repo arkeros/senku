@@ -23,8 +23,8 @@ func newCmdVersions() *cobra.Command {
 		Long: `Extracts and displays package name and version pairs from a Debian lock file.
 
 Examples:
-  knife deb versions distroless/debian13.lock.json
-  knife deb versions --arch amd64 distroless/debian13.lock.json`,
+  knife debian versions distroless/debian13.lock.json
+  knife debian versions --arch amd64 distroless/debian13.lock.json`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Path = args[0]
