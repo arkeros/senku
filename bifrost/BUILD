@@ -14,5 +14,5 @@ bzl_library(
     name = "render",
     srcs = ["render.bzl"],
     visibility = ["//visibility:public"],
-    deps = ["@rules_img//img/private/providers:deploy_info"],
+    deps = [],  # keep (deploy_info.bzl has visibility restricted to //img:__subpackages__)
 )
