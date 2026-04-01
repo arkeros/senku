@@ -1,12 +1,17 @@
 # Bifrost
 
-`bifrost` is a bridge between developer intent and platform-native infrastructure. Like Bifröst in Norse mythology, it connects different worlds: a small service API on one side, and Knative, Kubernetes, and Terraform artifacts on the other. The goal is to give developers a simpler and more stable authoring surface, improve portability across targets, and make cross-domain integration easier, while still producing native outputs for each platform.
+`bifrost` is a bridge between developer intent and platform-native infrastructure. Like Bifröst in Norse mythology, it connects different worlds: a small workload API on one side, and Knative, Kubernetes, and Terraform artifacts on the other. The goal is to give developers a simpler and more stable authoring surface, improve portability across targets, and make cross-domain integration easier, while still producing native outputs for each platform.
 
 Current outputs:
 
-- Cloud Run Knative YAML
-- Kubernetes `ServiceAccount` + `Deployment` + `HorizontalPodAutoscaler` + `Service`
-- Terraform for runtime identity (`google_service_account` and GKE Workload Identity binding)
+- `Service`:
+  - Cloud Run Knative YAML
+  - Kubernetes `ServiceAccount` + `Deployment` + `HorizontalPodAutoscaler` + `Service`
+  - Terraform for runtime identity (`google_service_account` and GKE Workload Identity binding)
+- `CronJob`:
+  - Cloud Run `run.googleapis.com/v1 Job` YAML
+  - Kubernetes `ServiceAccount` + `CronJob`
+  - Terraform for runtime identity and Cloud Scheduler trigger
 
 The source model lives under [`pkg/api/v1alpha1`](./pkg/api/v1alpha1). The CLI in [`cmd/bifrost`](./cmd/bifrost) is one consumer of that API.
 
@@ -44,6 +49,7 @@ spec:
       memory: 256Mi
   gcp:
     projectId: senku-prod
+    projectNumber: "874944788122"
     cloudRun:
       region: europe-west3
 ```
@@ -88,6 +94,7 @@ bifrost_service(
     },
     gcp = {
         "projectId": "senku-prod",
+        "projectNumber": "874944788122",
         "cloudRun": {
             "region": "europe-west3",
             "ingress": "all",
@@ -166,6 +173,7 @@ Shared fields live once at the top level:
 Platform-specific fields stay under the platform:
 
 - `gcp.projectId`
+- `gcp.projectNumber`
 - `gcp.cloudRun.*`
 - `kubernetes.*`
 
@@ -271,6 +279,7 @@ Validation focuses on required and security-relevant inputs:
 - `spec.port` must be positive
 - CPU and memory limits are required
 - `gcp.projectId` is required
+- `gcp.projectNumber` is required
 - `gcp.cloudRun.region` is required
 - `serviceAccountName`, if set, must be a GSA email
 
@@ -285,12 +294,24 @@ Defaults are used for low-risk operational knobs:
 
 ## Current Scope
 
-`bifrost` currently models one workload kind: `Service`.
+`bifrost` currently models two workload kinds:
 
-The point of the current design is to prove that one higher-level service model can generate:
+- `Service`
+- `CronJob`
+
+The point of the current design is to prove that one higher-level workload model can generate:
 
 - Cloud Run deploy artifacts
 - Kubernetes deploy artifacts
-- Terraform identity infrastructure
+- Terraform supporting infrastructure
 
 If that continues to hold, it is the right abstraction level for adding more workload kinds later.
+
+For `CronJob`, the source model is split into:
+
+- `schedule`
+  Cross-platform trigger intent such as cron and time zone.
+- `job`
+  Cross-platform execution settings such as parallelism, completions, retries, and timeout.
+- `gcp.cloudScheduler`
+  Google-specific scheduler configuration used only for the Cloud Run + Cloud Scheduler render path.

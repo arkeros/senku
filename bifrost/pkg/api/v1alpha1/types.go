@@ -12,19 +12,23 @@ import (
 )
 
 const (
-	APIVersion = "bifrost.apotema.cloud/v1alpha1"
-	Kind       = "Service"
+	APIVersion  = "bifrost.apotema.cloud/v1alpha1"
+	KindService = "Service"
+	KindCronJob = "CronJob"
 )
 
-type Service struct {
+type Workload struct {
 	APIVersion string     `yaml:"apiVersion"`
 	Kind       string     `yaml:"kind"`
 	Metadata   ObjectMeta `yaml:"metadata"`
 	Spec       Spec       `yaml:"spec"`
 }
 
+type Service = Workload
+
 type ObjectMeta struct {
-	Name string `yaml:"name"`
+	Name   string            `yaml:"name"`
+	Labels map[string]string `yaml:"labels"`
 }
 
 type Spec struct {
@@ -33,15 +37,21 @@ type Spec struct {
 	Args               []string                    `yaml:"args"`
 	Port               int32                       `yaml:"port"`
 	Resources          corev1.ResourceRequirements `yaml:"resources"`
+	VolumeMounts       []corev1.VolumeMount        `yaml:"volumeMounts"`
+	Volumes            []corev1.Volume             `yaml:"volumes"`
 	Probes             ProbeSpec                   `yaml:"probes"`
 	Autoscaling        AutoscalingSpec             `yaml:"autoscaling"`
+	Schedule           ScheduleSpec                `yaml:"schedule"`
+	Job                JobSpec                     `yaml:"job"`
 	GCP                GCPSpec                     `yaml:"gcp"`
 	Kubernetes         KubernetesSpec              `yaml:"kubernetes"`
 }
 
 type GCPSpec struct {
-	ProjectID string       `yaml:"projectId"`
-	CloudRun  CloudRunSpec `yaml:"cloudRun"`
+	ProjectID      string             `yaml:"projectId"`
+	ProjectNumber  string             `yaml:"projectNumber"`
+	CloudScheduler CloudSchedulerSpec `yaml:"cloudScheduler"`
+	CloudRun       CloudRunSpec       `yaml:"cloudRun"`
 }
 
 type ProbeSpec struct {
@@ -54,11 +64,33 @@ type CloudRunSpec struct {
 	Ingress              string `yaml:"ingress"`
 	ExecutionEnvironment string `yaml:"executionEnvironment"`
 	Public               bool   `yaml:"public"`
+	VPCAccessEgress      string `yaml:"vpcAccessEgress"`
+	VPCAccessConnector   string `yaml:"vpcAccessConnector"`
+	Secrets              string `yaml:"secrets"`
 }
 
 type KubernetesSpec struct {
 	ServiceType string `yaml:"serviceType"`
 	Namespace   string `yaml:"namespace"`
+}
+
+type ScheduleSpec struct {
+	Cron     string `yaml:"cron"`
+	TimeZone string `yaml:"timeZone"`
+}
+
+type JobSpec struct {
+	Parallelism    int32 `yaml:"parallelism"`
+	Completions    int32 `yaml:"completions"`
+	MaxRetries     int32 `yaml:"maxRetries"`
+	TimeoutSeconds int64 `yaml:"timeoutSeconds"`
+}
+
+type CloudSchedulerSpec struct {
+	Region                 string `yaml:"region"`
+	TimeZone               string `yaml:"timeZone"`
+	RetryCount             int32  `yaml:"retryCount"`
+	AttemptDeadlineSeconds int64  `yaml:"attemptDeadlineSeconds"`
 }
 
 type AutoscalingSpec struct {
@@ -68,26 +100,26 @@ type AutoscalingSpec struct {
 	TargetCPUUtilization int32 `yaml:"targetCPUUtilization"`
 }
 
-func Parse(r io.Reader) (Service, error) {
+func Parse(r io.Reader) (Workload, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
-		return Service{}, err
+		return Workload{}, err
 	}
-	var spec Service
+	var spec Workload
 	if err := yaml.Unmarshal(data, &spec); err != nil {
-		return Service{}, err
+		return Workload{}, err
 	}
 	if err := spec.Validate(); err != nil {
-		return Service{}, err
+		return Workload{}, err
 	}
 	return spec, nil
 }
 
-func (s *Service) Validate() error {
+func (s *Workload) Validate() error {
 	if s.APIVersion != APIVersion {
 		return fmt.Errorf("unsupported apiVersion %q", s.APIVersion)
 	}
-	if s.Kind != Kind {
+	if s.Kind != KindService && s.Kind != KindCronJob {
 		return fmt.Errorf("unsupported kind %q", s.Kind)
 	}
 	if s.Metadata.Name == "" {
@@ -99,8 +131,15 @@ func (s *Service) Validate() error {
 	if s.Spec.GCP.ProjectID == "" {
 		return fmt.Errorf("spec.gcp.projectId is required")
 	}
+	if s.Spec.GCP.ProjectNumber == "" {
+		return fmt.Errorf("spec.gcp.projectNumber is required")
+	}
 	if s.Spec.ServiceAccountName == "" {
-		accountID, err := defaultServiceAccountAccountID(s.Metadata.Name)
+		prefix := "svc-"
+		if s.Kind == KindCronJob {
+			prefix = "crj-"
+		}
+		accountID, err := DefaultServiceAccountAccountID(prefix, s.Metadata.Name)
 		if err != nil {
 			return err
 		}
@@ -114,7 +153,7 @@ func (s *Service) Validate() error {
 	} else if projectID != s.Spec.GCP.ProjectID {
 		return fmt.Errorf("spec.serviceAccountName project %q does not match spec.gcp.projectId %q", projectID, s.Spec.GCP.ProjectID)
 	}
-	if s.Spec.Port <= 0 {
+	if s.Kind == KindService && s.Spec.Port <= 0 {
 		return fmt.Errorf("spec.port must be greater than zero")
 	}
 	if s.Spec.Resources.Limits == nil {
@@ -177,6 +216,29 @@ func (s *Service) Validate() error {
 	if s.Spec.Autoscaling.TargetCPUUtilization <= 0 {
 		s.Spec.Autoscaling.TargetCPUUtilization = 80
 	}
+	if s.Kind == KindCronJob {
+		if strings.TrimSpace(s.Spec.Schedule.Cron) == "" {
+			return fmt.Errorf("spec.schedule.cron is required for kind %q", KindCronJob)
+		}
+		if s.Spec.Job.Parallelism <= 0 {
+			s.Spec.Job.Parallelism = 1
+		}
+		if s.Spec.Job.Completions <= 0 {
+			s.Spec.Job.Completions = 1
+		}
+		if s.Spec.Job.MaxRetries < 0 {
+			return fmt.Errorf("spec.job.maxRetries must be greater than or equal to zero")
+		}
+		if s.Spec.Job.MaxRetries == 0 {
+			s.Spec.Job.MaxRetries = 3
+		}
+		if s.Spec.Job.TimeoutSeconds <= 0 {
+			s.Spec.Job.TimeoutSeconds = 600
+		}
+		if s.Spec.GCP.CloudScheduler.Region == "" {
+			s.Spec.GCP.CloudScheduler.Region = s.Spec.GCP.CloudRun.Region
+		}
+	}
 	return nil
 }
 
@@ -199,9 +261,9 @@ func projectIDFromServiceAccountEmail(email string) (string, error) {
 	return strings.TrimSuffix(domain, suffix), nil
 }
 
-func defaultServiceAccountAccountID(serviceName string) (string, error) {
+func DefaultServiceAccountAccountID(prefix, name string) (string, error) {
 	var out strings.Builder
-	for _, r := range strings.TrimSpace(serviceName) {
+	for _, r := range strings.TrimSpace(name) {
 		switch {
 		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
 			out.WriteRune(r)
@@ -212,9 +274,9 @@ func defaultServiceAccountAccountID(serviceName string) (string, error) {
 		}
 	}
 	if out.Len() == 0 {
-		return "", fmt.Errorf("metadata.name does not produce a valid default service account")
+		return "", fmt.Errorf("name %q does not produce a valid default service account", name)
 	}
-	accountID := "svc-" + strings.Trim(out.String(), "-")
+	accountID := prefix + strings.Trim(out.String(), "-")
 	if len(accountID) < 6 || len(accountID) > 30 {
 		return "", fmt.Errorf("default service account account ID %q must be between 6 and 30 characters", accountID)
 	}

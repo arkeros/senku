@@ -16,6 +16,7 @@ go_library(
         "@dev_knative_serving//pkg/apis/serving/v1:serving",
         "@io_k8s_api//apps/v1:apps",
         "@io_k8s_api//autoscaling/v2:autoscaling",
+        "@io_k8s_api//batch/v1:batch",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/util/intstr",
@@ -32,6 +33,11 @@ go_binary(
 go_test(
     name = "bifrost_test",
     srcs = ["bifrost_test.go"],
+    data = glob(["testdata/**"]),
     embed = [":bifrost_lib"],
+    embedsrcs = [
+        "testdata/cronjob.yaml",
+        "testdata/service.yaml",
+    ],
     deps = ["//bifrost/pkg/api/v1alpha1"],
 )

@@ -12,6 +12,7 @@ import (
 	"github.com/zclconf/go-cty/cty"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -19,7 +20,18 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func RenderCloudRun(spec bifrostv1alpha1.Service) ([]byte, error) {
+func RenderCloudRun(spec bifrostv1alpha1.Workload) ([]byte, error) {
+	switch spec.Kind {
+	case bifrostv1alpha1.KindService:
+		return renderCloudRunService(spec)
+	case bifrostv1alpha1.KindCronJob:
+		return renderCloudRunCronJob(spec)
+	default:
+		return nil, fmt.Errorf("unsupported kind %q", spec.Kind)
+	}
+}
+
+func renderCloudRunService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	trueValue := true
 	trafficPercent := int64(100)
 	concurrency := spec.Spec.Autoscaling.Concurrency
@@ -31,28 +43,28 @@ func RenderCloudRun(spec bifrostv1alpha1.Service) ([]byte, error) {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      spec.Metadata.Name,
-			Namespace: spec.Spec.GCP.ProjectID,
+			Namespace: spec.Spec.GCP.ProjectNumber,
 			Annotations: map[string]string{
 				"run.googleapis.com/ingress": spec.Spec.GCP.CloudRun.Ingress,
 			},
-			Labels: map[string]string{
+			Labels: mergeStringMaps(spec.Metadata.Labels, map[string]string{
 				"cloud.googleapis.com/location": spec.Spec.GCP.CloudRun.Region,
-			},
+			}),
 		},
 		Spec: servingv1.ServiceSpec{
 			ConfigurationSpec: servingv1.ConfigurationSpec{
 				Template: servingv1.RevisionTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							"run.googleapis.com/execution-environment": spec.Spec.GCP.CloudRun.ExecutionEnvironment,
-							"autoscaling.knative.dev/minScale":         strconv.FormatInt(int64(spec.Spec.Autoscaling.MinReplicas), 10),
-							"autoscaling.knative.dev/maxScale":         strconv.FormatInt(int64(spec.Spec.Autoscaling.MaxReplicas), 10),
-						},
+						Annotations: mergeStringMaps(cloudRunTemplateAnnotations(spec), map[string]string{
+							"autoscaling.knative.dev/minScale": strconv.FormatInt(int64(spec.Spec.Autoscaling.MinReplicas), 10),
+							"autoscaling.knative.dev/maxScale": strconv.FormatInt(int64(spec.Spec.Autoscaling.MaxReplicas), 10),
+						}),
 					},
 					Spec: servingv1.RevisionSpec{
 						PodSpec: corev1.PodSpec{
 							ServiceAccountName: spec.Spec.ServiceAccountName,
-							Containers:         []corev1.Container{containerForSpec(spec.Spec)},
+							Containers:         []corev1.Container{containerForSpec(spec.Spec, true, true)},
+							Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
 						},
 						ContainerConcurrency: &concurrency,
 					},
@@ -72,7 +84,59 @@ func RenderCloudRun(spec bifrostv1alpha1.Service) ([]byte, error) {
 	return marshalManifest(svc)
 }
 
-func RenderKubernetes(spec bifrostv1alpha1.Service) ([]byte, error) {
+func renderCloudRunCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
+	jobSpec := map[string]any{
+		"apiVersion": "run.googleapis.com/v1",
+		"kind":       "Job",
+		"metadata": map[string]any{
+			"name":      spec.Metadata.Name,
+			"namespace": spec.Spec.GCP.ProjectNumber,
+			"labels": mergeStringMaps(spec.Metadata.Labels, map[string]string{
+				"cloud.googleapis.com/location": spec.Spec.GCP.CloudRun.Region,
+			}),
+		},
+		"spec": map[string]any{
+			"template": map[string]any{
+				"spec": map[string]any{
+					"parallelism": spec.Spec.Job.Parallelism,
+					"taskCount":   spec.Spec.Job.Completions,
+					"template": map[string]any{
+						"spec": map[string]any{
+							"containers":         []corev1.Container{containerForSpec(spec.Spec, false, false)},
+							"maxRetries":         spec.Spec.Job.MaxRetries,
+							"timeoutSeconds":     strconv.FormatInt(spec.Spec.Job.TimeoutSeconds, 10),
+							"serviceAccountName": spec.Spec.ServiceAccountName,
+						},
+					},
+				},
+			},
+		},
+	}
+	templateMetadataAnnotations := cloudRunTemplateAnnotations(spec)
+	if len(templateMetadataAnnotations) > 0 {
+		jobSpec["spec"].(map[string]any)["template"].(map[string]any)["metadata"] = map[string]any{
+			"annotations": templateMetadataAnnotations,
+		}
+	}
+	templateSpec := jobSpec["spec"].(map[string]any)["template"].(map[string]any)["spec"].(map[string]any)["template"].(map[string]any)["spec"].(map[string]any)
+	if len(spec.Spec.Volumes) > 0 {
+		templateSpec["volumes"] = slicesCloneVolumes(spec.Spec.Volumes)
+	}
+	return marshalManifest(jobSpec)
+}
+
+func RenderKubernetes(spec bifrostv1alpha1.Workload) ([]byte, error) {
+	switch spec.Kind {
+	case bifrostv1alpha1.KindService:
+		return renderKubernetesService(spec)
+	case bifrostv1alpha1.KindCronJob:
+		return renderKubernetesCronJob(spec)
+	default:
+		return nil, fmt.Errorf("unsupported kind %q", spec.Kind)
+	}
+}
+
+func renderKubernetesService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	labels := map[string]string{
 		"app.kubernetes.io/name": spec.Metadata.Name,
 	}
@@ -112,7 +176,8 @@ func RenderKubernetes(spec bifrostv1alpha1.Service) ([]byte, error) {
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: kubernetesServiceAccountName,
-					Containers:         []corev1.Container{containerForSpec(spec.Spec)},
+					Containers:         []corev1.Container{containerForSpec(spec.Spec, true, true)},
+					Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
 				},
 			},
 		},
@@ -200,7 +265,95 @@ func RenderKubernetes(spec bifrostv1alpha1.Service) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func RenderTerraform(spec bifrostv1alpha1.Service) ([]byte, error) {
+func renderKubernetesCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
+	labels := map[string]string{
+		"app.kubernetes.io/name": spec.Metadata.Name,
+	}
+	namespace := spec.Spec.Kubernetes.Namespace
+	kubernetesServiceAccountName := spec.Metadata.Name
+	parallelism := spec.Spec.Job.Parallelism
+	completions := spec.Spec.Job.Completions
+	maxRetries := spec.Spec.Job.MaxRetries
+	timeoutSeconds := spec.Spec.Job.TimeoutSeconds
+
+	serviceAccount := corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ServiceAccount",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      kubernetesServiceAccountName,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"iam.gke.io/gcp-service-account": spec.Spec.ServiceAccountName,
+			},
+		},
+	}
+
+	cronJob := batchv1.CronJob{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "batch/v1",
+			Kind:       "CronJob",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      spec.Metadata.Name,
+			Namespace: namespace,
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule: spec.Spec.Schedule.Cron,
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Parallelism:           &parallelism,
+					Completions:           &completions,
+					BackoffLimit:          &maxRetries,
+					ActiveDeadlineSeconds: &timeoutSeconds,
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: labels,
+						},
+						Spec: corev1.PodSpec{
+							RestartPolicy:      corev1.RestartPolicyNever,
+							ServiceAccountName: kubernetesServiceAccountName,
+							Containers:         []corev1.Container{containerForSpec(spec.Spec, false, true)},
+							Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
+						},
+					},
+				},
+			},
+		},
+	}
+	if spec.Spec.Schedule.TimeZone != "" {
+		cronJob.Spec.TimeZone = stringPtr(spec.Spec.Schedule.TimeZone)
+	}
+
+	serviceAccountYAML, err := marshalManifest(serviceAccount)
+	if err != nil {
+		return nil, err
+	}
+	cronJobYAML, err := marshalManifest(cronJob)
+	if err != nil {
+		return nil, err
+	}
+
+	var out bytes.Buffer
+	out.Write(serviceAccountYAML)
+	out.WriteString("---\n")
+	out.Write(cronJobYAML)
+	return out.Bytes(), nil
+}
+
+func RenderTerraform(spec bifrostv1alpha1.Workload) ([]byte, error) {
+	switch spec.Kind {
+	case bifrostv1alpha1.KindService:
+		return renderTerraformService(spec)
+	case bifrostv1alpha1.KindCronJob:
+		return renderTerraformCronJob(spec)
+	default:
+		return nil, fmt.Errorf("unsupported kind %q", spec.Kind)
+	}
+}
+
+func renderTerraformService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	projectID := spec.Spec.GCP.ProjectID
 	accountID, err := accountIDFromEmail(spec.Spec.ServiceAccountName)
 	if err != nil {
@@ -238,19 +391,124 @@ func RenderTerraform(spec bifrostv1alpha1.Service) ([]byte, error) {
 	return hclwrite.Format(file.Bytes()), nil
 }
 
-func containerForSpec(spec bifrostv1alpha1.Spec) corev1.Container {
-	resources := *spec.Resources.DeepCopy()
-	return corev1.Container{
-		Name:  "app",
-		Image: spec.Image,
-		Args:  slicesClone(spec.Args),
-		Ports: []corev1.ContainerPort{{
-			ContainerPort: spec.Port,
-		}},
-		Resources:     resources,
-		StartupProbe:  httpGetProbe(spec.Probes.StartupPath, spec.Port),
-		LivenessProbe: httpGetProbe(spec.Probes.LivenessPath, spec.Port),
+func renderTerraformCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
+	projectID := spec.Spec.GCP.ProjectID
+	runtimeAccountID, err := accountIDFromEmail(spec.Spec.ServiceAccountName)
+	if err != nil {
+		return nil, err
 	}
+	kubernetesServiceAccountName := spec.Metadata.Name
+	namespace := spec.Spec.Kubernetes.Namespace
+	runtimeResourceName := terraformIdentifier(runtimeAccountID)
+	workloadIdentityResourceName := terraformIdentifier(runtimeAccountID + "_workload_identity")
+	runtimeServiceAccountTraversal, err := traversalForExpr("google_service_account." + runtimeResourceName + ".name")
+	if err != nil {
+		return nil, err
+	}
+	schedulerAccountID, err := prefixedAccountID("sch-", spec.Metadata.Name)
+	if err != nil {
+		return nil, err
+	}
+	schedulerResourceName := terraformIdentifier(schedulerAccountID)
+	schedulerEmailTraversal, err := traversalForExpr("google_service_account." + schedulerResourceName + ".email")
+	if err != nil {
+		return nil, err
+	}
+
+	file := hclwrite.NewEmptyFile()
+	body := file.Body()
+
+	runtimeServiceAccountBlock := body.AppendNewBlock("resource", []string{"google_service_account", runtimeResourceName})
+	runtimeServiceAccountBody := runtimeServiceAccountBlock.Body()
+	runtimeServiceAccountBody.SetAttributeValue("project", cty.StringVal(projectID))
+	runtimeServiceAccountBody.SetAttributeValue("account_id", cty.StringVal(runtimeAccountID))
+	runtimeServiceAccountBody.SetAttributeValue("display_name", cty.StringVal("Runtime identity for "+spec.Metadata.Name))
+
+	body.AppendNewline()
+
+	workloadIdentityBlock := body.AppendNewBlock("resource", []string{"google_service_account_iam_member", workloadIdentityResourceName})
+	workloadIdentityBody := workloadIdentityBlock.Body()
+	workloadIdentityBody.SetAttributeTraversal("service_account_id", runtimeServiceAccountTraversal)
+	workloadIdentityBody.SetAttributeValue("role", cty.StringVal("roles/iam.workloadIdentityUser"))
+	workloadIdentityBody.SetAttributeValue(
+		"member",
+		cty.StringVal(fmt.Sprintf("serviceAccount:%s.svc.id.goog[%s/%s]", projectID, namespace, kubernetesServiceAccountName)),
+	)
+
+	body.AppendNewline()
+
+	schedulerServiceAccountBlock := body.AppendNewBlock("resource", []string{"google_service_account", schedulerResourceName})
+	schedulerServiceAccountBody := schedulerServiceAccountBlock.Body()
+	schedulerServiceAccountBody.SetAttributeValue("project", cty.StringVal(projectID))
+	schedulerServiceAccountBody.SetAttributeValue("account_id", cty.StringVal(schedulerAccountID))
+	schedulerServiceAccountBody.SetAttributeValue("display_name", cty.StringVal("Cloud Scheduler invoker for "+spec.Metadata.Name))
+
+	body.AppendNewline()
+
+	schedulerInvokerBlock := body.AppendNewBlock("resource", []string{"google_project_iam_member", terraformIdentifier(schedulerAccountID + "_run_invoker")})
+	schedulerInvokerBody := schedulerInvokerBlock.Body()
+	schedulerInvokerBody.SetAttributeValue("project", cty.StringVal(projectID))
+	schedulerInvokerBody.SetAttributeValue("role", cty.StringVal("roles/run.invoker"))
+	schedulerInvokerBody.SetAttributeRaw(
+		"member",
+		hclwrite.TokensForFunctionCall(
+			"format",
+			hclwrite.TokensForValue(cty.StringVal("serviceAccount:%s")),
+			hclwrite.TokensForTraversal(schedulerEmailTraversal),
+		),
+	)
+
+	body.AppendNewline()
+
+	schedulerBlock := body.AppendNewBlock("resource", []string{"google_cloud_scheduler_job", terraformIdentifier(spec.Metadata.Name + "_schedule")})
+	schedulerBody := schedulerBlock.Body()
+	schedulerBody.SetAttributeValue("project", cty.StringVal(projectID))
+	schedulerBody.SetAttributeValue("name", cty.StringVal(spec.Metadata.Name))
+	schedulerBody.SetAttributeValue("region", cty.StringVal(spec.Spec.GCP.CloudScheduler.Region))
+	schedulerBody.SetAttributeValue("schedule", cty.StringVal(spec.Spec.Schedule.Cron))
+	if spec.Spec.Schedule.TimeZone != "" {
+		schedulerBody.SetAttributeValue("time_zone", cty.StringVal(spec.Spec.Schedule.TimeZone))
+	}
+	if spec.Spec.GCP.CloudScheduler.AttemptDeadlineSeconds > 0 {
+		schedulerBody.SetAttributeValue("attempt_deadline", cty.StringVal(fmt.Sprintf("%ds", spec.Spec.GCP.CloudScheduler.AttemptDeadlineSeconds)))
+	}
+	if spec.Spec.GCP.CloudScheduler.RetryCount > 0 {
+		retryConfig := schedulerBody.AppendNewBlock("retry_config", nil)
+		retryConfig.Body().SetAttributeValue("retry_count", cty.NumberIntVal(int64(spec.Spec.GCP.CloudScheduler.RetryCount)))
+	}
+	httpTarget := schedulerBody.AppendNewBlock("http_target", nil)
+	httpTargetBody := httpTarget.Body()
+	httpTargetBody.SetAttributeValue("http_method", cty.StringVal("POST"))
+	httpTargetBody.SetAttributeValue("uri", cty.StringVal(fmt.Sprintf("https://run.googleapis.com/v2/projects/%s/locations/%s/jobs/%s:run", projectID, spec.Spec.GCP.CloudRun.Region, spec.Metadata.Name)))
+	httpTargetBody.SetAttributeRaw("body", hclwrite.TokensForFunctionCall("base64encode", hclwrite.TokensForValue(cty.StringVal("{}"))))
+	httpTargetBody.SetAttributeValue("headers", cty.MapVal(map[string]cty.Value{
+		"Content-Type": cty.StringVal("application/json"),
+	}))
+	oauthToken := httpTargetBody.AppendNewBlock("oauth_token", nil)
+	oauthToken.Body().SetAttributeTraversal("service_account_email", schedulerEmailTraversal)
+
+	return hclwrite.Format(file.Bytes()), nil
+}
+
+func containerForSpec(spec bifrostv1alpha1.Spec, includePorts bool, includeProbes bool) corev1.Container {
+	resources := *spec.Resources.DeepCopy()
+	container := corev1.Container{
+		Name:         "app",
+		Image:        spec.Image,
+		Args:         slicesClone(spec.Args),
+		Resources:    resources,
+		VolumeMounts: slicesCloneVolumeMounts(spec.VolumeMounts),
+	}
+	if includePorts && spec.Port > 0 {
+		container.Ports = []corev1.ContainerPort{{
+			ContainerPort: spec.Port,
+		}}
+	}
+	if includeProbes {
+		container.StartupProbe = httpGetProbe(spec.Probes.StartupPath, spec.Port)
+		container.LivenessProbe = httpGetProbe(spec.Probes.LivenessPath, spec.Port)
+	}
+	return container
 }
 
 func httpGetProbe(path string, port int32) *corev1.Probe {
@@ -322,7 +580,63 @@ func slicesClone(in []string) []string {
 	return out
 }
 
+func slicesCloneVolumes(in []corev1.Volume) []corev1.Volume {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]corev1.Volume, len(in))
+	copy(out, in)
+	return out
+}
+
+func slicesCloneVolumeMounts(in []corev1.VolumeMount) []corev1.VolumeMount {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]corev1.VolumeMount, len(in))
+	copy(out, in)
+	return out
+}
+
+func mergeStringMaps(base map[string]string, extra map[string]string) map[string]string {
+	if len(base) == 0 && len(extra) == 0 {
+		return nil
+	}
+	out := map[string]string{}
+	for k, v := range base {
+		if v != "" {
+			out[k] = v
+		}
+	}
+	for k, v := range extra {
+		if v != "" {
+			out[k] = v
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func cloudRunTemplateAnnotations(spec bifrostv1alpha1.Workload) map[string]string {
+	return mergeStringMaps(nil, map[string]string{
+		"run.googleapis.com/execution-environment": spec.Spec.GCP.CloudRun.ExecutionEnvironment,
+		"run.googleapis.com/vpc-access-egress":     spec.Spec.GCP.CloudRun.VPCAccessEgress,
+		"run.googleapis.com/vpc-access-connector":  spec.Spec.GCP.CloudRun.VPCAccessConnector,
+		"run.googleapis.com/secrets":               spec.Spec.GCP.CloudRun.Secrets,
+	})
+}
+
+func prefixedAccountID(prefix, name string) (string, error) {
+	return bifrostv1alpha1.DefaultServiceAccountAccountID(prefix, name)
+}
+
 func int32Ptr(v int32) *int32 {
+	return &v
+}
+
+func stringPtr(v string) *string {
 	return &v
 }
 

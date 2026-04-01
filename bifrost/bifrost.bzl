@@ -48,8 +48,9 @@ def bifrost_service(
         name: Service name (used in metadata.name and as target prefix).
         image: Container image reference.
         port: Container port number.
-        gcp: GCP configuration dict. Must include "projectId" and "cloudRun" with at
-            least "region". Example: {"projectId": "my-proj", "cloudRun": {"region": "us-central1"}}.
+        gcp: GCP configuration dict. Must include "projectId", "projectNumber", and
+            "cloudRun" with at least "region". Example:
+            {"projectId": "my-proj", "projectNumber": "123456789012", "cloudRun": {"region": "us-central1"}}.
         resources: Resource requirements dict with "requests" and/or "limits" sub-dicts,
             each containing "cpu" and "memory". Example: {"limits": {"cpu": "1000m", "memory": "256Mi"}}.
         args: Optional list of container arguments.
