@@ -106,6 +106,20 @@ bifrost_service(
 
 The macro emits JSON because Starlark can serialize JSON safely with the built-in `json` module. `bifrost render` consumes that generated JSON the same way it consumes a hand-written YAML or JSON file.
 
+### Digest-Pinned Images
+
+Instead of a plain string, `image_push` accepts a Bazel label pointing to an `image_push` target from `@rules_img`. At build time, the deploy manifest is read to resolve the image to a fully-qualified digest-pinned reference (e.g. `ghcr.io/arkeros/senku/registry@sha256:abc...`).
+
+```starlark
+bifrost_service(
+    name = "registry",
+    image_push = "//oci/cmd/registry:image_nonroot_push",
+    # ...
+)
+```
+
+`image` and `image_push` are mutually exclusive. Use `image` for plain strings (development, external images), and `image_push` for production builds pinned to a specific digest.
+
 ### Checked-In Outputs
 
 The macro also supports checked-in generated files through `checked_in = {...}`.

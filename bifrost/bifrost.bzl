@@ -2,13 +2,15 @@
 
 load("@bazel_lib//lib:write_source_files.bzl", "write_source_file")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("//bifrost:render.bzl", "bifrost_render")
 
 def bifrost_service(
         name,
-        image,
         port,
         gcp,
         resources,
+        image = None,
+        image_push = None,
         args = None,
         service_account_name = None,
         probes = None,
@@ -46,7 +48,12 @@ def bifrost_service(
 
     Args:
         name: Service name (used in metadata.name and as target prefix).
-        image: Container image reference.
+        image: Plain string container image reference (e.g. "registry"). Mutually
+            exclusive with image_push.
+        image_push: Bazel label pointing to an image_push target (e.g.
+            "//oci/cmd/registry:image_nonroot_push"). At build time, the deploy
+            manifest is read to resolve a digest-pinned image reference. Mutually
+            exclusive with image.
         port: Container port number.
         gcp: GCP configuration dict. Must include "projectId", "projectNumber", and
             "cloudRun" with at least "region". Example:
@@ -66,6 +73,11 @@ def bifrost_service(
             Use this to generate only a subset of outputs.
         visibility: Bazel visibility for all generated targets.
     """
+    if image and image_push:
+        fail("Cannot specify both 'image' and 'image_push'")
+    if not image and not image_push:
+        fail("Must specify either 'image' or 'image_push'")
+
     if targets == None:
         targets = ["cloudrun", "k8s", "terraform"]
     if checked_in == None:
@@ -73,7 +85,7 @@ def bifrost_service(
 
     # Build the service spec dict
     spec = {}
-    spec["image"] = image
+    spec["image"] = image or name
     if service_account_name:
         spec["serviceAccountName"] = service_account_name
     if args:
@@ -111,10 +123,7 @@ def bifrost_service(
         else:
             out_file = name + "." + target + ".yaml"
 
-        cmd = "$(execpath //bifrost/cmd/bifrost) render %s -f $(location :%s) > $@" % (
-            target,
-            name + "_service_json",
-        )
+        header = ""
         if target in checked_in:
             update_target = name + "_" + target + "_update"
             pkg = native.package_name()
@@ -125,18 +134,14 @@ def bifrost_service(
                 "#   bazel run %s" % update_label,
                 "",
             ])
-            cmd = "cat <<'EOF' > $@\n%s\nEOF\n$(execpath //bifrost/cmd/bifrost) render %s -f $(location :%s) >> $@" % (
-                header,
-                target,
-                name + "_service_json",
-            )
 
-        native.genrule(
+        bifrost_render(
             name = name + "_" + target,
-            srcs = [":" + name + "_service_json"],
-            outs = [out_file],
-            cmd = cmd,
-            tools = ["//bifrost/cmd/bifrost"],
+            spec = ":" + name + "_service_json",
+            target = target,
+            image_push = image_push,
+            header = header if header else None,
+            out = out_file,
             visibility = visibility,
         )
 

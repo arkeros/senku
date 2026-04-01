@@ -1,6 +1,5 @@
 load("@kustomize.bzl", "kustomize")
 load("//bifrost:bifrost.bzl", "bifrost_service")
-load("//oci:config.bzl", "OCI_REGISTRY", "OCI_REPOSITORY_PREFIX")
 
 bifrost_service(
     name = "registry",
@@ -17,6 +16,7 @@ bifrost_service(
     },
     gcp = {
         "projectId": "senku-prod",
+        "projectNumber": "874944788122",
         "cloudRun": {
             "region": "europe-west3",
             "ingress": "all",
@@ -48,10 +48,5 @@ kustomize(
         "kustomization.yaml",
         ":registry_cloudrun",
     ],
-    images = {
-        "registry": "//oci/cmd/registry:image_nonroot_amd64",
-    },
-    registry = OCI_REGISTRY,
-    repository_prefix = OCI_REPOSITORY_PREFIX,
     visibility = ["//visibility:public"],
 )
