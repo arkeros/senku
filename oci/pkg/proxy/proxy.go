@@ -3,6 +3,7 @@ package proxy
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -166,7 +167,9 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		slog.Warn("failed to copy response body", "path", req.URL.Path, "error", err)
+	}
 }
 
 // SetScheme overrides the scheme used to connect to the upstream registry.
