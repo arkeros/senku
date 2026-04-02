@@ -61,7 +61,7 @@ The proxy:
 
 ## Usage
 
-```
+```sh
 registry --upstream=ghcr.io --repository-prefix=arkeros/senku --port=8080
 ```
 
@@ -76,15 +76,15 @@ Push is not supported; images are pushed directly to GHCR via CI.
 
 ## Deployment
 
-Deployed to Cloud Run (europe-west3) via kustomize manifests in `k8s/`.
+Deployed to Cloud Run (europe-west3) via kustomize manifests in `oci/deploy/`.
 
-```
-bazel build //oci/cmd/registry/k8s
+```sh
+bazel build //oci/deploy:k8s
 ```
 
 ## Testing
 
-```
+```sh
 bazel test //oci/pkg/proxy:proxy_test
 ```
 
