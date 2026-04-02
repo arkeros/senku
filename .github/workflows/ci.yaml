@@ -177,7 +177,7 @@ jobs:
         with:
           script: |
             const marker = `<!-- tf-plan:${{ matrix.dir }} -->`;
-            const output = JSON.parse(${{ toJSON(steps.plan.outputs.stdout) }});
+            const output = ${{ toJSON(steps.plan.outputs.stdout) }};
             const body = `${marker}\n### Terraform Plan (\`${{ matrix.dir }}\`)\n\`\`\`\n${output.substring(0, 60000)}\n\`\`\``;
             const comments = await github.paginate(github.rest.issues.listComments, {
               issue_number: context.issue.number,
