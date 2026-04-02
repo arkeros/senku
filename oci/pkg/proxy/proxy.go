@@ -75,17 +75,39 @@ func RewritePath(path, repositoryPrefix string) string {
 	return prefix + repositoryPrefix + "/" + rest
 }
 
+// findOp scans path segments from the tail to find the first OCI operation
+// segment ("manifests", "blobs", or "tags") and returns its index.
+// Returns -1 if no operation segment is found.
+func findOp(segments []string) int {
+	for i := len(segments) - 1; i >= 0; i-- {
+		switch segments[i] {
+		case "manifests", "blobs", "tags":
+			return i
+		}
+	}
+	return -1
+}
+
 // ExtractRepo extracts the repository name from the request path.
 // e.g., /v2/redis/manifests/latest → redis
 // e.g., /v2/go/debian13/tags/list → go/debian13
 func ExtractRepo(path string) string {
 	rest := strings.TrimPrefix(path, "/v2/")
-	for _, op := range []string{"/manifests/", "/blobs/", "/tags/"} {
-		if idx := strings.Index(rest, op); idx != -1 {
-			return rest[:idx]
-		}
+	segments := strings.Split(rest, "/")
+	if i := findOp(segments); i > 0 {
+		return strings.Join(segments[:i], "/")
 	}
 	return rest
+}
+
+// IsBlob reports whether the path targets a blob endpoint.
+func IsBlob(path string) bool {
+	rest := strings.TrimPrefix(path, "/v2/")
+	segments := strings.Split(rest, "/")
+	if i := findOp(segments); i >= 0 {
+		return segments[i] == "blobs"
+	}
+	return false
 }
 
 func (p *Proxy) getTransport(repo string) (http.RoundTripper, error) {
@@ -176,7 +198,7 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	if strings.Contains(r.URL.Path, "/blobs/") && resp.StatusCode < 300 {
+	if IsBlob(r.URL.Path) && resp.StatusCode < 300 {
 		slog.Error("upstream returned blob body instead of redirect", "path", r.URL.Path, "status", resp.StatusCode)
 		http.Error(w, "upstream did not redirect blob request", http.StatusBadGateway)
 		return

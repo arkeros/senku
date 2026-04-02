@@ -68,6 +68,52 @@ func TestRewritePath(t *testing.T) {
 	}
 }
 
+func TestExtractRepo(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{"/v2/redis/manifests/latest", "redis"},
+		{"/v2/redis/blobs/sha256:abc123", "redis"},
+		{"/v2/redis/tags/list", "redis"},
+		{"/v2/go/debian13/manifests/v1.0.0", "go/debian13"},
+		// Repos with op-like names must not be misclassified.
+		{"/v2/org/manifests/manifests/latest", "org/manifests"},
+		{"/v2/org/blobs/blobs/sha256:abc", "org/blobs"},
+		{"/v2/org/tags/tags/list", "org/tags"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got := proxy.ExtractRepo(tt.path)
+			if got != tt.want {
+				t.Errorf("ExtractRepo(%q) = %q, want %q", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsBlob(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"/v2/redis/blobs/sha256:abc", true},
+		{"/v2/org/blobs/blobs/sha256:abc", true},
+		{"/v2/redis/manifests/latest", false},
+		{"/v2/redis/tags/list", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			got := proxy.IsBlob(tt.path)
+			if got != tt.want {
+				t.Errorf("IsBlob(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNonV2PathReturns404(t *testing.T) {
 	p := proxy.New("ghcr.io", "arkeros/senku")
 	srv := httptest.NewServer(p)
