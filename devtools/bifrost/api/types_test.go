@@ -69,7 +69,7 @@ func TestParse_RejectsUnknownFields(t *testing.T) {
 	t.Parallel()
 
 	yaml := `
-apiVersion: bifrost.arkeros.dev/v1alpha1
+apiVersion: bifrost.apotema.cloud/v1alpha1
 kind: Service
 metadata:
   name: test-svc

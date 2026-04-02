@@ -8,6 +8,9 @@ import (
 	"os"
 
 	bifrost "github.com/arkeros/senku/devtools/bifrost/api"
+	"github.com/arkeros/senku/devtools/bifrost/cloudrun"
+	"github.com/arkeros/senku/devtools/bifrost/k8s"
+	"github.com/arkeros/senku/devtools/bifrost/terraform"
 )
 
 func main() {
@@ -42,11 +45,11 @@ func main() {
 	var out []byte
 	switch target {
 	case "cloudrun":
-		out, err = RenderCloudRun(spec)
+		out, err = cloudrun.Render(spec)
 	case "k8s":
-		out, err = RenderKubernetes(spec)
+		out, err = k8s.Render(spec)
 	case "terraform":
-		out, err = RenderTerraform(spec)
+		out, err = terraform.Render(spec)
 	default:
 		log.Fatalf("unsupported render target %q", target)
 	}
