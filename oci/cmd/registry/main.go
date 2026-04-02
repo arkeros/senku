@@ -34,7 +34,11 @@ func main() {
 
 	handler := proxy.New(*upstream, *repositoryPrefix)
 	server := &http.Server{
-		Handler: handler,
+		Handler:           handler,
+		ReadTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	listener, err := net.Listen("tcp", ":"+*port)
