@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	bifrostv1alpha1 "github.com/arkeros/senku/bifrost/pkg/api/v1alpha1"
+	bifrost "github.com/arkeros/senku/devtools/bifrost/api"
 )
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 		defer closeFn()
 	}
 
-	spec, err := bifrostv1alpha1.Parse(reader)
+	spec, err := bifrost.Parse(reader)
 	if err != nil {
 		log.Fatal(err)
 	}

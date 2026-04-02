@@ -89,7 +89,7 @@ bifrost_render = rule(
             doc = "Output file name.",
         ),
         "_bifrost": attr.label(
-            default = "//bifrost/cmd/bifrost",
+            default = "//devtools/bifrost/cli",
             executable = True,
             cfg = "exec",
         ),

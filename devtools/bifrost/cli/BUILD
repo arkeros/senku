@@ -1,15 +1,15 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 
 go_library(
-    name = "bifrost_lib",
+    name = "cli_lib",
     srcs = [
         "main.go",
         "render.go",
     ],
-    importpath = "github.com/arkeros/senku/bifrost/cmd/bifrost",
+    importpath = "github.com/arkeros/senku/devtools/bifrost/cli",
     visibility = ["//visibility:private"],
     deps = [
-        "//bifrost/pkg/api/v1alpha1",
+        "//devtools/bifrost/api",
         "@com_github_hashicorp_hcl_v2//:hcl",
         "@com_github_hashicorp_hcl_v2//hclwrite",
         "@com_github_zclconf_go_cty//cty",
@@ -25,15 +25,15 @@ go_library(
 )
 
 go_binary(
-    name = "bifrost",
-    embed = [":bifrost_lib"],
+    name = "cli",
+    embed = [":cli_lib"],
     visibility = ["//visibility:public"],
 )
 
 go_test(
-    name = "bifrost_test",
+    name = "cli_test",
     srcs = ["bifrost_test.go"],
     data = glob(["testdata/**"]),
-    embed = [":bifrost_lib"],
-    deps = ["//bifrost/pkg/api/v1alpha1"],
+    embed = [":cli_lib"],
+    deps = ["//devtools/bifrost/api"],
 )

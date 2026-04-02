@@ -1,5 +1,5 @@
 load("@kustomize.bzl", "kustomize")
-load("//bifrost:bifrost.bzl", "bifrost_service")
+load("//devtools/bifrost:bifrost.bzl", "bifrost_service")
 
 bifrost_service(
     name = "registry",

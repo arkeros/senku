@@ -2,7 +2,7 @@
 
 load("@bazel_lib//lib:write_source_files.bzl", "write_source_file")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
-load("//bifrost:render.bzl", "bifrost_render")
+load("//devtools/bifrost:render.bzl", "bifrost_render")
 
 def bifrost_service(
         name,

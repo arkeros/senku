@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	bifrostv1alpha1 "github.com/arkeros/senku/bifrost/pkg/api/v1alpha1"
+	bifrost "github.com/arkeros/senku/devtools/bifrost/api"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
@@ -25,18 +25,18 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func RenderCloudRun(spec bifrostv1alpha1.Workload) ([]byte, error) {
+func RenderCloudRun(spec bifrost.Workload) ([]byte, error) {
 	switch spec.Kind {
-	case bifrostv1alpha1.KindService:
+	case bifrost.KindService:
 		return renderCloudRunService(spec)
-	case bifrostv1alpha1.KindCronJob:
+	case bifrost.KindCronJob:
 		return renderCloudRunCronJob(spec)
 	default:
 		return nil, fmt.Errorf("unsupported kind %q", spec.Kind)
 	}
 }
 
-func renderCloudRunService(spec bifrostv1alpha1.Workload) ([]byte, error) {
+func renderCloudRunService(spec bifrost.Workload) ([]byte, error) {
 	trueValue := true
 	trafficPercent := int64(100)
 	concurrency := spec.Spec.Autoscaling.Concurrency
@@ -90,7 +90,7 @@ func renderCloudRunService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	return marshalManifest(svc)
 }
 
-func renderCloudRunCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
+func renderCloudRunCronJob(spec bifrost.Workload) ([]byte, error) {
 	resolved := resolveSecretFiles(spec.Spec.GCP.ProjectID, spec.Spec.SecretFiles)
 	jobSpec := map[string]any{
 		"apiVersion": "run.googleapis.com/v1",
@@ -132,18 +132,18 @@ func renderCloudRunCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	return marshalManifest(jobSpec)
 }
 
-func RenderKubernetes(spec bifrostv1alpha1.Workload) ([]byte, error) {
+func RenderKubernetes(spec bifrost.Workload) ([]byte, error) {
 	switch spec.Kind {
-	case bifrostv1alpha1.KindService:
+	case bifrost.KindService:
 		return renderKubernetesService(spec)
-	case bifrostv1alpha1.KindCronJob:
+	case bifrost.KindCronJob:
 		return renderKubernetesCronJob(spec)
 	default:
 		return nil, fmt.Errorf("unsupported kind %q", spec.Kind)
 	}
 }
 
-func renderKubernetesService(spec bifrostv1alpha1.Workload) ([]byte, error) {
+func renderKubernetesService(spec bifrost.Workload) ([]byte, error) {
 	labels := map[string]string{
 		"app.kubernetes.io/name": spec.Metadata.Name,
 	}
@@ -278,7 +278,7 @@ func renderKubernetesService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func renderKubernetesCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
+func renderKubernetesCronJob(spec bifrost.Workload) ([]byte, error) {
 	labels := map[string]string{
 		"app.kubernetes.io/name": spec.Metadata.Name,
 	}
@@ -361,18 +361,18 @@ func renderKubernetesCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func RenderTerraform(spec bifrostv1alpha1.Workload) ([]byte, error) {
+func RenderTerraform(spec bifrost.Workload) ([]byte, error) {
 	switch spec.Kind {
-	case bifrostv1alpha1.KindService:
+	case bifrost.KindService:
 		return renderTerraformService(spec)
-	case bifrostv1alpha1.KindCronJob:
+	case bifrost.KindCronJob:
 		return renderTerraformCronJob(spec)
 	default:
 		return nil, fmt.Errorf("unsupported kind %q", spec.Kind)
 	}
 }
 
-func renderTerraformService(spec bifrostv1alpha1.Workload) ([]byte, error) {
+func renderTerraformService(spec bifrost.Workload) ([]byte, error) {
 	projectID := spec.Spec.GCP.ProjectID
 	accountID, err := accountIDFromEmail(spec.Spec.ServiceAccountName)
 	if err != nil {
@@ -410,7 +410,7 @@ func renderTerraformService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	return hclwrite.Format(file.Bytes()), nil
 }
 
-func renderTerraformCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
+func renderTerraformCronJob(spec bifrost.Workload) ([]byte, error) {
 	projectID := spec.Spec.GCP.ProjectID
 	runtimeAccountID, err := accountIDFromEmail(spec.Spec.ServiceAccountName)
 	if err != nil {
@@ -509,7 +509,7 @@ func renderTerraformCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	return hclwrite.Format(file.Bytes()), nil
 }
 
-func containerForSpec(spec bifrostv1alpha1.Spec, volumeMounts []corev1.VolumeMount, includePorts bool, includeProbes bool, includeSecurityContext bool) corev1.Container {
+func containerForSpec(spec bifrost.Spec, volumeMounts []corev1.VolumeMount, includePorts bool, includeProbes bool, includeSecurityContext bool) corev1.Container {
 	resources := *spec.Resources.DeepCopy()
 	container := corev1.Container{
 		Name:         "app",
@@ -619,7 +619,7 @@ type resolvedSecrets struct {
 	mounts  []corev1.VolumeMount
 }
 
-func resolveSecretFiles(projectID string, secretFiles []bifrostv1alpha1.SecretFile) resolvedSecrets {
+func resolveSecretFiles(projectID string, secretFiles []bifrost.SecretFile) resolvedSecrets {
 	if len(secretFiles) == 0 {
 		return resolvedSecrets{}
 	}
@@ -688,7 +688,7 @@ func resolveSecretFiles(projectID string, secretFiles []bifrostv1alpha1.SecretFi
 	return res
 }
 
-func secretManifests(projectID, namespace string, secretFiles []bifrostv1alpha1.SecretFile) ([]byte, error) {
+func secretManifests(projectID, namespace string, secretFiles []bifrost.SecretFile) ([]byte, error) {
 	if len(secretFiles) == 0 {
 		return nil, nil
 	}
@@ -770,14 +770,14 @@ func mergeStringMaps(base map[string]string, extra map[string]string) map[string
 	return out
 }
 
-func cloudRunTemplateAnnotations(spec bifrostv1alpha1.Workload) map[string]string {
+func cloudRunTemplateAnnotations(spec bifrost.Workload) map[string]string {
 	return mergeStringMaps(nil, map[string]string{
 		"run.googleapis.com/execution-environment": "gen2",
 		"run.googleapis.com/secrets":               cloudRunSecretsAnnotation(spec.Spec.GCP.ProjectID, spec.Spec.SecretFiles),
 	})
 }
 
-func cloudRunSecretsAnnotation(defaultProject string, secretFiles []bifrostv1alpha1.SecretFile) string {
+func cloudRunSecretsAnnotation(defaultProject string, secretFiles []bifrost.SecretFile) string {
 	seen := map[string]bool{}
 	var parts []string
 	for _, sf := range secretFiles {
@@ -796,7 +796,7 @@ func cloudRunSecretsAnnotation(defaultProject string, secretFiles []bifrostv1alp
 }
 
 func prefixedAccountID(prefix, name string) (string, error) {
-	return bifrostv1alpha1.DefaultServiceAccountAccountID(prefix, name)
+	return bifrost.DefaultServiceAccountAccountID(prefix, name)
 }
 
 func int32Ptr(v int32) *int32 {

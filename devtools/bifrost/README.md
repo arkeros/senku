@@ -13,7 +13,7 @@ Current outputs:
   - Kubernetes `ServiceAccount` + `CronJob`
   - Terraform for runtime identity and Cloud Scheduler trigger
 
-The source model lives under [`pkg/api/v1alpha1`](./pkg/api/v1alpha1). The CLI in [`cmd/bifrost`](./cmd/bifrost) is one consumer of that API.
+The source model lives under [`api/`](./api). The CLI in [`cli/`](./cli) is one consumer of that API.
 
 ## Setup
 
@@ -67,7 +67,7 @@ It lets you define a service in Starlark and generates:
 Example:
 
 ```starlark
-load("//bifrost:bifrost.bzl", "bifrost_service")
+load("//devtools/bifrost:bifrost.bzl", "bifrost_service")
 
 bifrost_service(
     name = "registry",
@@ -163,7 +163,7 @@ That is closer to a small platform API than to a templating trick.
 
 ### Custom Service API
 
-The service API is versioned in [`pkg/api/v1alpha1`](./pkg/api/v1alpha1), not embedded in the CLI package.
+The service API is defined in [`api/`](./api), not embedded in the CLI package.
 
 Why:
 

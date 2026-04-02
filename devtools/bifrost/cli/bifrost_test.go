@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	bifrostv1alpha1 "github.com/arkeros/senku/bifrost/pkg/api/v1alpha1"
+	bifrost "github.com/arkeros/senku/devtools/bifrost/api"
 )
 
 func TestRenderCloudRun(t *testing.T) {
@@ -218,7 +218,7 @@ func TestRenderTerraformCronJob(t *testing.T) {
 func TestParseServiceSpecValidatesRequiredFields(t *testing.T) {
 	t.Parallel()
 
-	_, err := bifrostv1alpha1.Parse(strings.NewReader(`
+	_, err := bifrost.Parse(strings.NewReader(`
 apiVersion: bifrost.apotema.cloud/v1alpha1
 kind: Service
 metadata:
@@ -266,7 +266,7 @@ func TestParseServiceSpecAppliesDefaults(t *testing.T) {
 func TestParseCronJobAppliesDefaults(t *testing.T) {
 	t.Parallel()
 
-	spec, err := bifrostv1alpha1.Parse(strings.NewReader(`
+	spec, err := bifrost.Parse(strings.NewReader(`
 apiVersion: bifrost.apotema.cloud/v1alpha1
 kind: CronJob
 metadata:
@@ -308,10 +308,10 @@ spec:
 	}
 }
 
-func loadSpecFixture(name string) (bifrostv1alpha1.Workload, error) {
+func loadSpecFixture(name string) (bifrost.Workload, error) {
 	data, err := os.ReadFile("testdata/" + name)
 	if err != nil {
-		return bifrostv1alpha1.Workload{}, err
+		return bifrost.Workload{}, err
 	}
-	return bifrostv1alpha1.Parse(strings.NewReader(string(data)))
+	return bifrost.Parse(strings.NewReader(string(data)))
 }
