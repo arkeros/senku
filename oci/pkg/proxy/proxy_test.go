@@ -375,7 +375,9 @@ func TestTransportCacheIsBounded(t *testing.T) {
 	upstream := newFakeRegistry(t, contents)
 	defer upstream.Close()
 
-	srv := newTestProxy(upstream)
+	p := proxy.New(upstream.Listener.Addr().String(), "arkeros/senku")
+	p.SetScheme("http")
+	srv := httptest.NewServer(p)
 	defer srv.Close()
 
 	// Request 200 unique repos
@@ -391,20 +393,6 @@ func TestTransportCacheIsBounded(t *testing.T) {
 	}
 
 	// Cache should not have grown beyond the limit
-	p := proxy.New(upstream.Listener.Addr().String(), "arkeros/senku")
-	p.SetScheme("http")
-	// Re-run through a proxy we hold a reference to, so we can check CacheLen
-	srv2 := httptest.NewServer(p)
-	defer srv2.Close()
-
-	for i := range 200 {
-		resp, err := http.Get(fmt.Sprintf("%s/v2/repo%d/manifests/latest", srv2.URL, i))
-		if err != nil {
-			t.Fatal(err)
-		}
-		resp.Body.Close()
-	}
-
 	if size := p.CacheLen(); size > proxy.MaxCacheEntries {
 		t.Errorf("transport cache size = %d, want <= %d", size, proxy.MaxCacheEntries)
 	}
