@@ -174,8 +174,7 @@ func newFakeRegistry(t *testing.T, contents map[string]fakeResponse) *httptest.S
 }
 
 func newTestProxy(upstream *httptest.Server) *httptest.Server {
-	p := proxy.New(upstream.Listener.Addr().String(), "arkeros/senku")
-	p.SetScheme("http")
+	p := proxy.New(upstream.Listener.Addr().String(), "arkeros/senku", proxy.Insecure())
 	return httptest.NewServer(p)
 }
 
@@ -375,8 +374,7 @@ func TestTransportCacheIsBounded(t *testing.T) {
 	upstream := newFakeRegistry(t, contents)
 	defer upstream.Close()
 
-	p := proxy.New(upstream.Listener.Addr().String(), "arkeros/senku")
-	p.SetScheme("http")
+	p := proxy.New(upstream.Listener.Addr().String(), "arkeros/senku", proxy.Insecure())
 	srv := httptest.NewServer(p)
 	defer srv.Close()
 

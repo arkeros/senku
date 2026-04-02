@@ -24,13 +24,27 @@ type Proxy struct {
 	transports map[string]http.RoundTripper
 }
 
-func New(upstream, repositoryPrefix string) *Proxy {
-	return &Proxy{
+// Option configures a Proxy.
+type Option func(*Proxy)
+
+// Insecure configures the proxy to use plain HTTP instead of HTTPS.
+func Insecure() Option {
+	return func(p *Proxy) {
+		p.scheme = "http"
+	}
+}
+
+func New(upstream, repositoryPrefix string, opts ...Option) *Proxy {
+	p := &Proxy{
 		upstream:         upstream,
 		repositoryPrefix: repositoryPrefix,
 		scheme:           "https",
 		transports:       make(map[string]http.RoundTripper),
 	}
+	for _, o := range opts {
+		o(p)
+	}
+	return p
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -180,8 +194,3 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// SetScheme overrides the scheme used to connect to the upstream registry.
-// Useful for testing against plain HTTP servers.
-func (p *Proxy) SetScheme(scheme string) {
-	p.scheme = scheme
-}
