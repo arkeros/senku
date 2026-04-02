@@ -88,6 +88,10 @@ bazel build //oci/cmd/registry/k8s
 bazel test //oci/pkg/proxy:proxy_test
 ```
 
+## TODO
+
+- [ ] Add OCI-compliant authentication (token challenge flow on `/v2/`) — the proxy is currently unauthenticated and exposed on the public internet
+
 ## See also
 
 - [archeio](https://github.com/kubernetes/registry.k8s.io/blob/main/cmd/archeio/README.md) — Kubernetes' registry.k8s.io proxy, similar architecture
