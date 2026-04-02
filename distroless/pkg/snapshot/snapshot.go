@@ -69,7 +69,7 @@ func ParseManifest(path string) (*Manifest, error) {
 func splitHeader(content string) (header, body string) {
 	lines := strings.Split(content, "\n")
 	var headerLines []string
-	bodyStart := 0
+	bodyStart := len(lines)
 	for i, line := range lines {
 		if strings.HasPrefix(line, "#") || line == "" {
 			headerLines = append(headerLines, line)

@@ -127,6 +127,17 @@ func TestUpdateManifestTimestamps(t *testing.T) {
 	}
 }
 
+func TestSplitHeaderAllComments(t *testing.T) {
+	content := "# comment one\n# comment two\n"
+	header, body := splitHeader(content)
+	if header != "# comment one\n# comment two\n" {
+		t.Errorf("header = %q, want all-comment content", header)
+	}
+	if body != "" {
+		t.Errorf("body = %q, want empty", body)
+	}
+}
+
 func TestParseManifestValidation(t *testing.T) {
 	tests := []struct {
 		name    string
