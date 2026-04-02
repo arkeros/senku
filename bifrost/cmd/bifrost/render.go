@@ -314,7 +314,7 @@ func renderKubernetesCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 						Spec: podSpecWithSecurityContext(corev1.PodSpec{
 							RestartPolicy:      corev1.RestartPolicyNever,
 							ServiceAccountName: kubernetesServiceAccountName,
-							Containers:         []corev1.Container{containerForSpec(spec.Spec, false, true)},
+							Containers:         []corev1.Container{containerForSpec(spec.Spec, false, false)},
 							Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
 						}),
 					},
