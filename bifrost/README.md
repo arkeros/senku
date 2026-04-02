@@ -50,8 +50,7 @@ spec:
   gcp:
     projectId: senku-prod
     projectNumber: "874944788122"
-    cloudRun:
-      region: europe-west3
+    region: europe-west3
 ```
 
 ## Bazel Macro
@@ -95,8 +94,8 @@ bifrost_service(
     gcp = {
         "projectId": "senku-prod",
         "projectNumber": "874944788122",
+        "region": "europe-west3",
         "cloudRun": {
-            "region": "europe-west3",
             "ingress": "all",
         },
     },
@@ -188,6 +187,7 @@ Platform-specific fields stay under the platform:
 
 - `gcp.projectId`
 - `gcp.projectNumber`
+- `gcp.region`
 - `gcp.cloudRun.*`
 - `kubernetes.*`
 
@@ -269,20 +269,22 @@ It does not set fixed `Deployment.spec.replicas`; horizontal scaling is owned by
 
 ### Terraform
 
-`bifrost render terraform` is intentionally narrow. It currently emits only supporting runtime identity:
+`bifrost render terraform` is intentionally narrow. It emits supporting infrastructure, not the workload itself.
 
-- `google_service_account`
-- `google_service_account_iam_member` for GKE Workload Identity
+For **Services**:
 
-It does not emit:
+- `google_service_account` — runtime identity
+- `google_service_account_iam_member` — GKE Workload Identity binding
 
-- Cloud Run service resources
-- public invoker IAM
-- DNS
-- load balancers
-- custom domains
+For **CronJobs**, it additionally emits:
 
-That split is deliberate: deploy artifacts own the service, Terraform owns the sustaining identity.
+- `google_service_account` — Cloud Scheduler invoker identity
+- `google_project_iam_member` — `roles/run.invoker` for the scheduler SA
+- `google_cloud_scheduler_job` — the cron trigger pointing at the Cloud Run Job
+
+It does not emit Cloud Run service/job resources, DNS, load balancers, or custom domains.
+
+That split is deliberate: deploy artifacts own the workload, Terraform owns the sustaining identity and scheduling.
 
 ## Validation and Defaults
 
@@ -294,7 +296,7 @@ Validation focuses on required and security-relevant inputs:
 - CPU and memory limits are required
 - `gcp.projectId` is required
 - `gcp.projectNumber` is required
-- `gcp.cloudRun.region` is required
+- `gcp.region` is required
 - `serviceAccountName`, if set, must be a GSA email
 
 Defaults are used for low-risk operational knobs:
@@ -328,4 +330,4 @@ For `CronJob`, the source model is split into:
 - `job`
   Cross-platform execution settings such as parallelism, completions, retries, and timeout.
 - `gcp.cloudScheduler`
-  Google-specific scheduler configuration used only for the Cloud Run + Cloud Scheduler render path.
+  Google-specific scheduler configuration (retry count, attempt deadline) used only for the Cloud Run + Cloud Scheduler render path. Region is shared via `gcp.region`.

@@ -17,10 +17,7 @@ bifrost_service(
     gcp = {
         "projectId": "senku-prod",
         "projectNumber": "874944788122",
-        "cloudRun": {
-            "region": "europe-west3",
-            "ingress": "all",
-        },
+        "region": "europe-west3",
     },
     image_push = "//oci/cmd/registry:image_push",
     kubernetes = {},

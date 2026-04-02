@@ -624,35 +624,35 @@ func resolveSecretFiles(projectID string, secretFiles []bifrostv1alpha1.SecretFi
 		return resolvedSecrets{}
 	}
 	type secretData struct {
-		name  string
-		data  map[string]string // version → base64(gcpsm ref)
-		items []corev1.KeyToPath
+		name string
+		data map[string]string // version → base64(gcpsm ref)
 	}
 	type mountGroup struct {
-		secret    *secretData
+		ukey      string
 		mountPath string
 		items     []corev1.KeyToPath
 	}
-	secrets := map[string]*secretData{}
+	secrets := map[string]*secretData{}   // keyed by uniqueKey (project/name)
 	var secretOrder []string
 	groups := map[string]*mountGroup{}
 	var groupOrder []string
 	for _, sf := range secretFiles {
+		ukey := sf.UniqueKey(projectID)
 		proj, name, version := sf.ParseSecret(projectID)
-		sd, ok := secrets[name]
+		sd, ok := secrets[ukey]
 		if !ok {
 			sd = &secretData{name: name, data: map[string]string{}}
-			secrets[name] = sd
-			secretOrder = append(secretOrder, name)
+			secrets[ukey] = sd
+			secretOrder = append(secretOrder, ukey)
 		}
 		sd.data[version] = base64.StdEncoding.EncodeToString([]byte(
 			fmt.Sprintf("${gcpsm:///projects/%s/secrets/%s/versions/%s}", proj, name, version)))
 
 		dir := path.Dir(sf.Path)
-		gkey := name + ":" + dir
+		gkey := ukey + ":" + dir
 		g, ok := groups[gkey]
 		if !ok {
-			g = &mountGroup{secret: sd, mountPath: dir}
+			g = &mountGroup{ukey: ukey, mountPath: dir}
 			groups[gkey] = g
 			groupOrder = append(groupOrder, gkey)
 		}
@@ -663,14 +663,14 @@ func resolveSecretFiles(projectID string, secretFiles []bifrostv1alpha1.SecretFi
 	}
 	// Compute suffixed names from secret data
 	suffixedNames := map[string]string{}
-	for _, name := range secretOrder {
-		sd := secrets[name]
-		suffixedNames[name] = name + "-" + hashSecretData(sd.data)
+	for _, ukey := range secretOrder {
+		sd := secrets[ukey]
+		suffixedNames[ukey] = sd.name + "-" + hashSecretData(sd.data)
 	}
 	var res resolvedSecrets
 	for _, gkey := range groupOrder {
 		g := groups[gkey]
-		sname := suffixedNames[g.secret.name]
+		sname := suffixedNames[g.ukey]
 		res.volumes = append(res.volumes, corev1.Volume{
 			Name: sname,
 			VolumeSource: corev1.VolumeSource{
@@ -699,19 +699,20 @@ func secretManifests(projectID, namespace string, secretFiles []bifrostv1alpha1.
 	seen := map[string]*secretEntry{}
 	var order []string
 	for _, sf := range secretFiles {
+		ukey := sf.UniqueKey(projectID)
 		proj, name, version := sf.ParseSecret(projectID)
-		e, ok := seen[name]
+		e, ok := seen[ukey]
 		if !ok {
 			e = &secretEntry{name: name, data: map[string]string{}}
-			seen[name] = e
-			order = append(order, name)
+			seen[ukey] = e
+			order = append(order, ukey)
 		}
 		e.data[version] = base64.StdEncoding.EncodeToString([]byte(
 			fmt.Sprintf("${gcpsm:///projects/%s/secrets/%s/versions/%s}", proj, name, version)))
 	}
 	var out bytes.Buffer
-	for _, name := range order {
-		e := seen[name]
+	for _, ukey := range order {
+		e := seen[ukey]
 		suffixed := e.name + "-" + hashSecretData(e.data)
 		secret := map[string]any{
 			"apiVersion": "v1",
@@ -771,9 +772,7 @@ func mergeStringMaps(base map[string]string, extra map[string]string) map[string
 
 func cloudRunTemplateAnnotations(spec bifrostv1alpha1.Workload) map[string]string {
 	return mergeStringMaps(nil, map[string]string{
-		"run.googleapis.com/execution-environment": spec.Spec.GCP.CloudRun.ExecutionEnvironment,
-		"run.googleapis.com/vpc-access-egress":     spec.Spec.GCP.CloudRun.VPCAccessEgress,
-		"run.googleapis.com/vpc-access-connector":  spec.Spec.GCP.CloudRun.VPCAccessConnector,
+		"run.googleapis.com/execution-environment": "gen2",
 		"run.googleapis.com/secrets":               cloudRunSecretsAnnotation(spec.Spec.GCP.ProjectID, spec.Spec.SecretFiles),
 	})
 }
@@ -782,11 +781,12 @@ func cloudRunSecretsAnnotation(defaultProject string, secretFiles []bifrostv1alp
 	seen := map[string]bool{}
 	var parts []string
 	for _, sf := range secretFiles {
+		ukey := sf.UniqueKey(defaultProject)
 		proj, name, _ := sf.ParseSecret(defaultProject)
-		if proj == defaultProject || seen[name] {
+		if proj == defaultProject || seen[ukey] {
 			continue
 		}
-		seen[name] = true
+		seen[ukey] = true
 		parts = append(parts, fmt.Sprintf("%s:projects/%s/secrets/%s", name, proj, name))
 	}
 	if len(parts) == 0 {

@@ -37,7 +37,7 @@ def bifrost_service(
             },
             gcp = {
                 "projectId": "senku-prod",
-                "cloudRun": {"region": "europe-west3"},
+                "region": "europe-west3",
             },
         )
 
@@ -57,8 +57,8 @@ def bifrost_service(
             exclusive with image.
         port: Container port number.
         gcp: GCP configuration dict. Must include "projectId", "projectNumber", and
-            "cloudRun" with at least "region". Example:
-            {"projectId": "my-proj", "projectNumber": "123456789012", "cloudRun": {"region": "us-central1"}}.
+            "region". Example:
+            {"projectId": "my-proj", "projectNumber": "123456789012", "region": "us-central1"}.
         resources: Resource requirements dict with "requests" and/or "limits" sub-dicts,
             each containing "cpu" and "memory". Example: {"limits": {"cpu": "1000m", "memory": "256Mi"}}.
         args: Optional list of container arguments.

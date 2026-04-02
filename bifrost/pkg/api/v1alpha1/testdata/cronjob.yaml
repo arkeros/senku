@@ -27,9 +27,5 @@ spec:
     region: europe-west1
     cloudScheduler:
       retryCount: 3
-    cloudRun:
-      executionEnvironment: gen2
-      vpcAccessEgress: private-ranges-only
-      vpcAccessConnector: projects/senku-prod/locations/europe-west1/connectors/internal
   kubernetes:
     namespace: jobs

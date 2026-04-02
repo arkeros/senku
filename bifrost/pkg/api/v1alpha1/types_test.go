@@ -292,24 +292,29 @@ func TestSecretFile_ParseSecret(t *testing.T) {
 	}
 }
 
-func TestValidate_CloudRunExecutionEnvironment(t *testing.T) {
+func TestValidate_SecretFiles(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		execEnv string
-		wantErr bool
+		name        string
+		secretFiles []SecretFile
+		wantErr     bool
+		errContain  string
 	}{
-		{"empty defaults to gen2", "", false},
-		{"gen1", "gen1", false},
-		{"gen2", "gen2", false},
-		{"invalid value", "gen3", true},
+		{"valid", []SecretFile{{Secret: "foo", Path: "/run/secrets/a.json"}}, false, ""},
+		{"empty secret", []SecretFile{{Secret: "", Path: "/run/secrets/a.json"}}, true, "secret is required"},
+		{"empty path", []SecretFile{{Secret: "foo", Path: ""}}, true, "path is required"},
+		{"relative path", []SecretFile{{Secret: "foo", Path: "relative/path"}}, true, "must be absolute"},
+		{"malformed projects path", []SecretFile{{Secret: "projects//secrets/", Path: "/a"}}, true, "not a valid"},
+		{"malformed projects no secrets", []SecretFile{{Secret: "projects/p", Path: "/a"}}, true, "not a valid"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			w := validWorkload()
-			w.Spec.GCP.CloudRun.ExecutionEnvironment = tt.execEnv
+			w.Kind = KindCronJob
+			w.Spec.SecretFiles = tt.secretFiles
+			w.Spec.Schedule.Cron = "0 * * * *"
 			err := w.Validate()
 			if tt.wantErr && err == nil {
 				t.Fatal("expected error, got nil")
@@ -317,9 +322,10 @@ func TestValidate_CloudRunExecutionEnvironment(t *testing.T) {
 			if !tt.wantErr && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if tt.wantErr && err != nil && !strings.Contains(err.Error(), "executionEnvironment") {
-				t.Fatalf("error should mention executionEnvironment, got: %v", err)
+			if tt.wantErr && err != nil && !strings.Contains(err.Error(), tt.errContain) {
+				t.Fatalf("error should contain %q, got: %v", tt.errContain, err)
 			}
 		})
 	}
 }
+

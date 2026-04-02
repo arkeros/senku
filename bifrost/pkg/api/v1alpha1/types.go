@@ -47,12 +47,43 @@ func (sf SecretFile) ParseSecret(defaultProject string) (project, name, version 
 		return defaultProject, s, "latest"
 	}
 	s = strings.TrimPrefix(s, "projects/")
-	project, s, _ = strings.Cut(s, "/secrets/")
-	name, version, ok := strings.Cut(s, "/versions/")
-	if !ok {
+	project, s, ok := strings.Cut(s, "/secrets/")
+	if !ok || project == "" || s == "" {
+		return defaultProject, sf.Secret, "latest"
+	}
+	name, version, ok = strings.Cut(s, "/versions/")
+	if !ok || version == "" {
 		version = "latest"
 	}
 	return project, name, version
+}
+
+// UniqueKey returns a key that uniquely identifies this secret across projects.
+func (sf SecretFile) UniqueKey(defaultProject string) string {
+	project, name, _ := sf.ParseSecret(defaultProject)
+	return project + "/" + name
+}
+
+func validateSecretFiles(secretFiles []SecretFile) error {
+	for i, sf := range secretFiles {
+		if sf.Secret == "" {
+			return fmt.Errorf("spec.secretFiles[%d].secret is required", i)
+		}
+		if sf.Path == "" {
+			return fmt.Errorf("spec.secretFiles[%d].path is required", i)
+		}
+		if !strings.HasPrefix(sf.Path, "/") {
+			return fmt.Errorf("spec.secretFiles[%d].path must be absolute", i)
+		}
+		if strings.HasPrefix(sf.Secret, "projects/") {
+			s := strings.TrimPrefix(sf.Secret, "projects/")
+			project, rest, ok := strings.Cut(s, "/secrets/")
+			if !ok || project == "" || rest == "" {
+				return fmt.Errorf("spec.secretFiles[%d].secret %q is not a valid GCP Secret Manager resource path", i, sf.Secret)
+			}
+		}
+	}
+	return nil
 }
 
 type Spec struct {
@@ -84,11 +115,8 @@ type ProbeSpec struct {
 }
 
 type CloudRunSpec struct {
-	Ingress              string `json:"ingress,omitempty"`
-	ExecutionEnvironment string `json:"executionEnvironment,omitempty"`
-	Public               bool   `json:"public,omitempty"`
-	VPCAccessEgress      string `json:"vpcAccessEgress,omitempty"`
-	VPCAccessConnector   string `json:"vpcAccessConnector,omitempty"`
+	Ingress string `json:"ingress,omitempty"`
+	Public  bool   `json:"public,omitempty"`
 }
 
 type KubernetesSpec struct {
@@ -213,6 +241,9 @@ func (s *Workload) Validate() error {
 	if reqMem := s.Spec.Resources.Requests[corev1.ResourceMemory]; reqMem.Cmp(s.Spec.Resources.Limits[corev1.ResourceMemory]) > 0 {
 		return fmt.Errorf("spec.resources.requests.memory must be <= spec.resources.limits.memory")
 	}
+	if err := validateSecretFiles(s.Spec.SecretFiles); err != nil {
+		return err
+	}
 	if s.Spec.GCP.Region == "" {
 		return fmt.Errorf("spec.gcp.region is required")
 	}
@@ -223,14 +254,6 @@ func (s *Workload) Validate() error {
 	case "all", "internal", "internal-and-cloud-load-balancing":
 	default:
 		return fmt.Errorf("spec.gcp.cloudRun.ingress %q is not valid, must be one of: all, internal, internal-and-cloud-load-balancing", s.Spec.GCP.CloudRun.Ingress)
-	}
-	if s.Spec.GCP.CloudRun.ExecutionEnvironment == "" {
-		s.Spec.GCP.CloudRun.ExecutionEnvironment = "gen2"
-	}
-	switch s.Spec.GCP.CloudRun.ExecutionEnvironment {
-	case "gen1", "gen2":
-	default:
-		return fmt.Errorf("spec.gcp.cloudRun.executionEnvironment %q is not valid, must be one of: gen1, gen2", s.Spec.GCP.CloudRun.ExecutionEnvironment)
 	}
 	if s.Spec.Kubernetes.ServiceType == "" {
 		s.Spec.Kubernetes.ServiceType = "ClusterIP"

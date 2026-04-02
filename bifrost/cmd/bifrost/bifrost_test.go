@@ -63,8 +63,7 @@ func TestRenderCloudRunCronJob(t *testing.T) {
 		"name: crossdocking-stock-flow",
 		"namespace: \"874944788122\"",
 		"cloud.googleapis.com/location: europe-west1",
-		"run.googleapis.com/vpc-access-egress: private-ranges-only",
-		"run.googleapis.com/vpc-access-connector: projects/senku-prod/locations/europe-west1/connectors/internal",
+		"run.googleapis.com/execution-environment: gen2",
 		"parallelism: 1",
 		"taskCount: 1",
 		"maxRetries: 3",
@@ -252,9 +251,6 @@ func TestParseServiceSpecAppliesDefaults(t *testing.T) {
 	}
 	if got, want := spec.Spec.Autoscaling.TargetCPUUtilization, int32(80); got != want {
 		t.Fatalf("spec.Spec.Autoscaling.TargetCPUUtilization = %d, want %d", got, want)
-	}
-	if got, want := spec.Spec.GCP.CloudRun.ExecutionEnvironment, "gen2"; got != want {
-		t.Fatalf("spec.Spec.GCP.CloudRun.ExecutionEnvironment = %q, want %q", got, want)
 	}
 	if got, want := spec.Spec.Kubernetes.ServiceType, "ClusterIP"; got != want {
 		t.Fatalf("spec.Spec.Kubernetes.ServiceType = %q, want %q", got, want)
