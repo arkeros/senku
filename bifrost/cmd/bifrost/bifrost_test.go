@@ -31,6 +31,8 @@ func TestRenderCloudRun(t *testing.T) {
 		"requests:",
 		"cpu: 250m",
 		"run.googleapis.com/ingress: all",
+		"secretName: registry-env",
+		"mountPath: /run/secrets",
 	} {
 		if !strings.Contains(string(got), want) {
 			t.Fatalf("cloudrun output missing %q\n%s", want, got)
@@ -63,7 +65,6 @@ func TestRenderCloudRunCronJob(t *testing.T) {
 		"cloud.googleapis.com/location: europe-west1",
 		"run.googleapis.com/vpc-access-egress: private-ranges-only",
 		"run.googleapis.com/vpc-access-connector: projects/senku-prod/locations/europe-west1/connectors/internal",
-		"run.googleapis.com/secrets: stock-flow-env:projects/123456789/secrets/custom--stock-flow-env",
 		"parallelism: 1",
 		"taskCount: 1",
 		"maxRetries: 3",
@@ -111,6 +112,11 @@ func TestRenderKubernetes(t *testing.T) {
 		"allowPrivilegeEscalation: false",
 		"readOnlyRootFilesystem: true",
 		"- ALL",
+		"kind: Secret",
+		"name: registry-env",
+		"JHtnY3BzbTovLy9wcm9qZWN0cy9zZW5rdS1wcm9kL3NlY3JldHMvcmVnaXN0cnktZW52L3ZlcnNpb25zL2xhdGVzdH0=",
+		"secretName: registry-env",
+		"mountPath: /run/secrets",
 	} {
 		if !strings.Contains(string(got), want) {
 			t.Fatalf("k8s output missing %q\n%s", want, got)
@@ -226,8 +232,7 @@ spec:
       cpu: 1000m
       memory: 256Mi
   gcp:
-    cloudRun:
-      region: europe-west3
+    region: europe-west3
 `))
 	if err == nil || (!strings.Contains(err.Error(), "projectId") && !strings.Contains(err.Error(), "projectNumber")) {
 		t.Fatalf("ParseServiceSpec() error = %v, want project validation", err)
@@ -282,9 +287,7 @@ spec:
   gcp:
     projectId: senku-prod
     projectNumber: "874944788122"
-    cloudScheduler: {}
-    cloudRun:
-      region: europe-west1
+    region: europe-west1
 `))
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
@@ -304,8 +307,8 @@ spec:
 	if got, want := spec.Spec.Job.TimeoutSeconds, int64(600); got != want {
 		t.Fatalf("spec.Spec.Job.TimeoutSeconds = %d, want %d", got, want)
 	}
-	if got, want := spec.Spec.GCP.CloudScheduler.Region, "europe-west1"; got != want {
-		t.Fatalf("spec.Spec.GCP.CloudScheduler.Region = %q, want %q", got, want)
+	if got, want := spec.Spec.GCP.Region, "europe-west1"; got != want {
+		t.Fatalf("spec.Spec.GCP.Region = %q, want %q", got, want)
 	}
 }
 

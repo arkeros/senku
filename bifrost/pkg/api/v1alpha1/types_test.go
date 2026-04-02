@@ -25,9 +25,7 @@ func validWorkload() Workload {
 			GCP: GCPSpec{
 				ProjectID:     "my-project",
 				ProjectNumber: "123456",
-				CloudRun: CloudRunSpec{
-					Region: "us-central1",
-				},
+				Region:        "us-central1",
 			},
 		},
 	}
@@ -86,8 +84,7 @@ spec:
   gcp:
     projectId: my-project
     projectNumber: "123456"
-    cloudRun:
-      region: us-central1
+    region: us-central1
 `
 	_, err := Parse(strings.NewReader(yaml))
 	if err == nil {
@@ -217,6 +214,79 @@ func TestValidate_RequestsExceedLimits(t *testing.T) {
 			}
 			if tt.wantErr && err != nil && !strings.Contains(err.Error(), tt.errContain) {
 				t.Fatalf("error should mention %q, got: %v", tt.errContain, err)
+			}
+		})
+	}
+}
+
+func TestParse_SecretFiles(t *testing.T) {
+	t.Parallel()
+
+	yaml := `
+apiVersion: bifrost.apotema.cloud/v1alpha1
+kind: CronJob
+metadata:
+  name: test-job
+spec:
+  image: test-image
+  resources:
+    limits:
+      cpu: "1"
+      memory: 256Mi
+  secretFiles:
+    - secret: my-secret
+      path: /run/secrets/env.json
+  schedule:
+    cron: "0 12 * * *"
+  gcp:
+    projectId: my-project
+    projectNumber: "123456"
+    region: us-central1
+`
+	w, err := Parse(strings.NewReader(yaml))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(w.Spec.SecretFiles) != 1 {
+		t.Fatalf("expected 1 secret file, got %d", len(w.Spec.SecretFiles))
+	}
+	sf := w.Spec.SecretFiles[0]
+	if sf.Secret != "my-secret" {
+		t.Errorf("expected secret %q, got %q", "my-secret", sf.Secret)
+	}
+	if sf.Path != "/run/secrets/env.json" {
+		t.Errorf("expected path %q, got %q", "/run/secrets/env.json", sf.Path)
+	}
+}
+
+func TestSecretFile_ParseSecret(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		secret         string
+		defaultProject string
+		wantProject    string
+		wantName       string
+		wantVersion    string
+	}{
+		{"bare name", "stock-flow-env", "my-project", "my-project", "stock-flow-env", "latest"},
+		{"full path no version", "projects/other/secrets/foo", "my-project", "other", "foo", "latest"},
+		{"full path with version", "projects/other/secrets/foo/versions/4", "my-project", "other", "foo", "4"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			sf := SecretFile{Secret: tt.secret}
+			proj, name, ver := sf.ParseSecret(tt.defaultProject)
+			if proj != tt.wantProject {
+				t.Errorf("project = %q, want %q", proj, tt.wantProject)
+			}
+			if name != tt.wantName {
+				t.Errorf("name = %q, want %q", name, tt.wantName)
+			}
+			if ver != tt.wantVersion {
+				t.Errorf("version = %q, want %q", ver, tt.wantVersion)
 			}
 		})
 	}

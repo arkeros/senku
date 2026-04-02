@@ -10,16 +10,9 @@ spec:
     limits:
       cpu: 1000m
       memory: 512Mi
-  volumeMounts:
-    - name: secrets
-      mountPath: /run/secrets
-  volumes:
-    - name: secrets
-      secret:
-        secretName: stock-flow-env
-        items:
-          - key: latest
-            path: env.json
+  secretFiles:
+    - secret: stock-flow-env
+      path: /run/secrets/env.json
   schedule:
     cron: "0 12 * * *"
     timeZone: Europe/Madrid
@@ -31,14 +24,12 @@ spec:
   gcp:
     projectId: senku-prod
     projectNumber: "874944788122"
+    region: europe-west1
     cloudScheduler:
-      region: europe-west1
       retryCount: 3
     cloudRun:
-      region: europe-west1
       executionEnvironment: gen2
       vpcAccessEgress: private-ranges-only
       vpcAccessConnector: projects/senku-prod/locations/europe-west1/connectors/internal
-      secrets: stock-flow-env:projects/123456789/secrets/custom--stock-flow-env
   kubernetes:
     namespace: jobs

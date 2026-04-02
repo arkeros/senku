@@ -13,6 +13,7 @@ def bifrost_service(
         image_push = None,
         args = None,
         service_account_name = None,
+        secret_files = None,
         probes = None,
         autoscaling = None,
         kubernetes = None,
@@ -62,6 +63,9 @@ def bifrost_service(
             each containing "cpu" and "memory". Example: {"limits": {"cpu": "1000m", "memory": "256Mi"}}.
         args: Optional list of container arguments.
         service_account_name: Optional GSA email. Auto-generated from name + projectId if omitted.
+        secret_files: Optional list of secret file dicts. Each dict has "secret" (name or
+            projects/P/secrets/N path) and "path" (mount path). Example:
+            [{"secret": "my-secret", "path": "/run/secrets/env.json"}].
         probes: Optional probe paths dict. Example: {"startupPath": "/healthz", "livenessPath": "/healthz"}.
         autoscaling: Optional autoscaling dict. Example: {"min": 0, "max": 5, "concurrency": 100}.
         kubernetes: Optional Kubernetes config dict. Example: {"namespace": "prod", "serviceType": "LoadBalancer"}.
@@ -92,6 +96,8 @@ def bifrost_service(
         spec["args"] = args
     spec["port"] = port
     spec["resources"] = resources
+    if secret_files:
+        spec["secretFiles"] = secret_files
     if probes:
         spec["probes"] = probes
     if autoscaling:

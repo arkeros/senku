@@ -31,14 +31,37 @@ type ObjectMeta struct {
 	Labels map[string]string `json:"labels,omitempty"`
 }
 
+type SecretFile struct {
+	Secret string `json:"secret"`
+	Path   string `json:"path"`
+}
+
+// ParseSecret parses the Secret field into project, name, and version components.
+// Accepted formats:
+//   - "name"                              → (defaultProject, "name", "latest")
+//   - "projects/P/secrets/name"           → ("P", "name", "latest")
+//   - "projects/P/secrets/name/versions/V" → ("P", "name", "V")
+func (sf SecretFile) ParseSecret(defaultProject string) (project, name, version string) {
+	s := sf.Secret
+	if !strings.HasPrefix(s, "projects/") {
+		return defaultProject, s, "latest"
+	}
+	s = strings.TrimPrefix(s, "projects/")
+	project, s, _ = strings.Cut(s, "/secrets/")
+	name, version, ok := strings.Cut(s, "/versions/")
+	if !ok {
+		version = "latest"
+	}
+	return project, name, version
+}
+
 type Spec struct {
 	Image              string                      `json:"image"`
 	ServiceAccountName string                      `json:"serviceAccountName,omitempty"`
 	Args               []string                    `json:"args,omitempty"`
 	Port               int32                       `json:"port,omitempty"`
 	Resources          corev1.ResourceRequirements `json:"resources"`
-	VolumeMounts       []corev1.VolumeMount        `json:"volumeMounts,omitempty"`
-	Volumes            []corev1.Volume             `json:"volumes,omitempty"`
+	SecretFiles        []SecretFile                `json:"secretFiles,omitempty"`
 	Probes             ProbeSpec                   `json:"probes,omitempty"`
 	Autoscaling        AutoscalingSpec             `json:"autoscaling,omitempty"`
 	Schedule           ScheduleSpec                `json:"schedule,omitempty"`
@@ -50,8 +73,9 @@ type Spec struct {
 type GCPSpec struct {
 	ProjectID      string             `json:"projectId"`
 	ProjectNumber  string             `json:"projectNumber"`
+	Region         string             `json:"region"`
 	CloudScheduler CloudSchedulerSpec `json:"cloudScheduler,omitempty"`
-	CloudRun       CloudRunSpec       `json:"cloudRun"`
+	CloudRun       CloudRunSpec       `json:"cloudRun,omitempty"`
 }
 
 type ProbeSpec struct {
@@ -60,13 +84,11 @@ type ProbeSpec struct {
 }
 
 type CloudRunSpec struct {
-	Region               string `json:"region"`
 	Ingress              string `json:"ingress,omitempty"`
 	ExecutionEnvironment string `json:"executionEnvironment,omitempty"`
 	Public               bool   `json:"public,omitempty"`
 	VPCAccessEgress      string `json:"vpcAccessEgress,omitempty"`
 	VPCAccessConnector   string `json:"vpcAccessConnector,omitempty"`
-	Secrets              string `json:"secrets,omitempty"`
 }
 
 type KubernetesSpec struct {
@@ -87,7 +109,6 @@ type JobSpec struct {
 }
 
 type CloudSchedulerSpec struct {
-	Region                 string `json:"region,omitempty"`
 	TimeZone               string `json:"timeZone,omitempty"`
 	RetryCount             int32  `json:"retryCount,omitempty"`
 	AttemptDeadlineSeconds int64  `json:"attemptDeadlineSeconds,omitempty"`
@@ -192,8 +213,8 @@ func (s *Workload) Validate() error {
 	if reqMem := s.Spec.Resources.Requests[corev1.ResourceMemory]; reqMem.Cmp(s.Spec.Resources.Limits[corev1.ResourceMemory]) > 0 {
 		return fmt.Errorf("spec.resources.requests.memory must be <= spec.resources.limits.memory")
 	}
-	if s.Spec.GCP.CloudRun.Region == "" {
-		return fmt.Errorf("spec.gcp.cloudRun.region is required")
+	if s.Spec.GCP.Region == "" {
+		return fmt.Errorf("spec.gcp.region is required")
 	}
 	if s.Spec.GCP.CloudRun.Ingress == "" {
 		s.Spec.GCP.CloudRun.Ingress = "all"
@@ -250,9 +271,6 @@ func (s *Workload) Validate() error {
 		}
 		if s.Spec.Job.TimeoutSeconds <= 0 {
 			s.Spec.Job.TimeoutSeconds = 600
-		}
-		if s.Spec.GCP.CloudScheduler.Region == "" {
-			s.Spec.GCP.CloudScheduler.Region = s.Spec.GCP.CloudRun.Region
 		}
 	}
 	return nil

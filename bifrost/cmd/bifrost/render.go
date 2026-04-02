@@ -2,7 +2,12 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"path"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -35,6 +40,7 @@ func renderCloudRunService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	trueValue := true
 	trafficPercent := int64(100)
 	concurrency := spec.Spec.Autoscaling.Concurrency
+	resolved := resolveSecretFiles(spec.Spec.GCP.ProjectID, spec.Spec.SecretFiles)
 
 	svc := servingv1.Service{
 		TypeMeta: metav1.TypeMeta{
@@ -48,7 +54,7 @@ func renderCloudRunService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 				"run.googleapis.com/ingress": spec.Spec.GCP.CloudRun.Ingress,
 			},
 			Labels: mergeStringMaps(spec.Metadata.Labels, map[string]string{
-				"cloud.googleapis.com/location": spec.Spec.GCP.CloudRun.Region,
+				"cloud.googleapis.com/location": spec.Spec.GCP.Region,
 			}),
 		},
 		Spec: servingv1.ServiceSpec{
@@ -63,8 +69,8 @@ func renderCloudRunService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 					Spec: servingv1.RevisionSpec{
 						PodSpec: corev1.PodSpec{
 							ServiceAccountName: spec.Spec.ServiceAccountName,
-							Containers:         []corev1.Container{containerForSpec(spec.Spec, true, true, false)},
-							Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
+							Containers:         []corev1.Container{containerForSpec(spec.Spec, resolved.mounts, true, true, false)},
+							Volumes:            resolved.volumes,
 						},
 						ContainerConcurrency: &concurrency,
 					},
@@ -85,6 +91,7 @@ func renderCloudRunService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 }
 
 func renderCloudRunCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
+	resolved := resolveSecretFiles(spec.Spec.GCP.ProjectID, spec.Spec.SecretFiles)
 	jobSpec := map[string]any{
 		"apiVersion": "run.googleapis.com/v1",
 		"kind":       "Job",
@@ -92,7 +99,7 @@ func renderCloudRunCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 			"name":      spec.Metadata.Name,
 			"namespace": spec.Spec.GCP.ProjectNumber,
 			"labels": mergeStringMaps(spec.Metadata.Labels, map[string]string{
-				"cloud.googleapis.com/location": spec.Spec.GCP.CloudRun.Region,
+				"cloud.googleapis.com/location": spec.Spec.GCP.Region,
 			}),
 		},
 		"spec": map[string]any{
@@ -102,7 +109,7 @@ func renderCloudRunCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 					"taskCount":   spec.Spec.Job.Completions,
 					"template": map[string]any{
 						"spec": map[string]any{
-							"containers":         []corev1.Container{containerForSpec(spec.Spec, false, false, false)},
+							"containers":         []corev1.Container{containerForSpec(spec.Spec, resolved.mounts, false, false, false)},
 							"maxRetries":         spec.Spec.Job.MaxRetries,
 							"timeoutSeconds":     strconv.FormatInt(spec.Spec.Job.TimeoutSeconds, 10),
 							"serviceAccountName": spec.Spec.ServiceAccountName,
@@ -119,8 +126,8 @@ func renderCloudRunCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 		}
 	}
 	templateSpec := jobSpec["spec"].(map[string]any)["template"].(map[string]any)["spec"].(map[string]any)["template"].(map[string]any)["spec"].(map[string]any)
-	if len(spec.Spec.Volumes) > 0 {
-		templateSpec["volumes"] = slicesCloneVolumes(spec.Spec.Volumes)
+	if len(resolved.volumes) > 0 {
+		templateSpec["volumes"] = resolved.volumes
 	}
 	return marshalManifest(jobSpec)
 }
@@ -142,6 +149,7 @@ func renderKubernetesService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	}
 	namespace := spec.Spec.Kubernetes.Namespace
 	kubernetesServiceAccountName := spec.Metadata.Name
+	resolved := resolveSecretFiles(spec.Spec.GCP.ProjectID, spec.Spec.SecretFiles)
 
 	serviceAccount := corev1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{
@@ -176,8 +184,8 @@ func renderKubernetesService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 				},
 				Spec: podSpecWithSecurityContext(corev1.PodSpec{
 					ServiceAccountName: kubernetesServiceAccountName,
-					Containers:         []corev1.Container{containerForSpec(spec.Spec, true, true, true)},
-					Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
+					Containers:         []corev1.Container{containerForSpec(spec.Spec, resolved.mounts, true, true, true)},
+					Volumes:            resolved.volumes,
 				}),
 			},
 		},
@@ -241,6 +249,10 @@ func renderKubernetesService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	secretsYAML, err := secretManifests(spec.Spec.GCP.ProjectID, namespace, spec.Spec.SecretFiles)
+	if err != nil {
+		return nil, err
+	}
 	deployYAML, err := marshalManifest(deploy)
 	if err != nil {
 		return nil, err
@@ -257,6 +269,7 @@ func renderKubernetesService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	var out bytes.Buffer
 	out.Write(serviceAccountYAML)
 	out.WriteString("---\n")
+	out.Write(secretsYAML)
 	out.Write(deployYAML)
 	out.WriteString("---\n")
 	out.Write(hpaYAML)
@@ -271,6 +284,7 @@ func renderKubernetesCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	}
 	namespace := spec.Spec.Kubernetes.Namespace
 	kubernetesServiceAccountName := spec.Metadata.Name
+	resolved := resolveSecretFiles(spec.Spec.GCP.ProjectID, spec.Spec.SecretFiles)
 	parallelism := spec.Spec.Job.Parallelism
 	completions := spec.Spec.Job.Completions
 	maxRetries := spec.Spec.Job.MaxRetries
@@ -314,8 +328,8 @@ func renderKubernetesCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 						Spec: podSpecWithSecurityContext(corev1.PodSpec{
 							RestartPolicy:      corev1.RestartPolicyNever,
 							ServiceAccountName: kubernetesServiceAccountName,
-							Containers:         []corev1.Container{containerForSpec(spec.Spec, false, false, true)},
-							Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
+							Containers:         []corev1.Container{containerForSpec(spec.Spec, resolved.mounts, false, false, true)},
+							Volumes:            resolved.volumes,
 						}),
 					},
 				},
@@ -330,6 +344,10 @@ func renderKubernetesCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	secretsYAML, err := secretManifests(spec.Spec.GCP.ProjectID, namespace, spec.Spec.SecretFiles)
+	if err != nil {
+		return nil, err
+	}
 	cronJobYAML, err := marshalManifest(cronJob)
 	if err != nil {
 		return nil, err
@@ -338,6 +356,7 @@ func renderKubernetesCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	var out bytes.Buffer
 	out.Write(serviceAccountYAML)
 	out.WriteString("---\n")
+	out.Write(secretsYAML)
 	out.Write(cronJobYAML)
 	return out.Bytes(), nil
 }
@@ -464,7 +483,7 @@ func renderTerraformCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	schedulerBody := schedulerBlock.Body()
 	schedulerBody.SetAttributeValue("project", cty.StringVal(projectID))
 	schedulerBody.SetAttributeValue("name", cty.StringVal(spec.Metadata.Name))
-	schedulerBody.SetAttributeValue("region", cty.StringVal(spec.Spec.GCP.CloudScheduler.Region))
+	schedulerBody.SetAttributeValue("region", cty.StringVal(spec.Spec.GCP.Region))
 	schedulerBody.SetAttributeValue("schedule", cty.StringVal(spec.Spec.Schedule.Cron))
 	if spec.Spec.Schedule.TimeZone != "" {
 		schedulerBody.SetAttributeValue("time_zone", cty.StringVal(spec.Spec.Schedule.TimeZone))
@@ -479,7 +498,7 @@ func renderTerraformCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	httpTarget := schedulerBody.AppendNewBlock("http_target", nil)
 	httpTargetBody := httpTarget.Body()
 	httpTargetBody.SetAttributeValue("http_method", cty.StringVal("POST"))
-	httpTargetBody.SetAttributeValue("uri", cty.StringVal(fmt.Sprintf("https://run.googleapis.com/v2/projects/%s/locations/%s/jobs/%s:run", projectID, spec.Spec.GCP.CloudRun.Region, spec.Metadata.Name)))
+	httpTargetBody.SetAttributeValue("uri", cty.StringVal(fmt.Sprintf("https://run.googleapis.com/v2/projects/%s/locations/%s/jobs/%s:run", projectID, spec.Spec.GCP.Region, spec.Metadata.Name)))
 	httpTargetBody.SetAttributeRaw("body", hclwrite.TokensForFunctionCall("base64encode", hclwrite.TokensForValue(cty.StringVal("{}"))))
 	httpTargetBody.SetAttributeValue("headers", cty.MapVal(map[string]cty.Value{
 		"Content-Type": cty.StringVal("application/json"),
@@ -490,14 +509,14 @@ func renderTerraformCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	return hclwrite.Format(file.Bytes()), nil
 }
 
-func containerForSpec(spec bifrostv1alpha1.Spec, includePorts bool, includeProbes bool, includeSecurityContext bool) corev1.Container {
+func containerForSpec(spec bifrostv1alpha1.Spec, volumeMounts []corev1.VolumeMount, includePorts bool, includeProbes bool, includeSecurityContext bool) corev1.Container {
 	resources := *spec.Resources.DeepCopy()
 	container := corev1.Container{
 		Name:         "app",
 		Image:        spec.Image,
 		Args:         slicesClone(spec.Args),
 		Resources:    resources,
-		VolumeMounts: slicesCloneVolumeMounts(spec.VolumeMounts),
+		VolumeMounts: volumeMounts,
 	}
 	if includeSecurityContext {
 		trueVal := true
@@ -595,22 +614,138 @@ func slicesClone(in []string) []string {
 	return out
 }
 
-func slicesCloneVolumes(in []corev1.Volume) []corev1.Volume {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make([]corev1.Volume, len(in))
-	copy(out, in)
-	return out
+type resolvedSecrets struct {
+	volumes []corev1.Volume
+	mounts  []corev1.VolumeMount
 }
 
-func slicesCloneVolumeMounts(in []corev1.VolumeMount) []corev1.VolumeMount {
-	if len(in) == 0 {
-		return nil
+func resolveSecretFiles(projectID string, secretFiles []bifrostv1alpha1.SecretFile) resolvedSecrets {
+	if len(secretFiles) == 0 {
+		return resolvedSecrets{}
 	}
-	out := make([]corev1.VolumeMount, len(in))
-	copy(out, in)
-	return out
+	type secretData struct {
+		name  string
+		data  map[string]string // version → base64(gcpsm ref)
+		items []corev1.KeyToPath
+	}
+	type mountGroup struct {
+		secret    *secretData
+		mountPath string
+		items     []corev1.KeyToPath
+	}
+	secrets := map[string]*secretData{}
+	var secretOrder []string
+	groups := map[string]*mountGroup{}
+	var groupOrder []string
+	for _, sf := range secretFiles {
+		proj, name, version := sf.ParseSecret(projectID)
+		sd, ok := secrets[name]
+		if !ok {
+			sd = &secretData{name: name, data: map[string]string{}}
+			secrets[name] = sd
+			secretOrder = append(secretOrder, name)
+		}
+		sd.data[version] = base64.StdEncoding.EncodeToString([]byte(
+			fmt.Sprintf("${gcpsm:///projects/%s/secrets/%s/versions/%s}", proj, name, version)))
+
+		dir := path.Dir(sf.Path)
+		gkey := name + ":" + dir
+		g, ok := groups[gkey]
+		if !ok {
+			g = &mountGroup{secret: sd, mountPath: dir}
+			groups[gkey] = g
+			groupOrder = append(groupOrder, gkey)
+		}
+		g.items = append(g.items, corev1.KeyToPath{
+			Key:  version,
+			Path: path.Base(sf.Path),
+		})
+	}
+	// Compute suffixed names from secret data
+	suffixedNames := map[string]string{}
+	for _, name := range secretOrder {
+		sd := secrets[name]
+		suffixedNames[name] = name + "-" + hashSecretData(sd.data)
+	}
+	var res resolvedSecrets
+	for _, gkey := range groupOrder {
+		g := groups[gkey]
+		sname := suffixedNames[g.secret.name]
+		res.volumes = append(res.volumes, corev1.Volume{
+			Name: sname,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: sname,
+					Items:      g.items,
+				},
+			},
+		})
+		res.mounts = append(res.mounts, corev1.VolumeMount{
+			Name:      sname,
+			MountPath: g.mountPath,
+		})
+	}
+	return res
+}
+
+func secretManifests(projectID, namespace string, secretFiles []bifrostv1alpha1.SecretFile) ([]byte, error) {
+	if len(secretFiles) == 0 {
+		return nil, nil
+	}
+	type secretEntry struct {
+		name string
+		data map[string]string
+	}
+	seen := map[string]*secretEntry{}
+	var order []string
+	for _, sf := range secretFiles {
+		proj, name, version := sf.ParseSecret(projectID)
+		e, ok := seen[name]
+		if !ok {
+			e = &secretEntry{name: name, data: map[string]string{}}
+			seen[name] = e
+			order = append(order, name)
+		}
+		e.data[version] = base64.StdEncoding.EncodeToString([]byte(
+			fmt.Sprintf("${gcpsm:///projects/%s/secrets/%s/versions/%s}", proj, name, version)))
+	}
+	var out bytes.Buffer
+	for _, name := range order {
+		e := seen[name]
+		suffixed := e.name + "-" + hashSecretData(e.data)
+		secret := map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Secret",
+			"metadata": map[string]any{
+				"name":      suffixed,
+				"namespace": namespace,
+			},
+			"data": e.data,
+		}
+		b, err := marshalManifest(secret)
+		if err != nil {
+			return nil, err
+		}
+		out.Write(b)
+		out.WriteString("---\n")
+	}
+	return out.Bytes(), nil
+}
+
+func hashSecretData(data map[string]string) string {
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	h := sha256.New()
+	for _, k := range keys {
+		h.Write([]byte(k))
+		h.Write([]byte{0})
+		h.Write([]byte(data[k]))
+		h.Write([]byte{0})
+	}
+	return hex.EncodeToString(h.Sum(nil))[:10]
 }
 
 func mergeStringMaps(base map[string]string, extra map[string]string) map[string]string {
@@ -639,8 +774,25 @@ func cloudRunTemplateAnnotations(spec bifrostv1alpha1.Workload) map[string]strin
 		"run.googleapis.com/execution-environment": spec.Spec.GCP.CloudRun.ExecutionEnvironment,
 		"run.googleapis.com/vpc-access-egress":     spec.Spec.GCP.CloudRun.VPCAccessEgress,
 		"run.googleapis.com/vpc-access-connector":  spec.Spec.GCP.CloudRun.VPCAccessConnector,
-		"run.googleapis.com/secrets":               spec.Spec.GCP.CloudRun.Secrets,
+		"run.googleapis.com/secrets":               cloudRunSecretsAnnotation(spec.Spec.GCP.ProjectID, spec.Spec.SecretFiles),
 	})
+}
+
+func cloudRunSecretsAnnotation(defaultProject string, secretFiles []bifrostv1alpha1.SecretFile) string {
+	seen := map[string]bool{}
+	var parts []string
+	for _, sf := range secretFiles {
+		proj, name, _ := sf.ParseSecret(defaultProject)
+		if proj == defaultProject || seen[name] {
+			continue
+		}
+		seen[name] = true
+		parts = append(parts, fmt.Sprintf("%s:projects/%s/secrets/%s", name, proj, name))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, ",")
 }
 
 func prefixedAccountID(prefix, name string) (string, error) {
