@@ -162,6 +162,12 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	if strings.Contains(r.URL.Path, "/blobs/") && resp.StatusCode < 300 {
+		slog.Error("upstream returned blob body instead of redirect", "path", r.URL.Path, "status", resp.StatusCode)
+		http.Error(w, "upstream did not redirect blob request", http.StatusBadGateway)
+		return
+	}
+
 	for _, h := range proxyHeaders {
 		if v := resp.Header.Get(h); v != "" {
 			w.Header().Set(h, v)

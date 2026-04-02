@@ -215,7 +215,7 @@ func TestProxyManifest(t *testing.T) {
 	}
 }
 
-func TestProxyBlob(t *testing.T) {
+func TestProxyBlobDirectResponseReturns502(t *testing.T) {
 	upstream := newFakeRegistry(t, map[string]fakeResponse{
 		"/v2/arkeros/senku/redis/blobs/sha256:abc123": {
 			headers: map[string]string{
@@ -235,12 +235,8 @@ func TestProxyBlob(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	if string(body) != "blob-content" {
-		t.Errorf("body = %q, want blob-content", body)
+	if resp.StatusCode != http.StatusBadGateway {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusBadGateway)
 	}
 }
 
