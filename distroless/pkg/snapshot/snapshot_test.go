@@ -127,6 +127,61 @@ func TestUpdateManifestTimestamps(t *testing.T) {
 	}
 }
 
+func TestParseManifestValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		wantErr string
+	}{
+		{
+			name:    "empty document",
+			content: "---\n",
+			wantErr: "missing or zero version",
+		},
+		{
+			name:    "missing sources",
+			content: "version: 1\narchs: [amd64]\npackages: [libc6]\n",
+			wantErr: "sources must not be empty",
+		},
+		{
+			name:    "missing archs",
+			content: "version: 1\nsources:\n  - channel: trixie\n    url: https://example.com/20260101T000000Z\npackages: [libc6]\n",
+			wantErr: "archs must not be empty",
+		},
+		{
+			name:    "missing packages",
+			content: "version: 1\nsources:\n  - channel: trixie\n    url: https://example.com/20260101T000000Z\narchs: [amd64]\n",
+			wantErr: "packages must not be empty",
+		},
+		{
+			name:    "source missing channel",
+			content: "version: 1\nsources:\n  - url: https://example.com/20260101T000000Z\narchs: [amd64]\npackages: [libc6]\n",
+			wantErr: "sources[0].channel must not be empty",
+		},
+		{
+			name:    "source missing url and urls",
+			content: "version: 1\nsources:\n  - channel: trixie\narchs: [amd64]\npackages: [libc6]\n",
+			wantErr: "sources[0] must have url or urls",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "manifest.yaml")
+			if err := os.WriteFile(path, []byte(tt.content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, err := ParseManifest(path)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error %q does not contain %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestIsSecurityChannel(t *testing.T) {
 	tests := []struct {
 		channel string

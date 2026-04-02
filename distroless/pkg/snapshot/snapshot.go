@@ -39,6 +39,28 @@ func ParseManifest(path string) (*Manifest, error) {
 	if err := yaml.Unmarshal([]byte(body), &m); err != nil {
 		return nil, fmt.Errorf("failed to parse manifest: %w", err)
 	}
+
+	if m.Version == 0 {
+		return nil, fmt.Errorf("invalid manifest: missing or zero version")
+	}
+	if len(m.Sources) == 0 {
+		return nil, fmt.Errorf("invalid manifest: sources must not be empty")
+	}
+	if len(m.Archs) == 0 {
+		return nil, fmt.Errorf("invalid manifest: archs must not be empty")
+	}
+	if len(m.Packages) == 0 {
+		return nil, fmt.Errorf("invalid manifest: packages must not be empty")
+	}
+	for i, src := range m.Sources {
+		if src.Channel == "" {
+			return nil, fmt.Errorf("invalid manifest: sources[%d].channel must not be empty", i)
+		}
+		if src.URL == "" && len(src.URLs) == 0 {
+			return nil, fmt.Errorf("invalid manifest: sources[%d] must have url or urls", i)
+		}
+	}
+
 	m.header = header
 
 	return &m, nil
