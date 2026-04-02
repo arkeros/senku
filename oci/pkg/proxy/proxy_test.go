@@ -124,6 +124,28 @@ func (f *fakeRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	token := strings.TrimPrefix(auth, "Bearer ")
+	if !strings.HasPrefix(token, "token-") {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	scope := strings.TrimPrefix(token, "token-")
+
+	// Enforce that the token scope matches the requested repository.
+	if strings.HasPrefix(r.URL.Path, "/v2/") {
+		rest := strings.TrimPrefix(r.URL.Path, "/v2/")
+		parts := strings.Split(rest, "/")
+		if len(parts) >= 3 {
+			repo := strings.Join(parts[:len(parts)-2], "/")
+			if repo != "" {
+				expectedScope := "repository:" + repo + ":pull"
+				if scope != expectedScope {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+			}
+		}
+	}
 
 	key := r.URL.Path
 	if r.URL.RawQuery != "" {
