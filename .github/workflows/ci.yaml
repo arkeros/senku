@@ -199,7 +199,7 @@ jobs:
   deploy:
     name: Deploy ${{ matrix.service }}
     if: github.event_name == 'push'
-    needs: [build, terraform]
+    needs: [build, terraform, attest]
     runs-on: ubuntu-latest
     permissions:
       contents: read
