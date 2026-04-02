@@ -22,7 +22,7 @@ bifrost_service(
             "ingress": "all",
         },
     },
-    image = "registry",
+    image_push = "//oci/cmd/registry:image_push",
     kubernetes = {},
     port = 8080,
     probes = {
