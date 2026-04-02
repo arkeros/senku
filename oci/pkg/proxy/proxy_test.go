@@ -360,12 +360,54 @@ func TestTagsList(t *testing.T) {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var tags struct {
+	var result struct {
+		Name string   `json:"name"`
 		Tags []string `json:"tags"`
 	}
-	json.Unmarshal(body, &tags)
-	if len(tags.Tags) != 2 {
-		t.Errorf("tags count = %d, want 2", len(tags.Tags))
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if result.Name != "redis" {
+		t.Errorf("name = %q, want %q", result.Name, "redis")
+	}
+	if len(result.Tags) != 2 {
+		t.Errorf("tags count = %d, want 2", len(result.Tags))
+	}
+}
+
+func TestTagsListMultiSegmentRepo(t *testing.T) {
+	upstream := newFakeRegistry(t, map[string]fakeResponse{
+		"/v2/arkeros/senku/go/debian13/tags/list": {
+			headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			body: `{"name":"arkeros/senku/go/debian13","tags":["v1.0.0"]}`,
+		},
+	})
+	defer upstream.Close()
+
+	srv := newTestProxy(upstream)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/v2/go/debian13/tags/list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	var result struct {
+		Name string   `json:"name"`
+		Tags []string `json:"tags"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if result.Name != "go/debian13" {
+		t.Errorf("name = %q, want %q", result.Name, "go/debian13")
 	}
 }
 
@@ -466,11 +508,17 @@ func TestQueryStringForwarded(t *testing.T) {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var tags struct {
+	var result struct {
+		Name string   `json:"name"`
 		Tags []string `json:"tags"`
 	}
-	json.Unmarshal(body, &tags)
-	if len(tags.Tags) != 2 || tags.Tags[0] != "v1.0.1" {
-		t.Errorf("tags = %v, want [v1.0.1 v1.0.2]", tags.Tags)
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if result.Name != "redis" {
+		t.Errorf("name = %q, want %q", result.Name, "redis")
+	}
+	if len(result.Tags) != 2 || result.Tags[0] != "v1.0.1" {
+		t.Errorf("tags = %v, want [v1.0.1 v1.0.2]", result.Tags)
 	}
 }

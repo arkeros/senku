@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -210,9 +212,52 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if isTagsList(r.URL.Path) && resp.StatusCode == http.StatusOK {
+		rewriteTagsName(w, resp.Body, repo, resp.StatusCode)
+		return
+	}
+
 	w.WriteHeader(resp.StatusCode)
 	if _, err := io.Copy(w, resp.Body); err != nil {
 		slog.Warn("failed to copy response body", "path", req.URL.Path, "error", err)
+	}
+}
+
+// isTagsList reports whether the path targets a tags/list endpoint.
+func isTagsList(path string) bool {
+	return strings.HasSuffix(path, "/tags/list")
+}
+
+// rewriteTagsName rewrites the "name" field in a tags-list JSON response
+// so clients see the vanity repo name instead of the prefixed upstream name.
+func rewriteTagsName(w http.ResponseWriter, body io.Reader, repo string, statusCode int) {
+	data, err := io.ReadAll(body)
+	if err != nil {
+		slog.Warn("failed to read tags response", "error", err)
+		w.WriteHeader(statusCode)
+		return
+	}
+
+	var result map[string]json.RawMessage
+	if err := json.Unmarshal(data, &result); err != nil {
+		w.WriteHeader(statusCode)
+		w.Write(data)
+		return
+	}
+
+	result["name"], _ = json.Marshal(repo)
+
+	out, err := json.Marshal(result)
+	if err != nil {
+		w.WriteHeader(statusCode)
+		w.Write(data)
+		return
+	}
+
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(out)))
+	w.WriteHeader(statusCode)
+	if _, err := io.Copy(w, bytes.NewReader(out)); err != nil {
+		slog.Warn("failed to write rewritten tags response", "error", err)
 	}
 }
 
