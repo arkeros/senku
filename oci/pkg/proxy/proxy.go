@@ -139,10 +139,12 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	upstreamPath := RewritePath(r.URL.Path, p.repositoryPrefix)
-	upstreamURL := fmt.Sprintf("%s://%s%s", p.scheme, p.upstream, upstreamPath)
+	u := *r.URL
+	u.Scheme = p.scheme
+	u.Host = p.upstream
+	u.Path = RewritePath(r.URL.Path, p.repositoryPrefix)
 
-	req, err := http.NewRequestWithContext(r.Context(), r.Method, upstreamURL, nil)
+	req, err := http.NewRequestWithContext(r.Context(), r.Method, u.String(), nil)
 	if err != nil {
 		http.Error(w, "bad request", http.StatusInternalServerError)
 		return

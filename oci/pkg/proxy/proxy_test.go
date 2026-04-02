@@ -125,7 +125,11 @@ func (f *fakeRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if resp, ok := f.contents[r.URL.Path]; ok {
+	key := r.URL.Path
+	if r.URL.RawQuery != "" {
+		key += "?" + r.URL.RawQuery
+	}
+	if resp, ok := f.contents[key]; ok {
 		for k, v := range resp.headers {
 			w.Header().Set(k, v)
 		}
@@ -385,5 +389,38 @@ func TestTransportCacheIsBounded(t *testing.T) {
 
 	if size := p.CacheLen(); size > proxy.MaxCacheEntries {
 		t.Errorf("transport cache size = %d, want <= %d", size, proxy.MaxCacheEntries)
+	}
+}
+
+func TestQueryStringForwarded(t *testing.T) {
+	upstream := newFakeRegistry(t, map[string]fakeResponse{
+		"/v2/arkeros/senku/redis/tags/list?n=10&last=v1.0.0": {
+			headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			body: `{"name":"arkeros/senku/redis","tags":["v1.0.1","v1.0.2"]}`,
+		},
+	})
+	defer upstream.Close()
+
+	srv := newTestProxy(upstream)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/v2/redis/tags/list?n=10&last=v1.0.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	var tags struct {
+		Tags []string `json:"tags"`
+	}
+	json.Unmarshal(body, &tags)
+	if len(tags.Tags) != 2 || tags.Tags[0] != "v1.0.1" {
+		t.Errorf("tags = %v, want [v1.0.1 v1.0.2]", tags.Tags)
 	}
 }
