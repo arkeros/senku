@@ -39,6 +39,9 @@ func TestRenderCloudRun(t *testing.T) {
 	if strings.Contains(string(got), "\nstatus:") {
 		t.Fatalf("cloudrun output should not contain status\n%s", got)
 	}
+	if strings.Contains(string(got), "securityContext") {
+		t.Fatalf("cloudrun output should not contain securityContext\n%s", got)
+	}
 }
 
 func TestRenderCloudRunCronJob(t *testing.T) {
@@ -72,6 +75,9 @@ func TestRenderCloudRunCronJob(t *testing.T) {
 		if !strings.Contains(string(got), want) {
 			t.Fatalf("cloudrun cronjob output missing %q\n%s", want, got)
 		}
+	}
+	if strings.Contains(string(got), "securityContext") {
+		t.Fatalf("cloudrun cronjob output should not contain securityContext\n%s", got)
 	}
 }
 

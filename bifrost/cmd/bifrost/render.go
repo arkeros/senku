@@ -63,7 +63,7 @@ func renderCloudRunService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 					Spec: servingv1.RevisionSpec{
 						PodSpec: corev1.PodSpec{
 							ServiceAccountName: spec.Spec.ServiceAccountName,
-							Containers:         []corev1.Container{containerForSpec(spec.Spec, true, true)},
+							Containers:         []corev1.Container{containerForSpec(spec.Spec, true, true, false)},
 							Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
 						},
 						ContainerConcurrency: &concurrency,
@@ -102,7 +102,7 @@ func renderCloudRunCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 					"taskCount":   spec.Spec.Job.Completions,
 					"template": map[string]any{
 						"spec": map[string]any{
-							"containers":         []corev1.Container{containerForSpec(spec.Spec, false, false)},
+							"containers":         []corev1.Container{containerForSpec(spec.Spec, false, false, false)},
 							"maxRetries":         spec.Spec.Job.MaxRetries,
 							"timeoutSeconds":     strconv.FormatInt(spec.Spec.Job.TimeoutSeconds, 10),
 							"serviceAccountName": spec.Spec.ServiceAccountName,
@@ -176,7 +176,7 @@ func renderKubernetesService(spec bifrostv1alpha1.Workload) ([]byte, error) {
 				},
 				Spec: podSpecWithSecurityContext(corev1.PodSpec{
 					ServiceAccountName: kubernetesServiceAccountName,
-					Containers:         []corev1.Container{containerForSpec(spec.Spec, true, true)},
+					Containers:         []corev1.Container{containerForSpec(spec.Spec, true, true, true)},
 					Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
 				}),
 			},
@@ -314,7 +314,7 @@ func renderKubernetesCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 						Spec: podSpecWithSecurityContext(corev1.PodSpec{
 							RestartPolicy:      corev1.RestartPolicyNever,
 							ServiceAccountName: kubernetesServiceAccountName,
-							Containers:         []corev1.Container{containerForSpec(spec.Spec, false, false)},
+							Containers:         []corev1.Container{containerForSpec(spec.Spec, false, false, true)},
 							Volumes:            slicesCloneVolumes(spec.Spec.Volumes),
 						}),
 					},
@@ -490,17 +490,19 @@ func renderTerraformCronJob(spec bifrostv1alpha1.Workload) ([]byte, error) {
 	return hclwrite.Format(file.Bytes()), nil
 }
 
-func containerForSpec(spec bifrostv1alpha1.Spec, includePorts bool, includeProbes bool) corev1.Container {
+func containerForSpec(spec bifrostv1alpha1.Spec, includePorts bool, includeProbes bool, includeSecurityContext bool) corev1.Container {
 	resources := *spec.Resources.DeepCopy()
-	trueVal := true
-	falseVal := false
 	container := corev1.Container{
 		Name:         "app",
 		Image:        spec.Image,
 		Args:         slicesClone(spec.Args),
 		Resources:    resources,
 		VolumeMounts: slicesCloneVolumeMounts(spec.VolumeMounts),
-		SecurityContext: &corev1.SecurityContext{
+	}
+	if includeSecurityContext {
+		trueVal := true
+		falseVal := false
+		container.SecurityContext = &corev1.SecurityContext{
 			RunAsNonRoot:             &trueVal,
 			AllowPrivilegeEscalation: &falseVal,
 			ReadOnlyRootFilesystem:   &trueVal,
@@ -510,7 +512,7 @@ func containerForSpec(spec bifrostv1alpha1.Spec, includePorts bool, includeProbe
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeRuntimeDefault,
 			},
-		},
+		}
 	}
 	if includePorts && spec.Port > 0 {
 		container.Ports = []corev1.ContainerPort{{
