@@ -26,8 +26,8 @@ git_override(
 apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
 apt.install(
     name = "debian13",
-    lock = "@@//distroless:debian13.lock.json",
-    manifest = "//distroless:debian13.yaml",
+    lock = "@@//oci/distroless:debian13.lock.json",
+    manifest = "//oci/distroless:debian13.yaml",
 )
 apt.install(
     name = "nginx_stable",

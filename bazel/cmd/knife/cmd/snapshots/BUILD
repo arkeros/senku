@@ -9,7 +9,7 @@ go_library(
     importpath = "github.com/arkeros/senku/bazel/cmd/knife/cmd/snapshots",
     visibility = ["//bazel/cmd/knife:__subpackages__"],
     deps = [
-        "//distroless/pkg/snapshot",
+        "//oci/distroless/debian/snapshot",
         "@com_github_spf13_cobra//:cobra",
     ],
 )

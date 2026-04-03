@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/arkeros/senku/distroless/pkg/snapshot"
+	"github.com/arkeros/senku/oci/distroless/debian/snapshot"
 )
 
 type updateOptions struct {
@@ -27,7 +27,7 @@ func newCmdUpdate() *cobra.Command {
   2. Updating all source URLs in the specified YAML file with the new timestamp
 
 Examples:
-  knife snapshots update distroless/debian13.yaml`,
+  knife snapshots update oci/distroless/debian13.yaml`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Path = args[0]

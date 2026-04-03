@@ -6,7 +6,7 @@ go_library(
         "fetch.go",
         "snapshot.go",
     ],
-    importpath = "github.com/arkeros/senku/distroless/pkg/snapshot",
+    importpath = "github.com/arkeros/senku/oci/distroless/debian/snapshot",
     visibility = ["//visibility:public"],
     deps = [
         "@in_yaml_go_yaml_v4//:yaml",

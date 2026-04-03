@@ -2,29 +2,31 @@ load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_img//img:push.bzl", "image_push")
-load("//distroless:distro.bzl", BUSYBOX_ARCHITECTURES = "ALL_ARCHITECTURES")
-load("//distroless/common:variables.bzl", "DEBUG_MODE", "USERS")
 load("//oci:config.bzl", "OCI_REGISTRY", "OCI_REPOSITORY_PREFIX")
-load(":bash.bzl", "bash_image", "bash_image_index")
+load("//oci/distroless:distro.bzl", "distroless_matrix")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE")
 load(":config.bzl", "BASH_ARCHITECTURES", "BASH_DISTROS")
 
 package(default_visibility = ["//visibility:public"])
 
 [
-    bash_image(
-        name = "bash",
-        arch = arch,
-        distro = distro,
-    )
-    for distro in BASH_DISTROS
-    for arch in BASH_ARCHITECTURES[distro]
-]
-
-[
-    bash_image_index(
+    distroless_matrix(
         name = "bash",
         architectures = BASH_ARCHITECTURES[distro],
+        base = "//oci/distroless/cc:base{mode}_{user}_{arch}_{distro}",
+        debug_index_annotations = {
+            "org.opencontainers.image.description": "Distroless bash image (debug)",
+            "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/bash/BUILD",
+        },
         distro = distro,
+        entrypoint = ["/usr/bin/bash"],
+        index_annotations = {
+            "org.opencontainers.image.description": "Distroless bash image",
+            "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/bash/BUILD",
+        },
+        layers = [
+            ":{arch}_{distro}_layer",
+        ],
     )
     for distro in BASH_DISTROS
 ]
@@ -32,17 +34,18 @@ package(default_visibility = ["//visibility:public"])
 [
     flatten(
         name = arch + "_" + distro + "_layer",
+        compress = COMPRESSION,
         deduplicate = True,
         tars = [
             "@{}//{}/{}".format(distro, "bash", arch),
             # for runfiles we need: env, sed, grep & awk
             # rust-coreutils provides /usr/bin/env without libsystemd0 dependency
             "@{}//{}/{}".format(distro, "rust-coreutils", arch),
-            "//distroless/common:coreutils_links",
+            "//oci/distroless/common:coreutils_links",
             "@{}//{}/{}".format(distro, "sed", arch),
             "@{}//{}/{}".format(distro, "grep", arch),
             "@{}//{}/{}".format(distro, "mawk", arch),
-            "//distroless/common:awk",
+            "//oci/distroless/common:awk",
         ],
     )
     for distro in BASH_DISTROS
@@ -73,18 +76,6 @@ container_structure_test(
     driver = "docker",
     image = ":bash_nonroot_amd64_debian13.oci_layout",
     tags = ["requires-docker"],
-)
-
-bzl_library(
-    name = "bash",
-    srcs = ["bash.bzl"],
-    deps = [
-        "//distroless:distro",
-        "//distroless/common:variables",
-        "//oci",
-        "@container_structure_test//:defs",
-        "@rules_img//img:image",
-    ],
 )
 
 bzl_library(

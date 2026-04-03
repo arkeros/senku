@@ -1,8 +1,8 @@
 load("@tar.bzl", "tar")
 load("@bazel_lib//lib:transitions.bzl", "platform_transition_filegroup")
 load("@rules_img//img:image.bzl", "image_index")
-load("//distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE", "USERS")
-load(":oci.bzl", "oci_image")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE", "USERS")
+load(":oci_image.bzl", "oci_image")
 load(":config.bzl", "GO_ARCHITECTURES", "GO_DISTROS")
 
 ARCHITECTURE_PLATFORMS = {
@@ -64,7 +64,7 @@ def go_image(
         target_platform = ARCHITECTURE_PLATFORMS[arch],
     )
 
-    base_prefix = "//distroless/static:static" if static else "//distroless/base:base"
+    base_prefix = "//oci/distroless/static:static" if static else "//oci/distroless/cc:base"
 
     # Build oci_image kwargs
     oci_kwargs = {

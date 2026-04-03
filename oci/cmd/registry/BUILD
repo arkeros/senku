@@ -1,8 +1,8 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_library")
 load("@rules_img//img:push.bzl", "image_push")
-load("//distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE")
 load("//oci:config.bzl", "OCI_REGISTRY", "OCI_REPOSITORY_PREFIX")
 load("//oci:go_image.bzl", "go_images_all_arch")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE")
 
 package(default_visibility = [
     "//oci/cmd/registry:__subpackages__",

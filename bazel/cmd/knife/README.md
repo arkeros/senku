@@ -21,13 +21,13 @@ After that, `knife` is available from the repo root.
 Display package versions from a Debian lock file:
 
 ```bash
-knife debian versions distroless/debian13.lock.json
+knife debian versions oci/distroless/debian13.lock.json
 ```
 
 Filter by architecture:
 
 ```bash
-knife debian versions --arch amd64 distroless/debian13.lock.json
+knife debian versions --arch amd64 oci/distroless/debian13.lock.json
 ```
 
 ### grype-db update
@@ -49,7 +49,7 @@ This command:
 Update Debian snapshot timestamps in a manifest YAML file:
 
 ```bash
-knife snapshots update distroless/debian13.yaml
+knife snapshots update oci/distroless/debian13.yaml
 ```
 
 This command:
@@ -70,5 +70,5 @@ Shared libraries:
 
 - `bazel/pkg/grypedb` - grype database MODULE.bazel updater (via buildtools AST)
 - `bazel/pkg/mod` - `bazel mod tidy` helper
-- `distroless/pkg/lockfile` - Debian lock file parsing
-- `distroless/pkg/snapshot` - manifest parsing and snapshot fetching
+- `oci/distroless/debian/lockfile` - Debian lock file parsing
+- `oci/distroless/debian/snapshot` - manifest parsing and snapshot fetching

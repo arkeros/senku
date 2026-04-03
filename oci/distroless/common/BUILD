@@ -1,7 +1,7 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@rules_distroless//distroless:defs.bzl", "cacerts", "group", "home", "locale", "os_release", "passwd")
 load("@tar.bzl", "tar")
-load("//distroless:distro.bzl", "ALL_ARCHITECTURES", "ALL_DISTROS", "VERSIONS")
+load("//oci/distroless:distro.bzl", "ALL_ARCHITECTURES", "ALL_DISTROS", "VERSIONS")
 load(":variables.bzl", "COMPRESSION", "MTIME", "NOBODY", "NONROOT", "OS_RELEASE", "ROOT", "quote")
 
 package(default_visibility = ["//visibility:public"])

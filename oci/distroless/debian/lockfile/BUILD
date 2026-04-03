@@ -3,7 +3,7 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "lockfile",
     srcs = ["lockfile.go"],
-    importpath = "github.com/arkeros/senku/distroless/pkg/lockfile",
+    importpath = "github.com/arkeros/senku/oci/distroless/debian/lockfile",
     visibility = ["//visibility:public"],
 )
 

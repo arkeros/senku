@@ -1,9 +1,9 @@
 load("@aspect_rules_py//py:defs.bzl", "py_image_layer")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@rules_img//img:image.bzl", "image_index")
-load("//distroless:distro.bzl", "ARCHITECTURE_PLATFORMS")
-load("//distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE", "USERS", "USER_IDS")
-load(":oci.bzl", "oci_image")
+load("//oci/distroless:distro.bzl", "ARCHITECTURE_PLATFORMS")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE", "USERS", "USER_IDS")
+load(":oci_image.bzl", "oci_image")
 load(":config.bzl", "PYTHON_ARCHITECTURES", "PYTHON_DISTROS")
 
 def py_image_index(name, distro, architectures):
@@ -49,7 +49,7 @@ def py_image(
     [
         oci_image(
             name = name + mode + "_" + user + "_" + arch,
-            base = "//distroless/bash:bash" + mode + "_" + user + "_" + arch + "_" + distro,
+            base = "//oci/distroless/bash:bash" + mode + "_" + user + "_" + arch + "_" + distro,
             entrypoint = ["/{}/{}".format(binary_path, binary_name)],
             # Use UTF-8 encoding for file system: match modern Linux
             env = {"LANG": "C.UTF-8"},

@@ -23,19 +23,19 @@ jobs:
         id: current-snapshot
         run: |
           # Extract current snapshot timestamp from debian13.yaml
-          CURRENT_SNAPSHOT=$(grep -oP '\d{8}T\d{6}Z' distroless/debian13.yaml | head -1)
+          CURRENT_SNAPSHOT=$(grep -oP '\d{8}T\d{6}Z' oci/distroless/debian13.yaml | head -1)
           echo "current_snapshot=${CURRENT_SNAPSHOT}" >> $GITHUB_OUTPUT
       - name: Update Debian packages using knife
         id: update-packages
         run: |
           # Run the update command (use absolute path since bazel run changes cwd)
-          bazel run //bazel/cmd/knife -- snapshots update $PWD/distroless/debian13.yaml
+          bazel run //bazel/cmd/knife -- snapshots update $PWD/oci/distroless/debian13.yaml
 
           # Regenerate the lockfile
           bazel run @debian13//:lock
 
           # Get the new snapshot info
-          NEW_SNAPSHOT=$(grep -oP '\d{8}T\d{6}Z' distroless/debian13.yaml | head -1)
+          NEW_SNAPSHOT=$(grep -oP '\d{8}T\d{6}Z' oci/distroless/debian13.yaml | head -1)
           echo "new_snapshot=${NEW_SNAPSHOT}" >> $GITHUB_OUTPUT
 
           # Check if update occurred
