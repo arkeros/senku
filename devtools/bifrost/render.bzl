@@ -21,7 +21,8 @@ def _bifrost_render_impl(ctx):
             inputs = [spec_file, deploy_manifest],
             outputs = [patched_spec],
             command = """\
-IMAGE=$({jq} -r '.operations[0] | "\\(.registry)/\\(.repository)@\\(.root.digest)"' {deploy})
+set -euo pipefail
+IMAGE=$({jq} -re '.operations[0] // error("no operations in deploy manifest") | if (.registry == null or .repository == null or .root.digest == null) then error("missing registry, repository, or digest") else "\\(.registry)/\\(.repository)@\\(.root.digest)" end' {deploy})
 {jq} --arg img "$IMAGE" '.spec.image = $img' {spec} > {out}
 """.format(
                 jq = jq.path,
