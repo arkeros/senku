@@ -25,6 +25,9 @@ USER_VARIANTS = [
     ("nonroot", NONROOT, "/home/nonroot"),
 ]
 
+# TODO: Replace placeholder string rendering with a less implicit API.
+# The current templating keeps BUILD call sites terse, but it hides behavior
+# and makes the macro harder to reason about than necessary.
 def _render_string(value, substitutions):
     rendered = value
     for key, replacement in substitutions.items():

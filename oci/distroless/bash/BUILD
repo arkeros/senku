@@ -13,7 +13,7 @@ package(default_visibility = ["//visibility:public"])
     distroless_matrix(
         name = "bash",
         architectures = BASH_ARCHITECTURES[distro],
-        base = "//oci/distroless/cc:base{mode}_{user}_{arch}_{distro}",
+        base = "//oci/distroless/cc:cc{mode}_{user}_{arch}_{distro}",
         debug_index_annotations = {
             "org.opencontainers.image.description": "Distroless bash image (debug)",
             "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/bash/BUILD",

@@ -50,7 +50,7 @@ def go_image(
         entrypoint: optional entrypoint override
         cmd: optional default command args
         extra_layers: additional layers to include
-        static: if True, use static base (no glibc); if False, use base with libstdc++6
+        static: if True, use static distroless; if False, use cc distroless with libstdc++6
         registry: container registry
         repository_prefix: repository prefix
     """
@@ -64,7 +64,7 @@ def go_image(
         target_platform = ARCHITECTURE_PLATFORMS[arch],
     )
 
-    base_prefix = "//oci/distroless/static:static" if static else "//oci/distroless/cc:base"
+    base_prefix = "//oci/distroless/static:static" if static else "//oci/distroless/cc:cc"
 
     # Build oci_image kwargs
     oci_kwargs = {
@@ -111,7 +111,7 @@ def go_images_all_arch(
         entrypoint: optional entrypoint override
         cmd: optional default command args
         extra_layers: dictionary of layers to include in the image, per architecture
-        static: if True, use static base (no glibc); if False, use base with libstdc++6
+        static: if True, use static distroless; if False, use cc distroless with libstdc++6
         registry: container registry
         repository_prefix: repository prefix
     """

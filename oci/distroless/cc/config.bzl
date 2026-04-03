@@ -1,10 +1,10 @@
-BASE_DISTROS = ["debian13"]
-BASE_ARCHITECTURES = {
+CC_DISTROS = ["debian13"]
+CC_ARCHITECTURES = {
     # "debian12": ["amd64", "arm64", "arm", "s390x", "ppc64le"],
     "debian13": ["amd64", "arm64"],
 }
 
-BASE_PACKAGES = {
+CC_PACKAGES = {
     "debian12": [
         "libc6",
         "libssl3",
