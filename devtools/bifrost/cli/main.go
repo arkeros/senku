@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -57,7 +56,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Print(string(out))
+	if _, err := os.Stdout.Write(out); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func inputReader(path string) (io.Reader, func() error, error) {
