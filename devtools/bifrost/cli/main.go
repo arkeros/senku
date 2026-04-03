@@ -14,7 +14,7 @@ import (
 
 func main() {
 	if len(os.Args) < 3 || os.Args[1] != "render" {
-		log.Fatalf("usage: bifrost render <cloudrun|k8s|terraform> -f <service.{yaml,json}>")
+		log.Fatalf("usage: bifrost render <cloudrun|k8s|terraform> -f <workload.{yaml,json}>")
 	}
 
 	target := os.Args[2]
