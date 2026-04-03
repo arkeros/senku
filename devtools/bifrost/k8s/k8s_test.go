@@ -47,9 +47,9 @@ func TestRenderService(t *testing.T) {
 		"readOnlyRootFilesystem: true",
 		"- ALL",
 		"kind: Secret",
-		"name: registry-env",
+		"name: registry-env-71bb3ea30f",
 		"JHtnY3BzbTovLy9wcm9qZWN0cy9zZW5rdS1wcm9kL3NlY3JldHMvcmVnaXN0cnktZW52L3ZlcnNpb25zL2xhdGVzdH0=",
-		"secretName: registry-env",
+		"secretName: registry-env-71bb3ea30f",
 		"mountPath: /run/secrets",
 	} {
 		if !strings.Contains(string(got), want) {
@@ -83,7 +83,7 @@ func TestRenderCronJob(t *testing.T) {
 		"backoffLimit: 3",
 		"activeDeadlineSeconds: 600",
 		"mountPath: /run/secrets",
-		"secretName: stock-flow-env",
+		"secretName: stock-flow-env-b6aff648dc",
 		"runAsNonRoot: true",
 		"allowPrivilegeEscalation: false",
 		"readOnlyRootFilesystem: true",
