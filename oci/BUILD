@@ -29,7 +29,6 @@ bzl_library(
         "//oci/distroless:platforms",
         "//oci/distroless/common:variables",
         "@aspect_rules_js//js:defs",
-        "@aspect_rules_py//py:defs",
         "@container_structure_test//:defs",
         "@rules_img//img:image",
     ],
@@ -57,5 +56,7 @@ bzl_library(
     deps = [
         "@grype.bzl//:grype",
         "@rules_img//img:image",
+        "@rules_img//img:load",
+        "@rules_img//img:push",
     ],
 )
