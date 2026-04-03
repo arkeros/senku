@@ -9,6 +9,8 @@ load(":config.bzl", "STATIC_ARCHITECTURES", "STATIC_DISTROS", "static_debug_laye
 
 package(default_visibility = ["//visibility:public"])
 
+_DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
 [
     flatten(
         name = "static_" + arch + "_" + distro + "_layer",
@@ -37,11 +39,11 @@ package(default_visibility = ["//visibility:public"])
         name = "static",
         architectures = STATIC_ARCHITECTURES[distro],
         debug_entrypoint = ["/busybox/sh"],
-        debug_env = {"PATH": "$PATH:/busybox"},
+        debug_env = {"PATH": _DEFAULT_PATH + ":/busybox"},
         debug_layers = static_debug_layers,
         distro = distro,
         env = {
-            "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "PATH": _DEFAULT_PATH,
             "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
         },
         layers = static_layers,
