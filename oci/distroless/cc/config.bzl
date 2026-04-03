@@ -14,3 +14,9 @@ CC_PACKAGES = {
         "libssl3t64",
     ],
 }
+
+def cc_layers(ctx):
+    return [
+        ":{}_{}_layer".format(ctx.arch, ctx.distro),
+        "@{}//libstdc++6/{}".format(ctx.distro, ctx.arch),
+    ]

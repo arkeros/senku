@@ -1,64 +1,14 @@
+"Shared distroless OCI image matrix factory."
+
 load("@rules_img//img:image.bzl", "image_index")
+load("//oci/distroless:platforms.bzl", "ARCHITECTURE_PLATFORMS")
 load("//oci/distroless/common:variables.bzl", "NONROOT")
 load("//oci:oci_image.bzl", "oci_image")
-
-VERSIONS = [
-    # ("debian12", "bookworm", "12"),
-    ("debian13", "trixie", "13"),
-]
-
-VARIANTS = {
-    "arm": "v7",
-    "arm64": "v8",
-}
-
-ARCHITECTURE_PLATFORMS = {
-    "amd64": "//bazel/platforms:linux_amd64",
-    "arm64": "//bazel/platforms:linux_arm64",
-}
-
-ALL_ARCHITECTURES = ["amd64", "arm64"]
-ALL_DISTROS = ["debian13"]
 
 USER_VARIANTS = [
     ("root", 0, "/"),
     ("nonroot", NONROOT, "/home/nonroot"),
 ]
-
-# TODO: Replace placeholder string rendering with a less implicit API.
-# The current templating keeps BUILD call sites terse, but it hides behavior
-# and makes the macro harder to reason about than necessary.
-def _render_string(value, substitutions):
-    rendered = value
-    for key, replacement in substitutions.items():
-        rendered = rendered.replace("{" + key + "}", replacement)
-    return rendered
-
-def _render_value(value, substitutions):
-    if value == None:
-        return None
-
-    value_type = type(value)
-    if value_type == "string":
-        return _render_string(value, substitutions)
-    if value_type == "list":
-        rendered = []
-        for item in value:
-            if type(item) == "string":
-                rendered.append(_render_string(item, substitutions))
-            else:
-                rendered.append(item)
-        return rendered
-    if value_type == "dict":
-        rendered = {}
-        for key, item in value.items():
-            if type(item) == "string":
-                rendered[key] = _render_string(item, substitutions)
-            else:
-                rendered[key] = item
-        return rendered
-
-    return value
 
 def _merge_dicts(base, overlay):
     merged = {}
@@ -79,6 +29,18 @@ def _image_name(name, mode, user, arch, distro):
 
 def _index_name(name, mode, user, distro):
     return "{}{}_{}_{}".format(name, mode, user, distro)
+
+def _resolve_image_ref(ref, context):
+    if ref == None:
+        return None
+
+    suffix = _image_name("", context["mode"], context["user"], context["arch"], context["distro"])
+    if ":" not in ref:
+        return "{}:{}{}".format(ref, ref.rsplit("/", 1)[-1], suffix)
+    return ref + suffix
+
+def _resolve_layers(layers_fn, context):
+    return layers_fn(struct(**context))
 
 def _emit_image(
         name,
@@ -125,7 +87,26 @@ def distroless_matrix(
         debug_env = None,
         debug_annotations = None,
         debug_index_annotations = None):
-    """Generates release/debug OCI images plus per-user manifest indexes."""
+    """Generates release/debug OCI images plus per-user manifest indexes.
+
+    Args:
+        name: image family name and target stem.
+        distro: distro key such as "debian13".
+        architectures: architectures included in the matrix.
+        layers: callback taking a context struct and returning release layers.
+        base: optional base package or explicit target stem label.
+        entrypoint: optional release entrypoint.
+        env: optional release environment map.
+        annotations: optional release image annotations.
+        index_annotations: optional release index annotations.
+        debug_base: optional debug base package or explicit target stem label.
+        debug_layers: optional callback for debug layers. Defaults to release
+            layers when a base image exists, or no extra layers for root images.
+        debug_entrypoint: optional debug entrypoint override.
+        debug_env: optional debug environment overlay.
+        debug_annotations: optional debug image annotations override.
+        debug_index_annotations: optional debug index annotations override.
+    """
 
     release_env = env or {}
     release_annotations = annotations or {}
@@ -156,11 +137,11 @@ def distroless_matrix(
                 arch = arch,
                 uid = uid,
                 working_dir = working_dir,
-                base = _render_value(base, release_context),
-                layers = _render_value(layers, release_context),
-                entrypoint = _render_value(entrypoint, release_context),
-                env = _render_value(release_env, release_context),
-                annotations = _render_value(release_annotations, release_context),
+                base = _resolve_image_ref(base, release_context),
+                layers = _resolve_layers(layers, release_context),
+                entrypoint = entrypoint,
+                env = release_env,
+                annotations = release_annotations,
             )
 
             debug_name = _image_name(name, "_debug", user, arch, distro)
@@ -168,9 +149,9 @@ def distroless_matrix(
             debug_context["mode"] = "_debug"
             debug_context["debug_name"] = debug_name
 
-            resolved_debug_base = _render_value(debug_base, debug_context)
+            resolved_debug_base = _resolve_image_ref(debug_base, debug_context)
             if resolved_debug_base == None:
-                resolved_debug_base = _render_value(base, debug_context) if base != None else ":" + release_name
+                resolved_debug_base = _resolve_image_ref(base, debug_context) if base != None else ":" + release_name
 
             _emit_image(
                 name = debug_name,
@@ -178,10 +159,10 @@ def distroless_matrix(
                 uid = uid,
                 working_dir = working_dir,
                 base = resolved_debug_base,
-                layers = _render_value(effective_debug_layers, debug_context),
-                entrypoint = _render_value(effective_debug_entrypoint, debug_context),
-                env = _render_value(effective_debug_env, debug_context),
-                annotations = _render_value(effective_debug_annotations, debug_context),
+                layers = _resolve_layers(effective_debug_layers, debug_context),
+                entrypoint = effective_debug_entrypoint,
+                env = effective_debug_env,
+                annotations = effective_debug_annotations,
             )
 
     for (mode, mode_annotations) in [
@@ -191,12 +172,7 @@ def distroless_matrix(
         for (user, _, _) in USER_VARIANTS:
             image_index(
                 name = _index_name(name, mode, user, distro),
-                annotations = _render_value(mode_annotations, {
-                    "name": name,
-                    "mode": mode,
-                    "user": user,
-                    "distro": distro,
-                }),
+                annotations = mode_annotations,
                 manifests = [
                     _image_name(name, mode, user, arch, distro)
                     for arch in architectures

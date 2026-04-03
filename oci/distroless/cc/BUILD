@@ -1,9 +1,9 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
-load("//oci/distroless:distro.bzl", "distroless_matrix")
+load("//oci/distroless:matrix.bzl", "distroless_matrix")
 load("//oci/distroless/common:variables.bzl", "COMPRESSION")
-load(":config.bzl", "CC_ARCHITECTURES", "CC_DISTROS", "CC_PACKAGES")
+load(":config.bzl", "CC_ARCHITECTURES", "CC_DISTROS", "CC_PACKAGES", "cc_layers")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -25,12 +25,9 @@ package(default_visibility = ["//visibility:public"])
     distroless_matrix(
         name = "cc",
         architectures = CC_ARCHITECTURES[distro],
-        base = "//oci/distroless/static:static{mode}_{user}_{arch}_{distro}",
+        base = "//oci/distroless/static",
         distro = distro,
-        layers = [
-            ":{arch}_{distro}_layer",
-            "@{distro}//libstdc++6/{arch}",
-        ],
+        layers = cc_layers,
     )
     for distro in CC_DISTROS
 ]

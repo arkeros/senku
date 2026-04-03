@@ -26,7 +26,7 @@ bzl_library(
     deps = [
         ":config",
         ":oci_image",
-        "//oci/distroless:distro",
+        "//oci/distroless:platforms",
         "//oci/distroless/common:variables",
         "@aspect_rules_js//js:defs",
         "@aspect_rules_py//py:defs",
@@ -42,7 +42,7 @@ bzl_library(
     deps = [
         ":config",
         ":oci_image",
-        "//oci/distroless:distro",
+        "//oci/distroless:platforms",
         "//oci/distroless/common:variables",
         "@aspect_rules_py//py:defs",
         "@container_structure_test//:defs",

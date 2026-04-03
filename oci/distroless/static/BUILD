@@ -1,10 +1,11 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
-load("//oci/distroless:distro.bzl", "distroless_matrix", BUSYBOX_ARCHITECTURES = "ALL_ARCHITECTURES")
+load("//oci/distroless:matrix.bzl", "distroless_matrix")
+load("//oci/distroless:platforms.bzl", BUSYBOX_ARCHITECTURES = "ALL_ARCHITECTURES")
 load("//oci/distroless/common:variables.bzl", "COMPRESSION")
 load(":busybox.bzl", "busybox_layer")
-load(":config.bzl", "STATIC_ARCHITECTURES", "STATIC_DISTROS")
+load(":config.bzl", "STATIC_ARCHITECTURES", "STATIC_DISTROS", "static_debug_layers", "static_layers")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -37,17 +38,13 @@ package(default_visibility = ["//visibility:public"])
         architectures = STATIC_ARCHITECTURES[distro],
         debug_entrypoint = ["/busybox/sh"],
         debug_env = {"PATH": "$PATH:/busybox"},
-        debug_layers = [
-            ":busybox_{arch}_{distro}_layer",
-        ],
+        debug_layers = static_debug_layers,
         distro = distro,
         env = {
             "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
         },
-        layers = [
-            ":static_{arch}_{distro}_layer",
-        ],
+        layers = static_layers,
     )
     for distro in STATIC_DISTROS
 ]

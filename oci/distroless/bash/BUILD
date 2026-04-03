@@ -3,9 +3,9 @@ load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_img//img:push.bzl", "image_push")
 load("//oci:config.bzl", "OCI_REGISTRY", "OCI_REPOSITORY_PREFIX")
-load("//oci/distroless:distro.bzl", "distroless_matrix")
+load("//oci/distroless:matrix.bzl", "distroless_matrix")
 load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE")
-load(":config.bzl", "BASH_ARCHITECTURES", "BASH_DISTROS")
+load(":config.bzl", "BASH_ARCHITECTURES", "BASH_DISTROS", "bash_layers")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -13,7 +13,7 @@ package(default_visibility = ["//visibility:public"])
     distroless_matrix(
         name = "bash",
         architectures = BASH_ARCHITECTURES[distro],
-        base = "//oci/distroless/cc:cc{mode}_{user}_{arch}_{distro}",
+        base = "//oci/distroless/cc",
         debug_index_annotations = {
             "org.opencontainers.image.description": "Distroless bash image (debug)",
             "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/bash/BUILD",
@@ -24,9 +24,7 @@ package(default_visibility = ["//visibility:public"])
             "org.opencontainers.image.description": "Distroless bash image",
             "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/bash/BUILD",
         },
-        layers = [
-            ":{arch}_{distro}_layer",
-        ],
+        layers = bash_layers,
     )
     for distro in BASH_DISTROS
 ]
