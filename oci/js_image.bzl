@@ -1,14 +1,13 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_image_layer")
 load("@aspect_rules_py//py:defs.bzl", "py_image_layer")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
-load("@npm//:@google-cloud/functions-framework/package_json.bzl", functions_framework_bin = "bin")
 load("@rules_img//img:image.bzl", "image_index")
 load("//distroless:distro.bzl", "ARCHITECTURE_PLATFORMS")
 load("//distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE", "USERS", "USER_IDS")
-load("//oci:oci.bzl", "oci_image")
+load(":oci.bzl", "oci_image")
 load(":config.bzl", "NODEJS_ARCHITECTURES", "NODEJS_DISTROS")
 
-def nodejs_image_index(name, distro, architectures):
+def js_image_index(name, distro, architectures):
     """nodejs image index for a distro
 
     Args:
@@ -27,7 +26,7 @@ def nodejs_image_index(name, distro, architectures):
                 ],
             )
 
-def nodejs_image(
+def js_image(
         name,
         distro,
         arch,
@@ -66,7 +65,7 @@ def nodejs_image(
         for user in USERS
     ]
 
-def nodejs_images_all_arch(name, distro, binary, entrypoint, extra_layers = {}, ignore_cves = None):
+def js_images_all_arch(name, distro, binary, entrypoint, extra_layers = {}, ignore_cves = None):
     """nodejs images for all architectures for a distro
 
     Args:
@@ -79,7 +78,7 @@ def nodejs_images_all_arch(name, distro, binary, entrypoint, extra_layers = {}, 
     architectures = NODEJS_ARCHITECTURES[distro]
 
     [
-        nodejs_image(
+        js_image(
             name = name,
             distro = distro,
             arch = arch,
@@ -91,34 +90,8 @@ def nodejs_images_all_arch(name, distro, binary, entrypoint, extra_layers = {}, 
         for arch in architectures
     ]
 
-    nodejs_image_index(
+    js_image_index(
         name = name,
         architectures = architectures,
         distro = distro,
-    )
-
-def functions_framework_image(
-        name,
-        ts_lib,
-        data = [],
-        dependencies = [],
-        **kwargs):
-    lib_name = ts_lib.split(":")[-1]
-
-    functions_framework_bin.functions_framework_binary(
-        name = "server",
-        args = ["--source={}/{}.pkg".format(native.package_name(), lib_name)],
-        data = [
-            ts_lib,
-        ] + data + ["//:node_modules/" + d for d in dependencies],
-    )
-
-    nodejs_images_all_arch(
-        name = name,
-        binary = ":server",
-        entrypoint = [
-            "/{}/server".format(native.package_name()),
-            "--source=/{}/{}.runfiles/_main/{}/{}.pkg".format(native.package_name(), "server", native.package_name(), lib_name),
-        ],
-        **kwargs
     )

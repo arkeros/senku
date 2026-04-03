@@ -2,7 +2,7 @@ load("@tar.bzl", "tar")
 load("@bazel_lib//lib:transitions.bzl", "platform_transition_filegroup")
 load("@rules_img//img:image.bzl", "image_index")
 load("//distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE", "USERS")
-load("//oci:oci.bzl", "oci_image")
+load(":oci.bzl", "oci_image")
 load(":config.bzl", "GO_ARCHITECTURES", "GO_DISTROS")
 
 ARCHITECTURE_PLATFORMS = {
@@ -54,12 +54,9 @@ def go_image(
         registry: container registry
         repository_prefix: repository prefix
     """
-    binary_name = binary.split(":")[-1]
-    binary_path = binary.split(":")[-2]
-    if binary_path == "":
-        binary_path = native.package_name()
-    if binary_path.startswith("//"):
-        binary_path = binary_path[2:]
+    binary_label = Label(binary)
+    binary_name = binary_label.name
+    binary_path = binary_label.package
 
     platform_transition_filegroup(
         name = name + "_" + arch + "_layer",

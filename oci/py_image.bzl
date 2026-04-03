@@ -3,10 +3,10 @@ load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@rules_img//img:image.bzl", "image_index")
 load("//distroless:distro.bzl", "ARCHITECTURE_PLATFORMS")
 load("//distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE", "USERS", "USER_IDS")
-load("//oci:oci.bzl", "oci_image")
+load(":oci.bzl", "oci_image")
 load(":config.bzl", "PYTHON_ARCHITECTURES", "PYTHON_DISTROS")
 
-def python_image_index(name, distro, architectures):
+def py_image_index(name, distro, architectures):
     """python image index for a distro
 
     Args:
@@ -25,12 +25,14 @@ def python_image_index(name, distro, architectures):
                 ],
             )
 
-def python_image(
+def py_image(
         name,
         distro,
         arch,
         binary):
-    binary_name = binary.split(":")[-1]
+    binary_label = Label(binary)
+    binary_name = binary_label.name
+    binary_path = binary_label.package
 
     [
         py_image_layer(
@@ -48,7 +50,7 @@ def python_image(
         oci_image(
             name = name + mode + "_" + user + "_" + arch,
             base = "//distroless/bash:bash" + mode + "_" + user + "_" + arch + "_" + distro,
-            entrypoint = ["/{}/{}".format(native.package_name(), binary_name)],
+            entrypoint = ["/{}/{}".format(binary_path, binary_name)],
             # Use UTF-8 encoding for file system: match modern Linux
             env = {"LANG": "C.UTF-8"},
             layers = [
@@ -61,7 +63,7 @@ def python_image(
         for user in USERS
     ]
 
-def python_images_all_arch(name, distro, binary):
+def py_images_all_arch(name, distro, binary):
     """python images for all architectures for a distro
 
     Args:
@@ -72,7 +74,7 @@ def python_images_all_arch(name, distro, binary):
     architectures = PYTHON_ARCHITECTURES[distro]
 
     [
-        python_image(
+        py_image(
             name = name,
             distro = distro,
             arch = arch,
@@ -81,7 +83,7 @@ def python_images_all_arch(name, distro, binary):
         for arch in architectures
     ]
 
-    python_image_index(
+    py_image_index(
         name = name,
         architectures = architectures,
         distro = distro,
