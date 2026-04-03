@@ -84,6 +84,9 @@ func TestRenderCronJob(t *testing.T) {
 			t.Fatalf("output missing %q\n%s", want, got)
 		}
 	}
+	if strings.Contains(string(got), "\nstatus:") {
+		t.Fatalf("output should not contain status\n%s", got)
+	}
 	if strings.Contains(string(got), "securityContext") {
 		t.Fatalf("output should not contain securityContext\n%s", got)
 	}
