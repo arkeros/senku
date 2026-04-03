@@ -54,7 +54,7 @@ def go_image(
         registry: container registry
         repository_prefix: repository prefix
     """
-    binary_label = Label(binary)
+    binary_label = native.package_relative_label(binary)
     binary_name = binary_label.name
     binary_path = binary_label.package
 
