@@ -112,7 +112,7 @@ def distroless_matrix(
     release_annotations = annotations or {}
     release_index_annotations = index_annotations if index_annotations != None else release_annotations
 
-    effective_debug_layers = debug_layers if debug_layers != None else (layers if base != None else [])
+    effective_debug_layers = debug_layers if debug_layers != None else (layers if base != None else None)
     effective_debug_entrypoint = debug_entrypoint if debug_entrypoint != None else entrypoint
     effective_debug_env = _merge_dicts(release_env, debug_env or {})
     effective_debug_annotations = debug_annotations if debug_annotations != None else release_annotations
@@ -153,13 +153,15 @@ def distroless_matrix(
             if resolved_debug_base == None:
                 resolved_debug_base = _resolve_image_ref(base, debug_context) if base != None else ":" + release_name
 
+            resolved_debug_layers = _resolve_layers(effective_debug_layers, debug_context) if effective_debug_layers != None else []
+
             _emit_image(
                 name = debug_name,
                 arch = arch,
                 uid = uid,
                 working_dir = working_dir,
                 base = resolved_debug_base,
-                layers = _resolve_layers(effective_debug_layers, debug_context),
+                layers = resolved_debug_layers,
                 entrypoint = effective_debug_entrypoint,
                 env = effective_debug_env,
                 annotations = effective_debug_annotations,
