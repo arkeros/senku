@@ -5,7 +5,7 @@ bzl_library(
     srcs = ["distro.bzl"],
     visibility = ["//visibility:public"],
     deps = [
-        "//oci",
+        "//oci:oci_image",
         "//oci/distroless/common:variables",
         "@rules_img//img:image",
     ],
