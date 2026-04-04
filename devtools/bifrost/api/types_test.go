@@ -270,7 +270,7 @@ func TestSecretFile_ParseSecret(t *testing.T) {
 		wantName       string
 		wantVersion    string
 	}{
-		{"bare name", "stock-flow-env", "my-project", "my-project", "stock-flow-env", "latest"},
+		{"bare name", "data-export-env", "my-project", "my-project", "data-export-env", "latest"},
 		{"full path no version", "projects/other/secrets/foo", "my-project", "other", "foo", "latest"},
 		{"full path with version", "projects/other/secrets/foo/versions/4", "my-project", "other", "foo", "4"},
 	}

@@ -1,9 +1,9 @@
 apiVersion: bifrost.apotema.cloud/v1alpha1
 kind: CronJob
 metadata:
-  name: crossdocking-stock-flow
+  name: analytics-data-export
 spec:
-  image: stock-flow
+  image: data-export
   args:
     - sync
   resources:
@@ -11,7 +11,7 @@ spec:
       cpu: 1000m
       memory: 512Mi
   secretFiles:
-    - secret: stock-flow-env
+    - secret: data-export-env
       path: /run/secrets/env.json
   schedule:
     cron: "0 12 * * *"

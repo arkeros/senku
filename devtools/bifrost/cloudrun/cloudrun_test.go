@@ -68,7 +68,7 @@ func TestRenderCronJob(t *testing.T) {
 	for _, want := range []string{
 		"apiVersion: run.googleapis.com/v1",
 		"kind: Job",
-		"name: crossdocking-stock-flow",
+		"name: analytics-data-export",
 		"namespace: \"874944788122\"",
 		"cloud.googleapis.com/location: europe-west1",
 		"run.googleapis.com/execution-environment: gen2",
@@ -76,9 +76,9 @@ func TestRenderCronJob(t *testing.T) {
 		"taskCount: 1",
 		"maxRetries: 3",
 		"timeoutSeconds: \"600\"",
-		"serviceAccountName: crj-crossdocking-stock-flow@senku-prod.iam.gserviceaccount.com",
+		"serviceAccountName: crj-analytics-data-export@senku-prod.iam.gserviceaccount.com",
 		"mountPath: /run/secrets",
-		"secretName: stock-flow-env",
+		"secretName: data-export-env",
 	} {
 		if !strings.Contains(string(got), want) {
 			t.Fatalf("output missing %q\n%s", want, got)

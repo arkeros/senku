@@ -54,15 +54,15 @@ func TestRenderCronJob(t *testing.T) {
 		t.Fatalf("Render() error = %v", err)
 	}
 	for _, want := range []string{
-		`resource "google_service_account" "crj_crossdocking_stock_flow" {`,
-		`resource "google_service_account" "sch_crossdocking_stock_flow" {`,
-		`resource "google_project_iam_member" "sch_crossdocking_stock_flow_run_invoker" {`,
-		`resource "google_cloud_scheduler_job" "crossdocking_stock_flow_schedule" {`,
+		`resource "google_service_account" "crj_analytics_data_export" {`,
+		`resource "google_service_account" "sch_analytics_data_export" {`,
+		`resource "google_project_iam_member" "sch_analytics_data_export_run_invoker" {`,
+		`resource "google_cloud_scheduler_job" "analytics_data_export_schedule" {`,
 		`project      = "senku-prod"`,
-		`account_id   = "crj-crossdocking-stock-flow"`,
-		`account_id   = "sch-crossdocking-stock-flow"`,
+		`account_id   = "crj-analytics-data-export"`,
+		`account_id   = "sch-analytics-data-export"`,
 		`role    = "roles/run.invoker"`,
-		`uri         = "https://run.googleapis.com/v2/projects/senku-prod/locations/europe-west1/jobs/crossdocking-stock-flow:run"`,
+		`uri         = "https://run.googleapis.com/v2/projects/senku-prod/locations/europe-west1/jobs/analytics-data-export:run"`,
 		`time_zone = "Europe/Madrid"`,
 	} {
 		if !strings.Contains(string(got), want) {
