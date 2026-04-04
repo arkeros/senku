@@ -42,33 +42,10 @@ def _resolve_image_ref(ref, context):
 def _resolve_layers(layers_fn, context):
     return layers_fn(struct(**context))
 
-def _emit_image(
-        name,
-        arch,
-        uid,
-        working_dir,
-        base,
-        layers,
-        entrypoint,
-        env,
-        annotations):
-    kwargs = {
-        "name": name,
-        "layers": layers,
-        "platform": ARCHITECTURE_PLATFORMS[arch],
-        "user": "%d" % uid,
-        "working_dir": working_dir,
-    }
-
-    if base != None:
-        kwargs["base"] = base
-    if entrypoint != None:
-        kwargs["entrypoint"] = entrypoint
-    if env:
-        kwargs["env"] = env
-    if annotations:
-        kwargs["annotations"] = annotations
-
+def _emit_image(arch, uid, working_dir, **kwargs):
+    kwargs["platform"] = ARCHITECTURE_PLATFORMS[arch]
+    kwargs["user"] = "%d" % uid
+    kwargs["working_dir"] = working_dir
     oci_image(**kwargs)
 
 def distroless_matrix(
@@ -86,7 +63,8 @@ def distroless_matrix(
         debug_entrypoint = None,
         debug_env = None,
         debug_annotations = None,
-        debug_index_annotations = None):
+        debug_index_annotations = None,
+        **kwargs):
     """Generates release/debug OCI images plus per-user manifest indexes.
 
     Args:
@@ -106,6 +84,7 @@ def distroless_matrix(
         debug_env: optional debug environment overlay.
         debug_annotations: optional debug image annotations override.
         debug_index_annotations: optional debug index annotations override.
+        **kwargs: passed through to oci_image (e.g. ignore_cves, fail_on_severity).
     """
 
     release_env = env or {}
@@ -142,6 +121,7 @@ def distroless_matrix(
                 entrypoint = entrypoint,
                 env = release_env,
                 annotations = release_annotations,
+                **kwargs
             )
 
             debug_name = _image_name(name, "_debug", user, arch, distro)
@@ -165,6 +145,7 @@ def distroless_matrix(
                 entrypoint = effective_debug_entrypoint,
                 env = effective_debug_env,
                 annotations = effective_debug_annotations,
+                **kwargs
             )
 
     for (mode, mode_annotations) in [

@@ -49,6 +49,19 @@ bzl_library(
 )
 
 bzl_library(
+    name = "frontend_image",
+    srcs = ["frontend_image.bzl"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":oci_image",
+        "//oci/distroless:platforms",
+        "//oci/distroless/common:variables",
+        "//oci/distroless/nginx:config",
+        "@rules_img//img:image",
+    ],
+)
+
+bzl_library(
     name = "oci_image",
     srcs = ["oci_image.bzl"],
     visibility = ["//visibility:public"],

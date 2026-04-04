@@ -1,9 +1,9 @@
 load("@rules_img//img:image.bzl", "image_index")
 load("@tar.bzl", "mutate", "tar")
-load("//distroless:distro.bzl", "ARCHITECTURE_PLATFORMS")
-load("//distroless/common:variables.bzl", "NONROOT")
-load("//oci:oci.bzl", "oci_image")
-load(":config.bzl", "NGINX_ARCHITECTURES")
+load("//oci/distroless:platforms.bzl", "ARCHITECTURE_PLATFORMS")
+load("//oci/distroless/common:variables.bzl", "NONROOT")
+load(":oci_image.bzl", "oci_image")
+load("//oci/distroless/nginx:config.bzl", "NGINX_ARCHITECTURES")
 
 def frontend_image_index(name, architectures):
     """frontend image index
@@ -72,7 +72,7 @@ def frontend_image(
 
     oci_image(
         name = name + "_" + arch,
-        base = base or "//distroless/nginx:nginx_mainline_nonroot_" + arch + "_" + distro,
+        base = base or "//oci/distroless/nginx:nginx_mainline_nonroot_" + arch + "_" + distro,
         layers = [statics_layer],
         platform = ARCHITECTURE_PLATFORMS[arch],
         **kwargs

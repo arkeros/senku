@@ -31,13 +31,13 @@ apt.install(
 )
 apt.install(
     name = "nginx_stable",
-    lock = "@@//distroless:nginx-stable.lock.json",
-    manifest = "//distroless:nginx-stable.yaml",
+    lock = "@@//oci/distroless/nginx:nginx-stable.lock.json",
+    manifest = "//oci/distroless/nginx:nginx-stable.yaml",
 )
 apt.install(
     name = "nginx_mainline",
-    lock = "@@//distroless:nginx-mainline.lock.json",
-    manifest = "//distroless:nginx-mainline.yaml",
+    lock = "@@//oci/distroless/nginx:nginx-mainline.lock.json",
+    manifest = "//oci/distroless/nginx:nginx-mainline.yaml",
 )
 use_repo(apt, "debian13", "nginx_stable", "nginx_mainline")
 

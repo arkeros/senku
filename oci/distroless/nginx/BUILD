@@ -3,10 +3,10 @@ load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_img//img:push.bzl", "image_push")
 load("@tar.bzl", "tar")
-load("//distroless/common:variables.bzl", "DEBUG_MODE")
 load("//oci:config.bzl", "OCI_REGISTRY", "OCI_REPOSITORY_PREFIX")
-load(":config.bzl", "NGINX_ARCHITECTURES", "NGINX_DISTROS", "NGINX_TAGS", "NGINX_VERSIONS")
-load(":nginx.bzl", "nginx_image", "nginx_image_index")
+load("//oci/distroless:matrix.bzl", "distroless_matrix")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBUG_MODE")
+load(":config.bzl", "NGINX_ARCHITECTURES", "NGINX_DISTROS", "NGINX_TAGS", "NGINX_VERSIONS", "nginx_layers")
 
 # CVE-2022-4899: libzstd, disputed - fixed in 2022 (https://github.com/facebook/zstd/issues/3200)
 # CVE-2026-1642: nginx HTTP/2 HEADERS frame DoS, stable only - fixed in mainline 1.29.5+ (https://nvd.nist.gov/vuln/detail/CVE-2026-1642)
@@ -29,9 +29,9 @@ tar(
         "nginx.conf",
     ],
     mtree = [
-        "./etc/nginx/nginx.conf uid=0 gid=0 mode=0644 type=file content=distroless/nginx/nginx.conf",
+        "./etc/nginx/nginx.conf uid=0 gid=0 mode=0644 type=file content=oci/distroless/nginx/nginx.conf",
         "./etc/nginx/conf.d type=dir uid=0 gid=0 mode=0755",
-        "./etc/nginx/conf.d/default.conf uid=0 gid=0 mode=0644 type=file content=distroless/nginx/default.conf",
+        "./etc/nginx/conf.d/default.conf uid=0 gid=0 mode=0644 type=file content=oci/distroless/nginx/default.conf",
         "./var/www/html type=dir uid=0 gid=0 mode=0755",
     ],
 )
@@ -39,6 +39,7 @@ tar(
 [
     flatten(
         name = version_label + "_" + arch + "_" + distro + "_layer",
+        compress = COMPRESSION,
         deduplicate = True,
         tars = [
             "@{}//{}/{}".format(apt_repo, "nginx", arch),
@@ -50,26 +51,56 @@ tar(
 ]
 
 [
-    nginx_image(
-        name = "nginx",
-        arch = arch,
+    distroless_matrix(
+        name = "nginx_stable",
+        architectures = NGINX_ARCHITECTURES[distro],
+        base = "//oci/distroless/cc",
+        debug_index_annotations = {
+            "org.opencontainers.image.description": "Distroless nginx stable image (debug)",
+            "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/nginx/BUILD",
+        },
         distro = distro,
-        ignore_cves = NGINX_IGNORE_CVES[version_label],
-        version_label = version_label,
+        entrypoint = [
+            "/usr/sbin/nginx",
+            "-e",
+            "/dev/stderr",
+            "-g",
+            "daemon off;",
+        ],
+        ignore_cves = NGINX_IGNORE_CVES["stable"],
+        index_annotations = {
+            "org.opencontainers.image.description": "Distroless nginx stable image",
+            "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/nginx/BUILD",
+        },
+        layers = nginx_layers("stable"),
     )
-    for version_label in NGINX_VERSIONS
     for distro in NGINX_DISTROS
-    for arch in NGINX_ARCHITECTURES[distro]
 ]
 
 [
-    nginx_image_index(
-        name = "nginx",
+    distroless_matrix(
+        name = "nginx_mainline",
         architectures = NGINX_ARCHITECTURES[distro],
+        base = "//oci/distroless/cc",
+        debug_index_annotations = {
+            "org.opencontainers.image.description": "Distroless nginx mainline image (debug)",
+            "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/nginx/BUILD",
+        },
         distro = distro,
-        version_label = version_label,
+        entrypoint = [
+            "/usr/sbin/nginx",
+            "-e",
+            "/dev/stderr",
+            "-g",
+            "daemon off;",
+        ],
+        ignore_cves = NGINX_IGNORE_CVES["mainline"],
+        index_annotations = {
+            "org.opencontainers.image.description": "Distroless nginx mainline image",
+            "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/nginx/BUILD",
+        },
+        layers = nginx_layers("mainline"),
     )
-    for version_label in NGINX_VERSIONS
     for distro in NGINX_DISTROS
 ]
 
@@ -108,30 +139,6 @@ container_structure_test(
     driver = "docker",
     image = ":nginx_mainline_nonroot_amd64_debian13.oci_layout",
     tags = ["requires-docker"],
-)
-
-bzl_library(
-    name = "nginx",
-    srcs = ["nginx.bzl"],
-    deps = [
-        "//distroless:distro",
-        "//distroless/common:variables",
-        "//oci",
-        "@container_structure_test//:defs",
-        "@rules_img//img:image",
-    ],
-)
-
-bzl_library(
-    name = "frontend",
-    srcs = ["frontend.bzl"],
-    deps = [
-        ":config",
-        "//distroless:distro",
-        "//distroless/common:variables",
-        "//oci",
-        "@rules_img//img:image",
-    ],
 )
 
 bzl_library(
