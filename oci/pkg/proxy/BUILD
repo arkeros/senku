@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/arkeros/senku/oci/pkg/proxy",
     visibility = ["//visibility:public"],
     deps = [
+        "//base/cache/lru",
         "@com_github_google_go_containerregistry//pkg/authn",
         "@com_github_google_go_containerregistry//pkg/name",
         "@com_github_google_go_containerregistry//pkg/v1/remote/transport",

@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
 
+	"github.com/arkeros/senku/base/cache/lru"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
@@ -22,8 +22,7 @@ type Proxy struct {
 	repositoryPrefix string
 	scheme           string
 
-	mu         sync.Mutex
-	transports map[string]http.RoundTripper
+	transports *lru.Cache[string, http.RoundTripper]
 }
 
 // Option configures a Proxy.
@@ -41,7 +40,7 @@ func New(upstream, repositoryPrefix string, opts ...Option) *Proxy {
 		upstream:         upstream,
 		repositoryPrefix: repositoryPrefix,
 		scheme:           "https",
-		transports:       make(map[string]http.RoundTripper),
+		transports:       lru.New[string, http.RoundTripper](MaxCacheEntries),
 	}
 	for _, o := range opts {
 		o(p)
@@ -113,12 +112,9 @@ func IsBlob(path string) bool {
 }
 
 func (p *Proxy) getTransport(repo string) (http.RoundTripper, error) {
-	p.mu.Lock()
-	if t, ok := p.transports[repo]; ok {
-		p.mu.Unlock()
+	if t, ok := p.transports.Get(repo); ok {
 		return t, nil
 	}
-	p.mu.Unlock()
 
 	fullRepo := p.repositoryPrefix + "/" + repo
 	opts := []name.Option{name.WithDefaultRegistry(p.upstream)}
@@ -140,23 +136,13 @@ func (p *Proxy) getTransport(repo string) (http.RoundTripper, error) {
 		return nil, fmt.Errorf("transport: %w", err)
 	}
 
-	p.mu.Lock()
-	if len(p.transports) >= MaxCacheEntries {
-		// Evict all entries when cache is full.
-		// Simple strategy that avoids tracking access order.
-		clear(p.transports)
-	}
-	p.transports[repo] = t
-	p.mu.Unlock()
-
+	p.transports.Put(repo, t)
 	return t, nil
 }
 
 // CacheLen returns the number of cached transports.
 func (p *Proxy) CacheLen() int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return len(p.transports)
+	return p.transports.Len()
 }
 
 var proxyHeaders = []string{
@@ -260,4 +246,3 @@ func rewriteTagsName(w http.ResponseWriter, body io.Reader, repo string, statusC
 		slog.Warn("failed to write rewritten tags response", "error", err)
 	}
 }
-
