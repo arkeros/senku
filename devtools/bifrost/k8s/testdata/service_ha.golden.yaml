@@ -2,46 +2,33 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   annotations:
-    iam.gke.io/gcp-service-account: svc-registry@senku-prod.iam.gserviceaccount.com
-  name: registry
-  namespace: jobs
----
-apiVersion: v1
-data:
-  latest: JHtnY3BzbTovLy9wcm9qZWN0cy9zZW5rdS1wcm9kL3NlY3JldHMvcmVnaXN0cnktZW52L3ZlcnNpb25zL2xhdGVzdH0=
-kind: Secret
-metadata:
-  name: registry-env-71bb3ea30f
+    iam.gke.io/gcp-service-account: svc-api-gateway@senku-prod.iam.gserviceaccount.com
+  name: api-gateway
   namespace: jobs
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: registry
+  name: api-gateway
   namespace: jobs
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: registry
+      app.kubernetes.io/name: api-gateway
   strategy: {}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: registry
+        app.kubernetes.io/name: api-gateway
     spec:
       containers:
-      - args:
-        - --upstream=ghcr.io
-        - --repository-prefix=arkeros/senku
-        env:
-        - name: LOG_LEVEL
-          value: info
+      - env:
         - name: PORT
           value: "8080"
-        image: registry
+        image: api-gateway
         livenessProbe:
           httpGet:
-            path: /v2/
+            path: /healthz
             port: 8080
         name: app
         ports:
@@ -50,7 +37,7 @@ spec:
           limits:
             cpu: "1"
           requests:
-            cpu: 250m
+            cpu: "1"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -62,31 +49,21 @@ spec:
             type: RuntimeDefault
         startupProbe:
           httpGet:
-            path: /v2/
+            path: /healthz
             port: 8080
-        volumeMounts:
-        - mountPath: /run/secrets
-          name: registry-env-71bb3ea30f
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
-      serviceAccountName: registry
-      volumes:
-      - name: registry-env-71bb3ea30f
-        secret:
-          items:
-          - key: latest
-            path: env.json
-          secretName: registry-env-71bb3ea30f
+      serviceAccountName: api-gateway
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: registry
+  name: api-gateway
   namespace: jobs
 spec:
-  maxReplicas: 3
+  maxReplicas: 5
   metrics:
   - resource:
       name: cpu
@@ -94,16 +71,16 @@ spec:
         averageUtilization: 80
         type: Utilization
     type: Resource
-  minReplicas: 1
+  minReplicas: 2
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: registry
+    name: api-gateway
 ---
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
-  name: registry
+  name: api-gateway
   namespace: jobs
 spec:
   resourcePolicy:
@@ -114,14 +91,25 @@ spec:
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: registry
+    name: api-gateway
   updatePolicy:
     updateMode: InPlaceOrRecreate
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway
+  namespace: jobs
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: registry
+  name: api-gateway
   namespace: jobs
 spec:
   ports:
@@ -129,5 +117,5 @@ spec:
     port: 8080
     targetPort: 8080
   selector:
-    app.kubernetes.io/name: registry
+    app.kubernetes.io/name: api-gateway
   type: ClusterIP
