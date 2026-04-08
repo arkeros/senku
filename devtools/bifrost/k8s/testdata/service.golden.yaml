@@ -4,7 +4,7 @@ metadata:
   annotations:
     iam.gke.io/gcp-service-account: svc-registry@senku-prod.iam.gserviceaccount.com
   name: registry
-  namespace: default
+  namespace: jobs
 ---
 apiVersion: v1
 data:
@@ -12,13 +12,13 @@ data:
 kind: Secret
 metadata:
   name: registry-env-71bb3ea30f
-  namespace: default
+  namespace: jobs
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: registry
-  namespace: default
+  namespace: jobs
 spec:
   selector:
     matchLabels:
@@ -33,6 +33,11 @@ spec:
       - args:
         - --upstream=ghcr.io
         - --repository-prefix=arkeros/senku
+        env:
+        - name: LOG_LEVEL
+          value: info
+        - name: PORT
+          value: "8080"
         image: registry
         livenessProbe:
           httpGet:
@@ -44,10 +49,8 @@ spec:
         resources:
           limits:
             cpu: "1"
-            memory: 256Mi
           requests:
             cpu: 250m
-            memory: 256Mi
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -81,7 +84,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: registry
-  namespace: default
+  namespace: jobs
 spec:
   maxReplicas: 3
   metrics:
@@ -97,11 +100,29 @@ spec:
     kind: Deployment
     name: registry
 ---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: registry
+  namespace: jobs
+spec:
+  resourcePolicy:
+    containerPolicies:
+    - containerName: app
+      controlledResources:
+      - memory
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: registry
+  updatePolicy:
+    updateMode: InPlaceOrRecreate
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: registry
-  namespace: default
+  namespace: jobs
 spec:
   ports:
   - name: http

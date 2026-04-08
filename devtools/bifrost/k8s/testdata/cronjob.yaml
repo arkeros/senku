@@ -6,6 +6,8 @@ spec:
   image: data-export
   args:
     - sync
+  env:
+    LOG_LEVEL: info
   resources:
     limits:
       cpu: 1000m
@@ -21,11 +23,5 @@ spec:
     completions: 1
     maxRetries: 3
     timeoutSeconds: 600
-  gcp:
-    projectId: senku-prod
-    projectNumber: "874944788122"
-    region: europe-west1
-    cloudScheduler:
-      retryCount: 3
-  kubernetes:
-    namespace: jobs
+  cloudScheduler:
+    retryCount: 3

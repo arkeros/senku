@@ -12,6 +12,7 @@ go_library(
         "@io_k8s_api//autoscaling/v2:autoscaling",
         "@io_k8s_api//batch/v1:batch",
         "@io_k8s_api//core/v1:core",
+        "@io_k8s_api//policy/v1:policy",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/util/intstr",
     ],
@@ -23,7 +24,7 @@ go_test(
     data = glob(["testdata/**"]),
     embed = [":k8s"],
     deps = [
-        "//devtools/bifrost/api",
+        "//devtools/bifrost/testing",
         "//testing/golden",
     ],
 )

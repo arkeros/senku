@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path"
 	"sort"
+	"strconv"
 
 	bifrost "github.com/arkeros/senku/devtools/bifrost/api"
 	"github.com/arkeros/senku/devtools/bifrost/internal"
@@ -15,31 +16,33 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func Render(spec bifrost.Workload) ([]byte, error) {
-	if spec.Spec.Kubernetes == nil {
-		return nil, fmt.Errorf("spec.kubernetes is required for k8s rendering")
+func Render(spec bifrost.Workload, env bifrost.Environment) ([]byte, error) {
+	if env.Spec.Kubernetes == nil {
+		return nil, fmt.Errorf("environment kubernetes is required for k8s rendering")
 	}
 	switch spec.Kind {
 	case bifrost.KindService:
-		return renderService(spec)
+		return renderService(spec, env)
 	case bifrost.KindCronJob:
-		return renderCronJob(spec)
+		return renderCronJob(spec, env)
 	default:
 		return nil, fmt.Errorf("unsupported kind %q", spec.Kind)
 	}
 }
 
-func renderService(spec bifrost.Workload) ([]byte, error) {
+func renderService(spec bifrost.Workload, env bifrost.Environment) ([]byte, error) {
 	labels := map[string]string{
 		"app.kubernetes.io/name": spec.Metadata.Name,
 	}
-	namespace := spec.Spec.Kubernetes.Namespace
+	gcp := env.Spec.GCP
+	namespace := env.Spec.Kubernetes.Namespace
 	kubernetesServiceAccountName := spec.Metadata.Name
-	resolved := resolveSecretFiles(spec.Spec.GCP.ProjectID, spec.Spec.SecretFiles)
+	resolved := resolveSecretFiles(gcp.ProjectID, spec.Spec.SecretFiles)
 
 	serviceAccount := corev1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{
@@ -74,7 +77,7 @@ func renderService(spec bifrost.Workload) ([]byte, error) {
 				},
 				Spec: podSpecWithSecurityContext(corev1.PodSpec{
 					ServiceAccountName: kubernetesServiceAccountName,
-					Containers:         []corev1.Container{containerWithSecurityContext(internal.ContainerForSpec(spec.Spec, resolved.mounts, true, true))},
+					Containers:         []corev1.Container{containerWithSecurityContext(withPortEnv(internal.ContainerForSpec(spec.Spec, resolved.mounts, true, true), spec.Spec.Port))},
 					Volumes:            resolved.volumes,
 				}),
 			},
@@ -125,7 +128,7 @@ func renderService(spec bifrost.Workload) ([]byte, error) {
 			Namespace: namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceType(spec.Spec.Kubernetes.ServiceType),
+			Type:     corev1.ServiceType(env.Spec.Kubernetes.ServiceType),
 			Selector: labels,
 			Ports: []corev1.ServicePort{{
 				Name:       "http",
@@ -139,7 +142,7 @@ func renderService(spec bifrost.Workload) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretsYAML, err := secretManifests(spec.Spec.GCP.ProjectID, namespace, spec.Spec.SecretFiles)
+	secretsYAML, err := secretManifests(gcp.ProjectID, namespace, spec.Spec.SecretFiles)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +159,60 @@ func renderService(spec bifrost.Workload) ([]byte, error) {
 		return nil, err
 	}
 
+	vpa := map[string]any{
+		"apiVersion": "autoscaling.k8s.io/v1",
+		"kind":       "VerticalPodAutoscaler",
+		"metadata": map[string]any{
+			"name":      spec.Metadata.Name,
+			"namespace": namespace,
+		},
+		"spec": map[string]any{
+			"targetRef": map[string]any{
+				"apiVersion": "apps/v1",
+				"kind":       "Deployment",
+				"name":       spec.Metadata.Name,
+			},
+			"updatePolicy": map[string]any{
+				"updateMode": "InPlaceOrRecreate",
+			},
+			"resourcePolicy": map[string]any{
+				"containerPolicies": []map[string]any{{
+					"containerName":       "app",
+					"controlledResources": []string{"memory"},
+				}},
+			},
+		},
+	}
+	vpaYAML, err := internal.MarshalManifest(vpa)
+	if err != nil {
+		return nil, err
+	}
+
+	var pdbYAML []byte
+	if spec.Spec.Autoscaling.MinReplicas >= 2 {
+		minAvailable := intstr.FromInt32(spec.Spec.Autoscaling.MinReplicas - 1)
+		pdb := policyv1.PodDisruptionBudget{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "policy/v1",
+				Kind:       "PodDisruptionBudget",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      spec.Metadata.Name,
+				Namespace: namespace,
+			},
+			Spec: policyv1.PodDisruptionBudgetSpec{
+				MinAvailable: &minAvailable,
+				Selector: &metav1.LabelSelector{
+					MatchLabels: labels,
+				},
+			},
+		}
+		pdbYAML, err = internal.MarshalManifest(pdb)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var out bytes.Buffer
 	out.Write(serviceAccountYAML)
 	out.WriteString("---\n")
@@ -164,17 +221,24 @@ func renderService(spec bifrost.Workload) ([]byte, error) {
 	out.WriteString("---\n")
 	out.Write(hpaYAML)
 	out.WriteString("---\n")
+	out.Write(vpaYAML)
+	out.WriteString("---\n")
+	if len(pdbYAML) > 0 {
+		out.Write(pdbYAML)
+		out.WriteString("---\n")
+	}
 	out.Write(serviceYAML)
 	return out.Bytes(), nil
 }
 
-func renderCronJob(spec bifrost.Workload) ([]byte, error) {
+func renderCronJob(spec bifrost.Workload, env bifrost.Environment) ([]byte, error) {
 	labels := map[string]string{
 		"app.kubernetes.io/name": spec.Metadata.Name,
 	}
-	namespace := spec.Spec.Kubernetes.Namespace
+	gcp := env.Spec.GCP
+	namespace := env.Spec.Kubernetes.Namespace
 	kubernetesServiceAccountName := spec.Metadata.Name
-	resolved := resolveSecretFiles(spec.Spec.GCP.ProjectID, spec.Spec.SecretFiles)
+	resolved := resolveSecretFiles(gcp.ProjectID, spec.Spec.SecretFiles)
 	parallelism := spec.Spec.Job.Parallelism
 	completions := spec.Spec.Job.Completions
 	maxRetries := spec.Spec.Job.MaxRetries
@@ -234,7 +298,7 @@ func renderCronJob(spec bifrost.Workload) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretsYAML, err := secretManifests(spec.Spec.GCP.ProjectID, namespace, spec.Spec.SecretFiles)
+	secretsYAML, err := secretManifests(gcp.ProjectID, namespace, spec.Spec.SecretFiles)
 	if err != nil {
 		return nil, err
 	}
@@ -410,6 +474,16 @@ func int32Ptr(v int32) *int32 {
 
 func stringPtr(v string) *string {
 	return &v
+}
+
+func withPortEnv(c corev1.Container, port int32) corev1.Container {
+	if port > 0 {
+		c.Env = append(c.Env, corev1.EnvVar{
+			Name:  "PORT",
+			Value: strconv.FormatInt(int64(port), 10),
+		})
+	}
+	return c
 }
 
 func podSpecWithSecurityContext(spec corev1.PodSpec) corev1.PodSpec {
