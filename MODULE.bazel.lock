@@ -352,11 +352,10 @@
   "moduleExtensions": {
     "@@aspect_rules_py+//py:extensions.bzl%py_tools": {
       "general": {
-        "bzlTransitiveDigest": "gfx1GgfOZCmI/TfRKcqaaN8gEqmKeyYVko3z1Me+SeM=",
-        "usagesDigest": "/wbi9Utt8CWq5O4kkcLg1g3StyNtsc/d9Qwa6paFJAE=",
+        "bzlTransitiveDigest": "tpDK7n2BYI3C2Tfw03iC91urZuOvPxDy01PtjBbuI6U=",
+        "usagesDigest": "vUZlUUgF3IKnrOqjiOX8WkCPfeOp+bm7h4MrLFcey6E=",
         "recordedInputs": [
           "REPO_MAPPING:aspect_rules_py+,aspect_tools_telemetry_report aspect_tools_telemetry++telemetry+aspect_tools_telemetry_report",
-          "REPO_MAPPING:aspect_rules_py+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:aspect_rules_py+,bazel_tools bazel_tools"
         ],
         "generatedRepoSpecs": {
