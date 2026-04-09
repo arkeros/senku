@@ -1,30 +1,17 @@
 package cloudrun
 
 import (
-	"os"
-	"strings"
 	"testing"
 
-	bifrost "github.com/arkeros/senku/devtools/bifrost/api"
+	btesting "github.com/arkeros/senku/devtools/bifrost/testing"
 	"github.com/arkeros/senku/testing/golden"
 )
-
-func loadSpecFixture(name string) (bifrost.Workload, error) {
-	data, err := os.ReadFile("testdata/" + name)
-	if err != nil {
-		return bifrost.Workload{}, err
-	}
-	return bifrost.Parse(strings.NewReader(string(data)))
-}
 
 func TestRenderService(t *testing.T) {
 	t.Parallel()
 
-	spec, err := loadSpecFixture("service.yaml")
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-	got, err := Render(spec)
+	spec, env := btesting.LoadFixtures(t, "testdata/service.yaml", "testdata/environment.yaml")
+	got, err := Render(spec, env)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -34,11 +21,8 @@ func TestRenderService(t *testing.T) {
 func TestRenderCronJob(t *testing.T) {
 	t.Parallel()
 
-	spec, err := loadSpecFixture("cronjob.yaml")
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-	got, err := Render(spec)
+	spec, env := btesting.LoadFixtures(t, "testdata/cronjob.yaml", "testdata/environment.yaml")
+	got, err := Render(spec, env)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}

@@ -7,14 +7,13 @@ spec:
   args:
     - --upstream=ghcr.io
     - --repository-prefix=arkeros/senku
-  port: 8080
+  env:
+    LOG_LEVEL: info
   resources:
     requests:
       cpu: 250m
-      memory: 256Mi
     limits:
       cpu: 1000m
-      memory: 256Mi
   secretFiles:
     - secret: registry-env
       path: /run/secrets/env.json
@@ -24,10 +23,5 @@ spec:
   autoscaling:
     min: 0
     max: 3
-  gcp:
-    projectId: senku-prod
-    projectNumber: "874944788122"
-    region: europe-west3
-    cloudRun:
-      ingress: all
-  kubernetes: {}
+  cloudRun:
+    ingress: all

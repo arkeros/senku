@@ -2,7 +2,10 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "api",
-    srcs = ["types.go"],
+    srcs = [
+        "environment.go",
+        "types.go",
+    ],
     importpath = "github.com/arkeros/senku/devtools/bifrost/api",
     visibility = ["//visibility:public"],
     deps = [
@@ -14,9 +17,15 @@ go_library(
 
 go_test(
     name = "api_test",
-    srcs = ["types_test.go"],
+    srcs = [
+        "environment_test.go",
+        "parse_test.go",
+        "types_test.go",
+    ],
+    data = glob(["testdata/**"]),
     embed = [":api"],
     deps = [
+        "//devtools/bifrost/testing",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/api/resource",
     ],

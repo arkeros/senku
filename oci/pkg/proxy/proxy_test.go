@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/arkeros/senku/oci/pkg/proxy"
+	"github.com/arkeros/senku/oci/ocitest"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
 func TestV2Base(t *testing.T) {
@@ -130,114 +132,33 @@ func TestNonV2PathReturns404(t *testing.T) {
 	}
 }
 
-// fakeRegistry implements a minimal OCI registry with standard auth challenge flow.
-// On /v2/ it returns a 401 with Www-Authenticate pointing to /auth/token.
-// On /auth/token it issues bearer tokens scoped per repository.
-// On /v2/<repo>/... it validates the bearer token and serves content.
-type fakeRegistry struct {
-	t        *testing.T
-	contents map[string]fakeResponse // path → response
-}
-
-type fakeResponse struct {
-	status  int
-	headers map[string]string
-	body    string
-}
-
-func (f *fakeRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Token endpoint at a non-standard path — only discoverable via Www-Authenticate challenge.
-	// This ensures the proxy follows the OCI auth spec rather than hardcoding a token URL.
-	if r.URL.Path == "/auth/token" {
-		scope := r.URL.Query().Get("scope")
-		token := "token-" + scope
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"token": token})
-		return
-	}
-
-	// /v2/ ping — return 401 with challenge pointing to our token endpoint
-	if r.URL.Path == "/v2/" || r.URL.Path == "/v2" {
-		host := r.Host
-		w.Header().Set("Www-Authenticate", fmt.Sprintf(`Bearer realm="http://%s/auth/token",service="%s"`, host, host))
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	// Registry API — require valid bearer token
-	auth := r.Header.Get("Authorization")
-	if !strings.HasPrefix(auth, "Bearer ") {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	token := strings.TrimPrefix(auth, "Bearer ")
-	if !strings.HasPrefix(token, "token-") {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	scope := strings.TrimPrefix(token, "token-")
-
-	// Enforce that the token scope matches the requested repository.
-	if strings.HasPrefix(r.URL.Path, "/v2/") {
-		rest := strings.TrimPrefix(r.URL.Path, "/v2/")
-		parts := strings.Split(rest, "/")
-		if len(parts) >= 3 {
-			repo := strings.Join(parts[:len(parts)-2], "/")
-			if repo != "" {
-				expectedScope := "repository:" + repo + ":pull"
-				if scope != expectedScope {
-					w.WriteHeader(http.StatusUnauthorized)
-					return
-				}
-			}
-		}
-	}
-
-	key := r.URL.Path
-	if r.URL.RawQuery != "" {
-		key += "?" + r.URL.RawQuery
-	}
-	if resp, ok := f.contents[key]; ok {
-		for k, v := range resp.headers {
-			w.Header().Set(k, v)
-		}
-		status := resp.status
-		if status == 0 {
-			status = http.StatusOK
-		}
-		w.WriteHeader(status)
-		fmt.Fprint(w, resp.body)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNotFound)
-	fmt.Fprint(w, `{"errors":[{"code":"NAME_UNKNOWN"}]}`)
-}
-
-func newFakeRegistry(t *testing.T, contents map[string]fakeResponse) *httptest.Server {
-	return httptest.NewServer(&fakeRegistry{t: t, contents: contents})
-}
-
-func newTestProxy(upstream *httptest.Server) *httptest.Server {
+func newTestProxy(t *testing.T, upstream *ocitest.Server) *httptest.Server {
+	t.Helper()
 	p := proxy.New(upstream.Listener.Addr().String(), "arkeros/senku", proxy.Insecure())
-	return httptest.NewServer(p)
+	srv := httptest.NewServer(p)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// firstLayerDigest returns the digest of the first layer in the image.
+func firstLayerDigest(t *testing.T, img v1.Image) v1.Hash {
+	t.Helper()
+	layers, err := img.Layers()
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := layers[0].Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return digest
 }
 
 func TestProxyManifest(t *testing.T) {
-	upstream := newFakeRegistry(t, map[string]fakeResponse{
-		"/v2/arkeros/senku/redis/manifests/latest": {
-			headers: map[string]string{
-				"Content-Type":          "application/vnd.oci.image.index.v1+json",
-				"Docker-Content-Digest": "sha256:deadbeef",
-			},
-			body: `{"schemaVersion":2}`,
-		},
-	})
-	defer upstream.Close()
+	upstream := ocitest.NewServer(t)
+	img := upstream.MustPushImage(t, "arkeros/senku/redis", "latest")
 
-	srv := newTestProxy(upstream)
-	defer srv.Close()
+	srv := newTestProxy(t, upstream)
 
 	resp, err := http.Get(srv.URL + "/v2/redis/manifests/latest")
 	if err != nil {
@@ -248,33 +169,29 @@ func TestProxyManifest(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
-	if ct := resp.Header.Get("Content-Type"); ct != "application/vnd.oci.image.index.v1+json" {
-		t.Errorf("Content-Type = %q, want OCI index", ct)
+	mt, _ := img.MediaType()
+	if ct := resp.Header.Get("Content-Type"); ct != string(mt) {
+		t.Errorf("Content-Type = %q, want %q", ct, mt)
 	}
-	if digest := resp.Header.Get("Docker-Content-Digest"); digest != "sha256:deadbeef" {
-		t.Errorf("Docker-Content-Digest = %q, want sha256:deadbeef", digest)
+	wantDigest, _ := img.Digest()
+	if digest := resp.Header.Get("Docker-Content-Digest"); digest != wantDigest.String() {
+		t.Errorf("Docker-Content-Digest = %q, want %q", digest, wantDigest)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	if string(body) != `{"schemaVersion":2}` {
-		t.Errorf("body = %q", body)
+	wantManifest, _ := img.RawManifest()
+	if string(body) != string(wantManifest) {
+		t.Errorf("body mismatch")
 	}
 }
 
 func TestProxyBlobDirectResponseReturns502(t *testing.T) {
-	upstream := newFakeRegistry(t, map[string]fakeResponse{
-		"/v2/arkeros/senku/redis/blobs/sha256:abc123": {
-			headers: map[string]string{
-				"Content-Type": "application/octet-stream",
-			},
-			body: "blob-content",
-		},
-	})
-	defer upstream.Close()
+	upstream := ocitest.NewServer(t)
+	img := upstream.MustPushImage(t, "arkeros/senku/redis", "latest")
+	digest := firstLayerDigest(t, img)
 
-	srv := newTestProxy(upstream)
-	defer srv.Close()
+	srv := newTestProxy(t, upstream)
 
-	resp, err := http.Get(srv.URL + "/v2/redis/blobs/sha256:abc123")
+	resp, err := http.Get(fmt.Sprintf("%s/v2/redis/blobs/%s", srv.URL, digest))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,18 +203,14 @@ func TestProxyBlobDirectResponseReturns502(t *testing.T) {
 }
 
 func TestProxyBlobRedirect(t *testing.T) {
-	upstream := newFakeRegistry(t, map[string]fakeResponse{
-		"/v2/arkeros/senku/redis/blobs/sha256:abc123": {
-			status: http.StatusTemporaryRedirect,
-			headers: map[string]string{
-				"Location": "https://storage.example.com/blob/sha256:abc123",
-			},
-		},
-	})
-	defer upstream.Close()
+	const redirectURL = "https://storage.example.com/blob/sha256:abc123"
 
-	srv := newTestProxy(upstream)
-	defer srv.Close()
+	upstream := ocitest.NewServer(t)
+	redirector := upstream.WithBlobRedirect(t, redirectURL)
+
+	p := proxy.New(redirector.Listener.Addr().String(), "arkeros/senku", proxy.Insecure())
+	srv := httptest.NewServer(p)
+	t.Cleanup(srv.Close)
 
 	// Don't follow redirects — we want to verify the proxy passes through the 307 + Location
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -313,17 +226,15 @@ func TestProxyBlobRedirect(t *testing.T) {
 	if resp.StatusCode != http.StatusTemporaryRedirect {
 		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusTemporaryRedirect)
 	}
-	if loc := resp.Header.Get("Location"); loc != "https://storage.example.com/blob/sha256:abc123" {
+	if loc := resp.Header.Get("Location"); loc != redirectURL {
 		t.Errorf("Location = %q, want storage URL", loc)
 	}
 }
 
 func TestUpstream404(t *testing.T) {
-	upstream := newFakeRegistry(t, nil)
-	defer upstream.Close()
+	upstream := ocitest.NewServer(t)
 
-	srv := newTestProxy(upstream)
-	defer srv.Close()
+	srv := newTestProxy(t, upstream)
 
 	resp, err := http.Get(srv.URL + "/v2/nonexistent/manifests/latest")
 	if err != nil {
@@ -337,18 +248,11 @@ func TestUpstream404(t *testing.T) {
 }
 
 func TestTagsList(t *testing.T) {
-	upstream := newFakeRegistry(t, map[string]fakeResponse{
-		"/v2/arkeros/senku/redis/tags/list": {
-			headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-			body: `{"name":"arkeros/senku/redis","tags":["latest","v1.0.0"]}`,
-		},
-	})
-	defer upstream.Close()
+	upstream := ocitest.NewServer(t)
+	upstream.MustPushImage(t, "arkeros/senku/redis", "latest")
+	upstream.MustPushImage(t, "arkeros/senku/redis", "v1.0.0")
 
-	srv := newTestProxy(upstream)
-	defer srv.Close()
+	srv := newTestProxy(t, upstream)
 
 	resp, err := http.Get(srv.URL + "/v2/redis/tags/list")
 	if err != nil {
@@ -376,18 +280,10 @@ func TestTagsList(t *testing.T) {
 }
 
 func TestTagsListMultiSegmentRepo(t *testing.T) {
-	upstream := newFakeRegistry(t, map[string]fakeResponse{
-		"/v2/arkeros/senku/go/debian13/tags/list": {
-			headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-			body: `{"name":"arkeros/senku/go/debian13","tags":["v1.0.0"]}`,
-		},
-	})
-	defer upstream.Close()
+	upstream := ocitest.NewServer(t)
+	upstream.MustPushImage(t, "arkeros/senku/go/debian13", "v1.0.0")
 
-	srv := newTestProxy(upstream)
-	defer srv.Close()
+	srv := newTestProxy(t, upstream)
 
 	resp, err := http.Get(srv.URL + "/v2/go/debian13/tags/list")
 	if err != nil {
@@ -412,20 +308,11 @@ func TestTagsListMultiSegmentRepo(t *testing.T) {
 }
 
 func TestPerRepoTokenScoping(t *testing.T) {
-	upstream := newFakeRegistry(t, map[string]fakeResponse{
-		"/v2/arkeros/senku/redis/manifests/latest": {
-			headers: map[string]string{"Content-Type": "application/vnd.oci.image.index.v1+json"},
-			body:    `{"schemaVersion":2}`,
-		},
-		"/v2/arkeros/senku/nginx/manifests/latest": {
-			headers: map[string]string{"Content-Type": "application/vnd.oci.image.index.v1+json"},
-			body:    `{"schemaVersion":2}`,
-		},
-	})
-	defer upstream.Close()
+	upstream := ocitest.NewServer(t)
+	upstream.MustPushImage(t, "arkeros/senku/redis", "latest")
+	upstream.MustPushImage(t, "arkeros/senku/nginx", "latest")
 
-	srv := newTestProxy(upstream)
-	defer srv.Close()
+	srv := newTestProxy(t, upstream)
 
 	// Pull redis first
 	resp, err := http.Get(srv.URL + "/v2/redis/manifests/latest")
@@ -449,18 +336,10 @@ func TestPerRepoTokenScoping(t *testing.T) {
 }
 
 func TestTransportCacheIsBounded(t *testing.T) {
-	// Generate content for many unique repos
-	contents := make(map[string]fakeResponse)
+	upstream := ocitest.NewServer(t)
 	for i := range 200 {
-		path := fmt.Sprintf("/v2/arkeros/senku/repo%d/manifests/latest", i)
-		contents[path] = fakeResponse{
-			headers: map[string]string{"Content-Type": "application/vnd.oci.image.index.v1+json"},
-			body:    `{"schemaVersion":2}`,
-		}
+		upstream.MustPushImage(t, fmt.Sprintf("arkeros/senku/repo%d", i), "latest")
 	}
-
-	upstream := newFakeRegistry(t, contents)
-	defer upstream.Close()
 
 	p := proxy.New(upstream.Listener.Addr().String(), "arkeros/senku", proxy.Insecure())
 	srv := httptest.NewServer(p)
@@ -484,21 +363,79 @@ func TestTransportCacheIsBounded(t *testing.T) {
 	}
 }
 
-func TestQueryStringForwarded(t *testing.T) {
-	upstream := newFakeRegistry(t, map[string]fakeResponse{
-		"/v2/arkeros/senku/redis/tags/list?n=10&last=v1.0.0": {
-			headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-			body: `{"name":"arkeros/senku/redis","tags":["v1.0.1","v1.0.2"]}`,
-		},
-	})
-	defer upstream.Close()
-
-	srv := newTestProxy(upstream)
+func TestCatalogEmpty(t *testing.T) {
+	p := proxy.New("ghcr.io", "arkeros/senku")
+	srv := httptest.NewServer(p)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/v2/redis/tags/list?n=10&last=v1.0.0")
+	resp, err := http.Get(srv.URL + "/v2/_catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	want := `{"repositories":[]}`
+	got := strings.TrimSpace(string(body))
+	if got != want {
+		t.Errorf("body = %s, want %s", got, want)
+	}
+}
+
+func TestCatalog(t *testing.T) {
+	p := proxy.New("ghcr.io", "arkeros/senku", proxy.WithRepos([]string{"redis", "nginx"}))
+	srv := httptest.NewServer(p)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/v2/_catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	var result struct {
+		Repositories []string `json:"repositories"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(result.Repositories) != 2 || result.Repositories[0] != "redis" || result.Repositories[1] != "nginx" {
+		t.Errorf("repositories = %v, want [redis nginx]", result.Repositories)
+	}
+}
+
+func TestNonExistentRepoForwardsUpstreamStatus(t *testing.T) {
+	upstream := ocitest.NewServerDenyAuth(t)
+	upstream.MustPushImage(t, "arkeros/senku/nginx", "latest")
+
+	p := proxy.New(upstream.Listener.Addr().String(), "arkeros/senku", proxy.Insecure())
+	srv := httptest.NewServer(p)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/v2/apache/manifests/latest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusForbidden)
+	}
+}
+
+func TestQueryStringForwarded(t *testing.T) {
+	upstream := ocitest.NewServer(t)
+	upstream.MustPushImage(t, "arkeros/senku/redis", "v1.0.0")
+	upstream.MustPushImage(t, "arkeros/senku/redis", "v1.0.1")
+	upstream.MustPushImage(t, "arkeros/senku/redis", "v1.0.2")
+
+	srv := newTestProxy(t, upstream)
+
+	// Request with n=2 to paginate — the proxy must forward the query string.
+	resp, err := http.Get(srv.URL + "/v2/redis/tags/list?n=2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -518,7 +455,7 @@ func TestQueryStringForwarded(t *testing.T) {
 	if result.Name != "redis" {
 		t.Errorf("name = %q, want %q", result.Name, "redis")
 	}
-	if len(result.Tags) != 2 || result.Tags[0] != "v1.0.1" {
-		t.Errorf("tags = %v, want [v1.0.1 v1.0.2]", result.Tags)
+	if len(result.Tags) != 2 {
+		t.Errorf("tags count = %d, want 2 (paginated)", len(result.Tags))
 	}
 }
