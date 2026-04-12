@@ -8,13 +8,13 @@ metadata:
   namespace: default
 ---
 apiVersion: v1
+data:
+  api-key: a2V5LWFiYy0xMjM=
+  password: czNjcmV0LXBhc3N3b3Jk
 kind: Secret
 metadata:
   name: db-credentials
   namespace: default
-stringData:
-  api-key: key-abc-123
-  password: s3cret-password
 type: Opaque
 ---
 apiVersion: apps/v1

@@ -90,8 +90,12 @@ func TestResolve_StringData(t *testing.T) {
 	if err := secrets.Resolve(context.Background(), secret, fetch); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if secret.StringData["password"] != "s3cret" {
-		t.Errorf("got %q, want %q", secret.StringData["password"], "s3cret")
+	// Resolved values should be in Data (binary-safe), not StringData.
+	if string(secret.Data["password"]) != "s3cret" {
+		t.Errorf("Data[password] = %q, want %q", secret.Data["password"], "s3cret")
+	}
+	if len(secret.StringData) != 0 {
+		t.Errorf("StringData should be empty after resolution, got %v", secret.StringData)
 	}
 }
 
@@ -151,8 +155,8 @@ func TestResolve_EnvProvider(t *testing.T) {
 	if err := secrets.Resolve(context.Background(), secret, fetch); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if secret.StringData["password"] != "env-secret" {
-		t.Errorf("got %q, want %q", secret.StringData["password"], "env-secret")
+	if string(secret.Data["password"]) != "env-secret" {
+		t.Errorf("got %q, want %q", secret.Data["password"], "env-secret")
 	}
 }
 
@@ -175,8 +179,8 @@ func TestResolve_FileProvider(t *testing.T) {
 	if err := secrets.Resolve(context.Background(), secret, fetch); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if secret.StringData["token"] != "file-token" {
-		t.Errorf("got %q, want %q", secret.StringData["token"], "file-token")
+	if string(secret.Data["token"]) != "file-token" {
+		t.Errorf("got %q, want %q", secret.Data["token"], "file-token")
 	}
 }
 
@@ -212,14 +216,14 @@ func TestResolve_MixedProviders(t *testing.T) {
 	if err := secrets.Resolve(context.Background(), secret, fetch); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if secret.StringData["db-pass"] != "gcp-password" {
-		t.Errorf("got %q, want %q", secret.StringData["db-pass"], "gcp-password")
+	if string(secret.Data["db-pass"]) != "gcp-password" {
+		t.Errorf("got %q, want %q", secret.Data["db-pass"], "gcp-password")
 	}
-	if secret.StringData["api-key"] != "key-123" {
-		t.Errorf("got %q, want %q", secret.StringData["api-key"], "key-123")
+	if string(secret.Data["api-key"]) != "key-123" {
+		t.Errorf("got %q, want %q", secret.Data["api-key"], "key-123")
 	}
-	if secret.StringData["cert"] != "CERT-DATA" {
-		t.Errorf("got %q, want %q", secret.StringData["cert"], "CERT-DATA")
+	if string(secret.Data["cert"]) != "CERT-DATA" {
+		t.Errorf("got %q, want %q", secret.Data["cert"], "CERT-DATA")
 	}
 }
 

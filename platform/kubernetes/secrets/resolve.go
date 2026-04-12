@@ -41,13 +41,17 @@ func NewFetcher(providers map[string]Provider) Fetcher {
 // Data values are base64-decoded. If the decoded value is a valid URI
 // it is resolved and re-encoded to base64. Non-URI values are left unchanged.
 func Resolve(ctx context.Context, secret *corev1.Secret, fetch Fetcher) error {
+	if secret.Data == nil {
+		secret.Data = make(map[string][]byte, len(secret.StringData))
+	}
 	for key, val := range secret.StringData {
 		payload, err := fetch(ctx, val)
 		if err != nil {
 			return fmt.Errorf("stringData[%q]: %v", key, err)
 		}
-		secret.StringData[key] = string(payload)
+		secret.Data[key] = payload
 	}
+	secret.StringData = nil
 
 	for key, val := range secret.Data {
 		uri := string(val)
