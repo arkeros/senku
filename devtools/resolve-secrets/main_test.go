@@ -55,6 +55,32 @@ func TestResolveManifest_SecretOnly(t *testing.T) {
 	golden.Compare(t, buf.Bytes(), "testdata/secret_only.golden.yaml")
 }
 
+func TestResolveManifest_Transforms(t *testing.T) {
+	t.Parallel()
+
+	fetch := secrets.NewFetcher(map[string]secrets.Provider{
+		"mem": mem.Provider(map[string]string{
+			"db-config":                `{"password":"s3cret","database":{"host":"db.internal"}}`,
+			"json-with-b64-field":      `{"tls_cert":"aGVsbG8="}`,
+			"b64-json":                 "eyJwYXNzd29yZCI6InMzY3JldCJ9",                 // base64(`{"password":"s3cret"}`)
+			"b64-json-with-b64-field":  "eyJjZXJ0IjoiYUdWc2JHOD0ifQ==",                 // base64(`{"cert":"aGVsbG8="}`)
+		}),
+	})
+
+	f, err := os.Open("testdata/transforms.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	var buf bytes.Buffer
+	if err := resolveManifest(context.Background(), f, &buf, fetch); err != nil {
+		t.Fatalf("resolveManifest() error = %v", err)
+	}
+
+	golden.Compare(t, buf.Bytes(), "testdata/transforms.golden.yaml")
+}
+
 func TestResolveManifest_NoSecrets(t *testing.T) {
 	t.Parallel()
 
