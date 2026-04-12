@@ -1,0 +1,37 @@
+apiVersion: v1
+data:
+  DATABASE_URL: postgres://db:5432/app
+  LOG_LEVEL: info
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: default
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: default
+stringData:
+  api-key: key-abc-123
+  password: s3cret-password
+type: Opaque
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+      - image: gcr.io/myproject/app:v1.0.0
+        name: app
