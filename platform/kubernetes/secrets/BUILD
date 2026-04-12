@@ -5,7 +5,11 @@ go_library(
     srcs = ["resolve.go"],
     importpath = "github.com/arkeros/senku/platform/kubernetes/secrets",
     visibility = ["//visibility:public"],
-    deps = ["@io_k8s_api//core/v1:core"],
+    deps = [
+        "//base/json/jsonutil",
+        "//base/json/pointer",
+        "@io_k8s_api//core/v1:core",
+    ],
 )
 
 go_test(
