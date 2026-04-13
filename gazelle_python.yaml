@@ -19,4 +19,4 @@ manifest:
     ruamel.yaml: ruamel_yaml
   pip_repository:
     name: pip
-integrity: dacd3b30a72aeab9b7bbfa60e4562a8dfcf03e7c5de399bc1c158236215cbbcb
+integrity: 23ab771105249268421afc37796744b06d8a88fd5374c204db8c6652d4aa71a2
