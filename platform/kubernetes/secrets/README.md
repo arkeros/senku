@@ -74,6 +74,28 @@ env://MY_SECRET?payload=base64#/password
 env://MY_SECRET?payload=base64&decode=base64#/cert
 ```
 
+## Spread
+
+Keys prefixed with `...` spread a JSON secret into multiple K8s Secret keys:
+
+```yaml
+stringData:
+  ...db: gcp:///projects/P/secrets/db-config/versions/1
+  ...redis: gcp:///projects/P/secrets/redis-config/versions/1
+  port: "5433"  # explicit override
+```
+
+If `db-config` contains `{"host":"db.internal","port":"5432","user":"admin"}`,
+the resolved Secret will have keys `host`, `port`, `user`, `redis-host`, etc.
+
+The suffix after `...` is a disambiguator (ignored by the resolver).
+Transforms compose: `...db: gcp:///...?payload=base64` works.
+
+### Collision rules
+
+- **Spread vs spread**: if two spreads produce the same key → **hard error**
+- **Explicit vs spread**: explicit keys always win (no error)
+
 ## Usage with kustomize
 
 Kustomize `secretGenerator` produces `data` (base64-encoded) fields. Place

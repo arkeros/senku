@@ -6,12 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/arkeros/senku/base/json/jsonutil"
 	"github.com/arkeros/senku/base/json/pointer"
 )
+
+const spreadPrefix = "..."
 
 // Provider resolves a parsed secret URL to secret bytes.
 type Provider func(ctx context.Context, u *url.URL) ([]byte, error)
@@ -115,13 +118,47 @@ func NewFetcher(providers map[string]Provider) Fetcher {
 // StringData values are treated as URIs and resolved directly.
 // Every value must have a scheme; plain strings are rejected.
 //
-// Data values are base64-decoded. If the decoded value is a valid URI
-// it is resolved and re-encoded to base64. Non-URI values are left unchanged.
+// Keys prefixed with "..." trigger spread: the URI is fetched, parsed as a
+// JSON object, and all top-level keys are merged into the Secret's data.
+// Spread-vs-spread collisions are a hard error; explicit keys always win.
+//
+// Data values are inspected as raw bytes. If the value is a provider URI
+// it is resolved. Non-URI values are left unchanged.
 func Resolve(ctx context.Context, secret *corev1.Secret, fetch Fetcher) error {
 	if secret.Data == nil {
 		secret.Data = make(map[string][]byte, len(secret.StringData))
 	}
+
+	// Pass 1: process spread keys, build spread map.
+	spreadData := make(map[string][]byte)
+	spreadSource := make(map[string]string) // key → spread source for error messages
 	for key, val := range secret.StringData {
+		if !strings.HasPrefix(key, spreadPrefix) {
+			continue
+		}
+		entries, err := spreadJSON(ctx, val, fetch)
+		if err != nil {
+			return fmt.Errorf("stringData[%q]: %v", key, err)
+		}
+		for k, v := range entries {
+			if src, exists := spreadSource[k]; exists {
+				return fmt.Errorf("spread collision: key %q produced by both %q and %q", k, src, key)
+			}
+			spreadData[k] = v
+			spreadSource[k] = key
+		}
+	}
+
+	// Apply spread data as the base layer.
+	for k, v := range spreadData {
+		secret.Data[k] = v
+	}
+
+	// Pass 2: process explicit (non-spread) keys; these override spread.
+	for key, val := range secret.StringData {
+		if strings.HasPrefix(key, spreadPrefix) {
+			continue
+		}
 		payload, err := fetch(ctx, val)
 		if err != nil {
 			return fmt.Errorf("stringData[%q]: %v", key, err)
@@ -145,4 +182,26 @@ func Resolve(ctx context.Context, secret *corev1.Secret, fetch Fetcher) error {
 	}
 
 	return nil
+}
+
+// spreadJSON fetches a URI, parses the result as a JSON object, and returns
+// each top-level key as a separate entry.
+func spreadJSON(ctx context.Context, uri string, fetch Fetcher) (map[string][]byte, error) {
+	data, err := fetch(ctx, uri)
+	if err != nil {
+		return nil, err
+	}
+	var obj map[string]any
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return nil, fmt.Errorf("spread requires a JSON object, got: %w", err)
+	}
+	result := make(map[string][]byte, len(obj))
+	for k, v := range obj {
+		b, err := jsonutil.MarshalRaw(v)
+		if err != nil {
+			return nil, fmt.Errorf("spread key %q: %w", k, err)
+		}
+		result[k] = b
+	}
+	return result, nil
 }

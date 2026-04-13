@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: basic-spread
+  namespace: default
+type: Opaque
+stringData:
+  ...db: mem://db-config
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: spread-with-override
+  namespace: default
+type: Opaque
+stringData:
+  ...db: mem://db-config
+  port: mem://custom-port
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: multiple-spreads
+  namespace: default
+type: Opaque
+stringData:
+  ...db: mem://db-config
+  ...redis: mem://redis-config

@@ -81,6 +81,31 @@ func TestResolveManifest_Transforms(t *testing.T) {
 	golden.Compare(t, buf.Bytes(), "testdata/transforms.golden.yaml")
 }
 
+func TestResolveManifest_Spread(t *testing.T) {
+	t.Parallel()
+
+	fetch := secrets.NewFetcher(map[string]secrets.Provider{
+		"mem": mem.Provider(map[string]string{
+			"db-config":    `{"host":"db.internal","port":"5432","user":"admin"}`,
+			"redis-config": `{"redis-host":"redis.internal","redis-port":"6379"}`,
+			"custom-port":  "5433",
+		}),
+	})
+
+	f, err := os.Open("testdata/spread.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	var buf bytes.Buffer
+	if err := resolveManifest(context.Background(), f, &buf, fetch); err != nil {
+		t.Fatalf("resolveManifest() error = %v", err)
+	}
+
+	golden.Compare(t, buf.Bytes(), "testdata/spread.golden.yaml")
+}
+
 func TestResolveManifest_NoSecrets(t *testing.T) {
 	t.Parallel()
 

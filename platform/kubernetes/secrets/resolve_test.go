@@ -567,3 +567,133 @@ func TestNewFetcher_FragmentAndQueryStrippedFromProvider(t *testing.T) {
 		t.Errorf("provider received query %q, expected it to be stripped", receivedURL.RawQuery)
 	}
 }
+
+// --- Spread ---
+
+func TestResolve_Spread(t *testing.T) {
+	secret := &corev1.Secret{
+		StringData: map[string]string{
+			"...db": "test://db-config",
+		},
+	}
+	fetch := mockFetcher(map[string]string{
+		"test://db-config": `{"username":"admin","password":"s3cret"}`,
+	})
+
+	if err := secrets.Resolve(context.Background(), secret, fetch); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(secret.Data["username"]) != "admin" {
+		t.Errorf("Data[username] = %q, want %q", secret.Data["username"], "admin")
+	}
+	if string(secret.Data["password"]) != "s3cret" {
+		t.Errorf("Data[password] = %q, want %q", secret.Data["password"], "s3cret")
+	}
+	if _, ok := secret.Data["...db"]; ok {
+		t.Error("spread key ...db should not appear in Data")
+	}
+}
+
+func TestResolve_SpreadMultiple(t *testing.T) {
+	secret := &corev1.Secret{
+		StringData: map[string]string{
+			"...db":    "test://db-config",
+			"...redis": "test://redis-config",
+		},
+	}
+	fetch := mockFetcher(map[string]string{
+		"test://db-config":    `{"db-host":"db.internal"}`,
+		"test://redis-config": `{"redis-host":"redis.internal"}`,
+	})
+
+	if err := secrets.Resolve(context.Background(), secret, fetch); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(secret.Data["db-host"]) != "db.internal" {
+		t.Errorf("Data[db-host] = %q, want %q", secret.Data["db-host"], "db.internal")
+	}
+	if string(secret.Data["redis-host"]) != "redis.internal" {
+		t.Errorf("Data[redis-host] = %q, want %q", secret.Data["redis-host"], "redis.internal")
+	}
+}
+
+func TestResolve_SpreadCollision(t *testing.T) {
+	secret := &corev1.Secret{
+		StringData: map[string]string{
+			"...a": "test://a",
+			"...b": "test://b",
+		},
+	}
+	fetch := mockFetcher(map[string]string{
+		"test://a": `{"host":"a.internal"}`,
+		"test://b": `{"host":"b.internal"}`,
+	})
+
+	err := secrets.Resolve(context.Background(), secret, fetch)
+	if err == nil {
+		t.Fatal("expected error for spread collision")
+	}
+	if !strings.Contains(err.Error(), "host") {
+		t.Errorf("error should mention colliding key, got: %v", err)
+	}
+}
+
+func TestResolve_SpreadExplicitOverride(t *testing.T) {
+	secret := &corev1.Secret{
+		StringData: map[string]string{
+			"...db": "test://db-config",
+			"port":  "test://custom-port",
+		},
+	}
+	fetch := mockFetcher(map[string]string{
+		"test://db-config":   `{"host":"db.internal","port":"5432"}`,
+		"test://custom-port": "5433",
+	})
+
+	if err := secrets.Resolve(context.Background(), secret, fetch); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(secret.Data["host"]) != "db.internal" {
+		t.Errorf("Data[host] = %q, want %q", secret.Data["host"], "db.internal")
+	}
+	if string(secret.Data["port"]) != "5433" {
+		t.Errorf("Data[port] = %q, want %q (explicit should win)", secret.Data["port"], "5433")
+	}
+}
+
+func TestResolve_SpreadWithTransforms(t *testing.T) {
+	providers := map[string]secrets.Provider{
+		"test": func(_ context.Context, u *url.URL) ([]byte, error) {
+			return []byte("eyJ1c2VyIjoiYWRtaW4ifQ=="), nil // base64(`{"user":"admin"}`)
+		},
+	}
+	fetch := secrets.NewFetcher(providers)
+
+	secret := &corev1.Secret{
+		StringData: map[string]string{
+			"...cfg": "test://config?payload=base64",
+		},
+	}
+	if err := secrets.Resolve(context.Background(), secret, fetch); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(secret.Data["user"]) != "admin" {
+		t.Errorf("Data[user] = %q, want %q", secret.Data["user"], "admin")
+	}
+}
+
+func TestResolve_SpreadNonObject(t *testing.T) {
+	secret := &corev1.Secret{
+		StringData: map[string]string{
+			"...x": "test://not-object",
+		},
+	}
+	fetch := mockFetcher(map[string]string{
+		"test://not-object": `"just a string"`,
+	})
+
+	err := secrets.Resolve(context.Background(), secret, fetch)
+	if err == nil {
+		t.Fatal("expected error for non-object spread")
+	}
+}
