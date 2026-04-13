@@ -7,12 +7,12 @@ metadata:
   namespace: jobs
 ---
 apiVersion: v1
-data:
-  latest: JHtnY3BzbTovLy9wcm9qZWN0cy9zZW5rdS1wcm9kL3NlY3JldHMvcmVnaXN0cnktZW52L3ZlcnNpb25zL2xhdGVzdH0=
 kind: Secret
 metadata:
-  name: registry-env-71bb3ea30f
+  name: registry-env-c4453f4aee
   namespace: jobs
+stringData:
+  env.json: gcp:///projects/senku-prod/secrets/registry-env/versions/1
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -66,19 +66,16 @@ spec:
             port: 8080
         volumeMounts:
         - mountPath: /run/secrets
-          name: registry-env-71bb3ea30f
+          name: registry-env-c4453f4aee
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       serviceAccountName: registry
       volumes:
-      - name: registry-env-71bb3ea30f
+      - name: registry-env-c4453f4aee
         secret:
-          items:
-          - key: latest
-            path: env.json
-          secretName: registry-env-71bb3ea30f
+          secretName: registry-env-c4453f4aee
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

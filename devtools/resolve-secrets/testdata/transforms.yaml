@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: json-pointer
+  namespace: default
+type: Opaque
+stringData:
+  password: mem://db-config#/password
+  host: mem://db-config#/database/host
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: egress-decode
+  namespace: default
+type: Opaque
+stringData:
+  cert: mem://json-with-b64-field?decode=base64#/tls_cert
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ingress-decode
+  namespace: default
+type: Opaque
+stringData:
+  password: mem://b64-json?payload=base64#/password
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: both-decodes
+  namespace: default
+type: Opaque
+stringData:
+  cert: mem://b64-json-with-b64-field?payload=base64&decode=base64#/cert

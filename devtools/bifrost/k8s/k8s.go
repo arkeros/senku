@@ -3,7 +3,6 @@ package k8s
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"path"
@@ -12,6 +11,7 @@ import (
 
 	bifrost "github.com/arkeros/senku/devtools/bifrost/api"
 	"github.com/arkeros/senku/devtools/bifrost/internal"
+	"github.com/arkeros/senku/platform/kubernetes/secrets/providers/gcp"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -333,7 +333,6 @@ func resolveSecretFiles(projectID string, secretFiles []bifrost.SecretFile) reso
 	type mountGroup struct {
 		ukey      string
 		mountPath string
-		items     []corev1.KeyToPath
 	}
 	secrets := map[string]*secretData{}
 	var secretOrder []string
@@ -341,28 +340,24 @@ func resolveSecretFiles(projectID string, secretFiles []bifrost.SecretFile) reso
 	var groupOrder []string
 	for _, sf := range secretFiles {
 		ukey := sf.UniqueKey(projectID)
-		proj, name, version := sf.ParseSecret(projectID)
+		proj := sf.ProjectOrDefault(projectID)
+		version := sf.VersionString()
+		basename := path.Base(sf.Path)
+		vname := sf.VolumeName(projectID)
 		sd, ok := secrets[ukey]
 		if !ok {
-			sd = &secretData{name: name, data: map[string]string{}}
+			sd = &secretData{name: vname, data: map[string]string{}}
 			secrets[ukey] = sd
 			secretOrder = append(secretOrder, ukey)
 		}
-		sd.data[version] = base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("${gcpsm:///projects/%s/secrets/%s/versions/%s}", proj, name, version)))
+		sd.data[basename] = gcp.URI(proj, sf.Secret, version)
 
 		dir := path.Dir(sf.Path)
 		gkey := ukey + ":" + dir
-		g, ok := groups[gkey]
-		if !ok {
-			g = &mountGroup{ukey: ukey, mountPath: dir}
-			groups[gkey] = g
+		if _, ok := groups[gkey]; !ok {
+			groups[gkey] = &mountGroup{ukey: ukey, mountPath: dir}
 			groupOrder = append(groupOrder, gkey)
 		}
-		g.items = append(g.items, corev1.KeyToPath{
-			Key:  version,
-			Path: path.Base(sf.Path),
-		})
 	}
 	suffixedNames := map[string]string{}
 	for _, ukey := range secretOrder {
@@ -378,7 +373,6 @@ func resolveSecretFiles(projectID string, secretFiles []bifrost.SecretFile) reso
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: sname,
-					Items:      g.items,
 				},
 			},
 		})
@@ -402,15 +396,17 @@ func secretManifests(projectID, namespace string, secretFiles []bifrost.SecretFi
 	var order []string
 	for _, sf := range secretFiles {
 		ukey := sf.UniqueKey(projectID)
-		proj, name, version := sf.ParseSecret(projectID)
+		proj := sf.ProjectOrDefault(projectID)
+		version := sf.VersionString()
+		basename := path.Base(sf.Path)
+		vname := sf.VolumeName(projectID)
 		e, ok := seen[ukey]
 		if !ok {
-			e = &secretEntry{name: name, data: map[string]string{}}
+			e = &secretEntry{name: vname, data: map[string]string{}}
 			seen[ukey] = e
 			order = append(order, ukey)
 		}
-		e.data[version] = base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf("${gcpsm:///projects/%s/secrets/%s/versions/%s}", proj, name, version)))
+		e.data[basename] = gcp.URI(proj, sf.Secret, version)
 	}
 	var out bytes.Buffer
 	for _, ukey := range order {
@@ -423,7 +419,7 @@ func secretManifests(projectID, namespace string, secretFiles []bifrost.SecretFi
 				"name":      suffixed,
 				"namespace": namespace,
 			},
-			"data": e.data,
+			"stringData": e.data,
 		}
 		b, err := internal.MarshalManifest(secret)
 		if err != nil {

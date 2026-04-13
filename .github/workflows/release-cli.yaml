@@ -1,0 +1,101 @@
+name: Release CLI tools
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    name: Release ${{ matrix.tool }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - tool: knife
+            package: //bazel/cmd/knife
+          - tool: bifrost
+            package: //devtools/bifrost/cli
+          - tool: resolve-secrets
+            package: //devtools/resolve-secrets
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Set up Bazelisk
+        uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          bazelrc: |
+            common --config=ci
+            common --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
+      # NOTE: When x_defs are added to go_binary targets for --version
+      # stamping, add --stamp here and compare unstamped SHAs instead, or
+      # drop change detection entirely and release on every push.
+      - name: Build all platforms
+        run: |
+          bazel build --remote_download_outputs=toplevel ${{ matrix.package }}/...
+          for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            cp "$(bazel cquery --output=files "${{ matrix.package }}:${{ matrix.tool }}-${platform}")" "${{ matrix.tool }}-${platform}"
+          done
+      - name: Check if binaries changed
+        id: check
+        run: |
+          TOOL="${{ matrix.tool }}"
+          LATEST_TAG=$(gh release list --repo "${{ github.repository }}" --json tagName --jq "[.[] | select(.tagName | startswith(\"${TOOL}/\"))][0].tagName // empty")
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous release found, releasing"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Comparing against ${LATEST_TAG}"
+          gh release download "$LATEST_TAG" --repo "${{ github.repository }}" --pattern "${TOOL}-*" --dir "/tmp/${TOOL}-latest"
+
+          CHANGED=false
+          for platform in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            NEW_SHA=$(sha256sum "${TOOL}-${platform}" | cut -d' ' -f1)
+            if [ -f "/tmp/${TOOL}-latest/${TOOL}-${platform}" ]; then
+              OLD_SHA=$(sha256sum "/tmp/${TOOL}-latest/${TOOL}-${platform}" | cut -d' ' -f1)
+            else
+              OLD_SHA="none"
+            fi
+            if [ "$NEW_SHA" != "$OLD_SHA" ]; then
+              echo "${platform}: changed (${OLD_SHA} -> ${NEW_SHA})"
+              CHANGED=true
+              break
+            else
+              echo "${platform}: unchanged (${NEW_SHA})"
+            fi
+          done
+
+          if [ "$CHANGED" = "false" ]; then
+            echo "All binaries unchanged, skipping release"
+          fi
+          echo "changed=${CHANGED}" >> $GITHUB_OUTPUT
+          echo "latest_tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest provenance
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ matrix.tool }}-*
+      - name: Publish release
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          VERSION=$(./bazel/workspace_status.sh | grep STABLE_MONOREPO_SHORT_VERSION | cut -d' ' -f2)
+          TAG="${{ matrix.tool }}/v${VERSION}"
+          if [ -n "${{ steps.check.outputs.latest_tag }}" ]; then
+            gh release create "$TAG" ${{ matrix.tool }}-* --title "${{ matrix.tool }} ${VERSION}" --generate-notes --notes-start-tag "${{ steps.check.outputs.latest_tag }}"
+          else
+            gh release create "$TAG" ${{ matrix.tool }}-* --title "${{ matrix.tool }} ${VERSION}" --notes "Initial release"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

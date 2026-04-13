@@ -7,12 +7,12 @@ metadata:
   namespace: jobs
 ---
 apiVersion: v1
-data:
-  latest: JHtnY3BzbTovLy9wcm9qZWN0cy9zZW5rdS1wcm9kL3NlY3JldHMvZGF0YS1leHBvcnQtZW52L3ZlcnNpb25zL2xhdGVzdH0=
 kind: Secret
 metadata:
-  name: data-export-env-4badae36a3
+  name: data-export-env-923de72e61
   namespace: jobs
+stringData:
+  env.json: gcp:///projects/senku-prod/secrets/data-export-env/versions/1
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -58,7 +58,7 @@ spec:
                 type: RuntimeDefault
             volumeMounts:
             - mountPath: /run/secrets
-              name: data-export-env-4badae36a3
+              name: data-export-env-923de72e61
           restartPolicy: Never
           securityContext:
             runAsNonRoot: true
@@ -66,11 +66,8 @@ spec:
               type: RuntimeDefault
           serviceAccountName: analytics-data-export
           volumes:
-          - name: data-export-env-4badae36a3
+          - name: data-export-env-923de72e61
             secret:
-              items:
-              - key: latest
-                path: env.json
-              secretName: data-export-env-4badae36a3
+              secretName: data-export-env-923de72e61
   schedule: 0 12 * * *
   timeZone: Europe/Madrid

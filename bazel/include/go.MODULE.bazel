@@ -43,6 +43,7 @@ use_repo(
     "com_github_spf13_cobra",
     "com_github_yannh_kubeconform",
     "com_github_zclconf_go_cty",
+    "com_google_cloud_go_secretmanager",
     "dev_knative_serving",
     "in_yaml_go_yaml_v4",
     "io_k8s_api",
