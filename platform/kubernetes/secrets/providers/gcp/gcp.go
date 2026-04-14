@@ -22,6 +22,39 @@ func URI(project, name, version string) string {
 	}).String()
 }
 
+// SecretRef holds the parsed components of a GCP Secret Manager reference.
+type SecretRef struct {
+	Project string
+	Name    string
+	Version string
+}
+
+// NewSecretRef parses a gcp:// URI string into its components.
+func NewSecretRef(uri string) (SecretRef, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return SecretRef{}, fmt.Errorf("invalid URI %q: %v", uri, err)
+	}
+	return NewSecretRefFromURL(u)
+}
+
+// NewSecretRefFromURL parses a pre-parsed gcp:// URL into its components.
+func NewSecretRefFromURL(u *url.URL) (SecretRef, error) {
+	if u.Scheme != "gcp" {
+		return SecretRef{}, fmt.Errorf("expected gcp:// scheme, got %q", u.Scheme)
+	}
+	ref := strings.TrimPrefix(u.Path, "/")
+	if !SecretPattern.MatchString(ref) {
+		return SecretRef{}, fmt.Errorf("GCP secret reference %q does not match pattern projects/{project}/secrets/{name}/versions/{number}", ref)
+	}
+	parts := strings.Split(ref, "/")
+	return SecretRef{
+		Project: parts[1],
+		Name:    parts[3],
+		Version: parts[5],
+	}, nil
+}
+
 // NewProvider returns a provider that fetches secrets from GCP Secret Manager,
 // and a cleanup function that closes the underlying client.
 // URI: gcp:///projects/{project}/secrets/{name}/versions/{number}
