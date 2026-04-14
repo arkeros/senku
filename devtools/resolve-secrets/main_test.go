@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/arkeros/senku/platform/kubernetes/secrets"
-	"github.com/arkeros/senku/platform/kubernetes/secrets/providers/mem"
+	"github.com/arkeros/senku/platform/secrets"
+	"github.com/arkeros/senku/platform/secrets/mem"
 	"github.com/arkeros/senku/testing/golden"
 )
 

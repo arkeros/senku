@@ -3,7 +3,7 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "mem",
     srcs = ["mem.go"],
-    importpath = "github.com/arkeros/senku/platform/kubernetes/secrets/providers/mem",
+    importpath = "github.com/arkeros/senku/platform/secrets/mem",
     visibility = ["//visibility:public"],
 )
 

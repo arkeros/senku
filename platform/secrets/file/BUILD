@@ -3,7 +3,7 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "file",
     srcs = ["file.go"],
-    importpath = "github.com/arkeros/senku/platform/kubernetes/secrets/providers/file",
+    importpath = "github.com/arkeros/senku/platform/secrets/file",
     visibility = ["//visibility:public"],
 )
 

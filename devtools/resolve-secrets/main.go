@@ -14,10 +14,10 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/yaml"
 
-	"github.com/arkeros/senku/platform/kubernetes/secrets"
-	"github.com/arkeros/senku/platform/kubernetes/secrets/providers/env"
-	"github.com/arkeros/senku/platform/kubernetes/secrets/providers/file"
-	"github.com/arkeros/senku/platform/kubernetes/secrets/providers/gcp"
+	"github.com/arkeros/senku/platform/secrets"
+	"github.com/arkeros/senku/platform/secrets/env"
+	"github.com/arkeros/senku/platform/secrets/file"
+	"github.com/arkeros/senku/platform/secrets/gcp"
 )
 
 func main() {
@@ -39,8 +39,8 @@ func main() {
 
 	ctx := context.Background()
 
-	gcpProvider, gcpClose := gcp.NewProvider()
-	defer gcpClose()
+	gcpProvider, gcpCleanup := gcp.NewProvider()
+	defer gcpCleanup()
 
 	fetch := secrets.NewFetcher(map[string]secrets.Provider{
 		"gcp":  gcpProvider,
@@ -92,7 +92,7 @@ func resolveManifest(ctx context.Context, r io.Reader, w io.Writer, fetch secret
 			if err := yaml.UnmarshalStrict(doc, &secret); err != nil {
 				return fmt.Errorf("parse Secret: %v", err)
 			}
-			if err := secrets.Resolve(ctx, &secret, fetch); err != nil {
+			if err := resolveSecret(ctx, &secret, fetch); err != nil {
 				return err
 			}
 			if doc, err = yaml.Marshal(&secret); err != nil {

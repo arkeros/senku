@@ -3,14 +3,18 @@ load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 
 go_library(
     name = "resolve-secrets_lib",
-    srcs = ["main.go"],
+    srcs = [
+        "main.go",
+        "resolve.go",
+    ],
     importpath = "github.com/arkeros/senku/devtools/resolve-secrets",
     visibility = ["//visibility:private"],
     deps = [
-        "//platform/kubernetes/secrets",
-        "//platform/kubernetes/secrets/providers/env",
-        "//platform/kubernetes/secrets/providers/file",
-        "//platform/kubernetes/secrets/providers/gcp",
+        "//base/json/jsonutil",
+        "//platform/secrets",
+        "//platform/secrets/env",
+        "//platform/secrets/file",
+        "//platform/secrets/gcp",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/runtime",
@@ -43,12 +47,18 @@ PLATFORMS = {
 
 go_test(
     name = "resolve-secrets_test",
-    srcs = ["main_test.go"],
+    srcs = [
+        "main_test.go",
+        "resolve_test.go",
+    ],
     data = glob(["testdata/**"]),
     embed = [":resolve-secrets_lib"],
     deps = [
-        "//platform/kubernetes/secrets",
-        "//platform/kubernetes/secrets/providers/mem",
+        "//platform/secrets",
+        "//platform/secrets/env",
+        "//platform/secrets/file",
+        "//platform/secrets/mem",
         "//testing/golden",
+        "@io_k8s_api//core/v1:core",
     ],
 )
