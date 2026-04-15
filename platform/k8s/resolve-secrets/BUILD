@@ -7,7 +7,7 @@ go_library(
         "main.go",
         "resolve.go",
     ],
-    importpath = "github.com/arkeros/senku/devtools/resolve-secrets",
+    importpath = "github.com/arkeros/senku/platform/k8s/resolve-secrets",
     visibility = ["//visibility:private"],
     deps = [
         "//base/json/jsonutil",

@@ -75,4 +75,4 @@ env://MY_SECRET?payload=base64&decode=base64#/cert
 
 ## CLI
 
-See [devtools/resolve-secrets](../../devtools/resolve-secrets/README.md).
+See [platform/k8s/resolve-secrets](../k8s/resolve-secrets/README.md).
