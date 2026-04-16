@@ -1,41 +1,48 @@
-"React application macro with Starlark-defined routes"
+"React application macro with Starlark-defined routes and lazy loading"
 
 load("@aspect_rules_esbuild//esbuild:defs.bzl", "esbuild")
 load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
 load("@bazel_lib//lib:expand_template.bzl", "expand_template")
-load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("//devtools/build/js:devserver.bzl", "devserver")
+load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
 load(":stylex_css.bzl", "stylex_css")
 
-def route(path, component = None, children = None, import_path = None):
+def _to_ts(label):
+    """Map a react_component label to its internal _ts target."""
+    if label.startswith("//"):
+        if ":" in label:
+            return label + "_ts"
+        return label + ":" + label.split("/")[-1] + "_ts"
+    return label + "_ts"
+
+def route(path, component = None, children = None):
     """Define a route mapping a URL path to a react_component target.
 
     Args:
         path: URL path (e.g. "/", "about", ":city")
         component: label of a react_component target (optional for grouping routes)
         children: list of nested route() dicts (optional)
-        import_path: JS import path override (defaults to derived from label)
     """
     r = {"path": path}
     if component:
         r["component"] = component
-        if import_path:
-            r["import_path"] = import_path
     if children:
         r["children"] = children
     return r
 
-def react_app(name, layout, routes, browser_deps, components = [], html_template = None, **kwargs):
-    """Build a React application with Starlark-defined routes.
+def react_app(name, layout, routes, browser_deps, html_template = None, **kwargs):
+    """Build a React application with Starlark-defined routes and lazy loading.
 
-    Generates a React Router configuration from route definitions in BUILD files.
-    Supports nested routes and route parameters.
+    Routes are defined in BUILD files and compiled to React Router's
+    createBrowserRouter config with lazy() imports for per-route code splitting.
+    Import paths are derived from actual .js output files via ReactComponentInfo
+    providers — no naming convention assumptions.
 
     Produces:
       - :{name}_devserver — dev server with unbundled ESM
       - :{name}_bundle — production esbuild bundle
-      - :{name}_styles — collected StyleX CSS
+      - :{name}_styles — collected StyleX CSS (transitive via StylexInfo)
       - :{name}_html — production index.html
 
     Args:
@@ -43,79 +50,53 @@ def react_app(name, layout, routes, browser_deps, components = [], html_template
         layout: label of the root layout react_component (renders <Outlet />)
         routes: list of route() dicts (supports nesting)
         browser_deps: list of browser_dep labels for the devserver
-        components: additional react_component targets whose StyleX styles
-            should be collected (for non-route components like Button)
         html_template: optional custom HTML template (defaults to built-in)
         **kwargs: passed through to downstream targets (e.g. visibility, tags)
     """
 
-    # Derive JS import path from a Bazel label relative to this package.
-    def _import_path(label):
-        if label.startswith("//"):
-            pkg_and_target = label.lstrip("/")
-            if ":" in pkg_and_target:
-                pkg, target_name = pkg_and_target.split(":")
-            else:
-                pkg = pkg_and_target
-                target_name = pkg_and_target.split("/")[-1]
-            this_pkg = native.package_name()
-            if pkg.startswith(this_pkg + "/"):
-                rel = pkg[len(this_pkg) + 1:]
-            else:
-                rel = pkg
-            return "./" + rel + "/" + target_name
-        else:
-            target_name = label.lstrip(":")
-            return "./" + target_name
+    # Flatten route tree: collect ordered component list and build
+    # index-based route config for the manifest rule
+    ordered_components = []
 
-    # Convert a route list to manifest format iteratively.
-    # Uses a stack with (input_routes, output_list) pairs.
-    def _routes_to_manifest(route_list):
+    def _flatten_routes(route_list):
         result = []
-        # Stack: (remaining_input_routes, output_list_to_append_to)
-        stack = [(route_list, result)]
-        for _ in range(1000):  # safety bound
-            if not stack:
-                break
-            routes_to_process, output = stack.pop()
-            for r in routes_to_process:
-                entry = {"path": r["path"]}
-                if "component" in r:
-                    entry["component"] = {
-                        "target": r["component"],
-                        "import": r.get("import_path") or _import_path(r["component"]),
-                    }
-                if "children" in r:
-                    entry["children"] = []
-                    stack.append((r["children"], entry["children"]))
-                output.append(entry)
+        for r in route_list:
+            entry = {"path": r["path"]}
+            if "component" in r:
+                entry["component_idx"] = len(ordered_components)
+                ordered_components.append(r["component"])
+            if "children" in r:
+                entry["children"] = _flatten_routes(r["children"])
+            result.append(entry)
         return result
 
-    # Collect all component labels from routes (iterative, any depth)
-    all_route_components = [layout]
-    stack = list(routes)
-    for _ in range(1000):  # safety bound
+    # Starlark doesn't allow recursion — use iterative flattening
+    flat_routes = []
+    stack = [(routes, flat_routes)]
+    for _ in range(1000):
         if not stack:
             break
-        r = stack.pop()
-        if "component" in r:
-            all_route_components.append(r["component"])
-        stack.extend(r.get("children", []))
+        route_list, output = stack.pop()
+        for r in route_list:
+            entry = {"path": r["path"]}
+            if "component" in r:
+                entry["component_idx"] = len(ordered_components)
+                ordered_components.append(r["component"])
+            if "children" in r:
+                entry["children"] = []
+                stack.append((r["children"], entry["children"]))
+            output.append(entry)
 
-    manifest = {
-        "layout": {
-            "target": layout,
-            "import": _import_path(layout),
-        },
-        "routes": _routes_to_manifest(routes),
-    }
+    all_route_components = [layout] + ordered_components
 
-    # Write manifest JSON
-    manifest_name = name + "_route_manifest"
-    write_file(
+    # Generate route manifest using ReactComponentInfo providers
+    manifest_name = name + "_manifest"
+    react_app_manifest(
         name = manifest_name,
-        out = manifest_name + ".json",
-        content = [json.encode(manifest)],
+        layout = layout,
+        route_components = ordered_components,
+        route_config = json.encode(flat_routes),
+        router_module_name = name + "_router",
     )
 
     # Generate router.tsx and main.tsx from manifest
@@ -135,7 +116,9 @@ def react_app(name, layout, routes, browser_deps, components = [], html_template
         tool = "//devtools/build/react_component:react_app_codegen_bin",
     )
 
-    # Compile generated router
+    # Compile generated router. Deps on route components are needed for
+    # tsc type-checking of dynamic import() expressions, even though
+    # the imports are lazy at runtime.
     react_component(
         name = name + "_router",
         srcs = [name + "_router.tsx"],
@@ -158,11 +141,10 @@ def react_app(name, layout, routes, browser_deps, components = [], html_template
         ],
     )
 
-    # Collect StyleX CSS from all components
+    # Collect StyleX CSS from all route components (transitive via StylexInfo)
     stylex_css(
         name = name + "_styles",
-        components = all_route_components + components,
-        output = name + "_styles.css",
+        components = all_route_components,
     )
 
     # HTML template
@@ -179,12 +161,16 @@ def react_app(name, layout, routes, browser_deps, components = [], html_template
         template = tpl_name,
     )
 
+    # esbuild and devserver need _ts targets (which carry JsInfo)
+    all_ts_targets = [_to_ts(c) for c in all_route_components]
+
     # Production bundle
     esbuild(
         name = name + "_bundle",
         entry_point = name + "_main.js",
         deps = [
-            ":" + name + "_main",
+            ":" + name + "_main_ts",
+        ] + all_ts_targets + [
             "//:node_modules/react",
             "//:node_modules/react-dom",
             "//:node_modules/react-router",
@@ -195,8 +181,9 @@ def react_app(name, layout, routes, browser_deps, components = [], html_template
     # Dev server
     devserver(
         name = name + "_devserver",
-        entry_point = ":" + name + "_main",
-        components = [":" + name + "_main", ":" + name + "_router"] + all_route_components,
+        entry_point = ":" + name + "_main_ts",
+        entry_js = name + "_main.js",
+        components = [":" + name + "_main_ts", ":" + name + "_router_ts"] + all_ts_targets,
         browser_deps = browser_deps,
         html_template = tpl_name,
         css = ":" + name + "_styles",

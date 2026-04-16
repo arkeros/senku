@@ -24,7 +24,6 @@ react_app(
         "//devtools/build/js:set_cookie_parser",
         "//devtools/build/js:stylex",
     ],
-    components = [":Button"],
     layout = ":Layout",
     routes = [
         route(
@@ -72,8 +71,8 @@ sh_test(
     srcs = ["app_test.sh"],
     data = [
         ":app_html",
-        ":app_main",
-        ":app_router",
+        ":app_main_ts",
+        ":app_router_ts",
         ":app_styles",
     ],
 )

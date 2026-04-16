@@ -5,32 +5,59 @@ load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("@bazel_lib//lib:copy_file.bzl", "copy_file")
 load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load(":react_library.bzl", "react_library")
 
 _DEFAULT_BABEL_CONFIG = "//devtools/build/react_component:babel_config"
 _DEFAULT_TSCONFIG = "//:tsconfig"
 
+def _is_node_module(dep):
+    """Check if a dep is a node_modules label."""
+    return "node_modules" in dep
+
+def _ts_dep(dep):
+    """Map a component dep to its ts_project target name."""
+    if _is_node_module(dep):
+        return dep
+    if dep.startswith("//"):
+        # Cross-package: "//examples/stylex/pages:Home" -> "//examples/stylex/pages:Home_ts"
+        if ":" in dep:
+            return dep + "_ts"
+        else:
+            return dep + ":" + dep.split("/")[-1] + "_ts"
+    # Same package: ":Button" -> ":Button_ts"
+    return dep + "_ts"
+
+def _lib_dep(dep):
+    """Map a component dep to its react_library target (unchanged — it's the public name)."""
+    return dep
+
 def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_config = _DEFAULT_BABEL_CONFIG, _export_test = True, **kwargs):
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.
 
-    Wraps ts_project with the StyleX Babel transpiler. Each source file is
-    compiled in a single Babel pass producing .js + .js.map + .stylex.json,
-    while tsc runs in parallel for type-checking and .d.ts generation.
+    Wraps ts_project with the StyleX Babel transpiler and a react_library rule
+    that carries StylexInfo and ReactComponentInfo providers.
 
     Produces the following targets:
-      - :{name}              — JS outputs (default)
-      - :{name}_typecheck    — tsc type-check
-      - :{name}_transpile_stylex_metadata — .stylex.json files for stylex_css()
+      - :{name}              — react_library (public, carries providers)
+      - :{name}_ts           — ts_project (internal, JS + .d.ts outputs)
+      - :{name}_typecheck    — tsc type-check (from ts_project)
+      - :{name}_export_test  — verifies named export matches target name
 
     Args:
-        name: target name
+        name: target name (must match the exported component name)
         srcs: .ts/.tsx source files
-        deps: ts_project deps (other components, node_modules)
+        deps: other react_component targets or node_modules labels
         tsconfig: tsconfig.json label (optional)
-        babel_config: babel.config.json label (defaults to //devtools/build/react_component:babel_config)
+        babel_config: babel.config.json label
         **kwargs: passed through to ts_project (e.g. visibility, tags)
     """
+
+    # Separate component deps from node_module deps
+    component_deps = [d for d in deps if not _is_node_module(d)]
+    ts_deps = [_ts_dep(d) for d in deps]
+
     ts_project(
-        name = name,
+        name = name + "_ts",
         srcs = srcs,
         declaration = True,
         source_map = True,
@@ -39,12 +66,22 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_c
             **transpiler_kwargs
         ),
         tsconfig = tsconfig,
-        deps = deps + [
+        deps = ts_deps + [
             "//:node_modules/@stylexjs/stylex",
             "//:node_modules/@types/react",
             "//:node_modules/react",
         ],
         **kwargs
+    )
+
+    # Wrap in react_library to carry StylexInfo + ReactComponentInfo
+    react_library(
+        name = name,
+        js_outs = [name + "_ts"],
+        metadata = [name + "_ts_transpile_stylex_metadata"],
+        entry_name = name,
+        deps = [_lib_dep(d) for d in component_deps],
+        **{k: v for k, v in kwargs.items() if k == "visibility" or k == "tags"}
     )
 
     if not _export_test:
@@ -73,10 +110,12 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_c
         ],
     )
 
+    # Reference the specific .js file from ts_project output
+    js_file = srcs[0].replace(".tsx", ".js").replace(".ts", ".js")
     js_test(
         name = name + "_export_test",
-        args = ["$(location {}.js)".format(name)],
-        data = [name + ".js"],
+        args = ["$(location {})".format(js_file)],
+        data = [js_file],
         entry_point = name + "_export_test.mjs",
     )
 

@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Test generated router has correct imports and structure
+# Test generated router has correct lazy imports and structure
 ROUTER="examples/stylex/app_router.js"
 echo "=== Router tests ==="
 
-grep -q 'import.*Layout.*from.*"./Layout"' "$ROUTER" || { echo "FAIL: missing Layout import"; exit 1; }
-grep -q 'import.*Home.*from.*"./pages/Home"' "$ROUTER" || { echo "FAIL: missing Home import"; exit 1; }
-grep -q 'import.*About.*from.*"./pages/About"' "$ROUTER" || { echo "FAIL: missing About import"; exit 1; }
-grep -q 'import.*ConcertsHome.*from.*"./pages/concerts/ConcertsHome"' "$ROUTER" || { echo "FAIL: missing ConcertsHome import"; exit 1; }
-grep -q 'import.*City.*from.*"./pages/concerts/City"' "$ROUTER" || { echo "FAIL: missing City import"; exit 1; }
+grep -q 'import("./Layout")' "$ROUTER" || { echo "FAIL: missing Layout lazy import"; exit 1; }
+grep -q 'import("./pages/Home")' "$ROUTER" || { echo "FAIL: missing Home lazy import"; exit 1; }
+grep -q 'import("./pages/About")' "$ROUTER" || { echo "FAIL: missing About lazy import"; exit 1; }
+grep -q 'import("./pages/concerts/ConcertsHome")' "$ROUTER" || { echo "FAIL: missing ConcertsHome lazy import"; exit 1; }
+grep -q 'import("./pages/concerts/City")' "$ROUTER" || { echo "FAIL: missing City lazy import"; exit 1; }
 grep -q 'createBrowserRouter' "$ROUTER" || { echo "FAIL: missing createBrowserRouter"; exit 1; }
 grep -q 'path: "concerts"' "$ROUTER" || { echo "FAIL: missing concerts route"; exit 1; }
 grep -q 'path: ":city"' "$ROUTER" || { echo "FAIL: missing :city param route"; exit 1; }
+grep -q 'Component: m.Layout' "$ROUTER" || { echo "FAIL: missing Layout component reference"; exit 1; }
 echo "PASS: router"
 
 # Test generated main entry point

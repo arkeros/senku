@@ -3,7 +3,7 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary")
 load("@bazel_lib//lib:copy_file.bzl", "copy_file")
 
-def devserver(name, entry_point, components, browser_deps, html_template, css, **kwargs):
+def devserver(name, entry_point, components, browser_deps, html_template, css, entry_js = None, **kwargs):
     """Dev server that serves React components as unbundled ESM with import maps.
 
     Uses pre-built browser_dep targets (defined once, shared across apps)
@@ -34,7 +34,8 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, *
     for mf in manifest_files:
         manifest_args.extend(["--manifest", "$(location {})".format(mf)])
 
-    entry_js = entry_point.lstrip(":") + ".js" if entry_point.startswith(":") else entry_point + ".js"
+    if not entry_js:
+        entry_js = entry_point.lstrip(":") + ".js" if entry_point.startswith(":") else entry_point + ".js"
 
     # Copy cross-package files into this package so js_binary can use them
     copy_file(

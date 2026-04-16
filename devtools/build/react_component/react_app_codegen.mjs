@@ -1,7 +1,9 @@
 /**
  * Generates router.tsx and main.tsx from a route manifest JSON.
  *
- * Supports nested routes and route parameters.
+ * The manifest is produced by the react_app_manifest rule with actual
+ * file paths from ReactComponentInfo providers. Routes use lazy loading
+ * via dynamic import() for per-route code splitting.
  *
  * Usage: node react_app_codegen.mjs --manifest <file.json> --out-router <router.tsx> --out-main <main.tsx>
  */
@@ -26,56 +28,22 @@ const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
 const manifest = JSON.parse(readFileSync(resolve(execroot, manifestFile), "utf-8"));
 const routerModuleName = "./" + outRouter.split("/").pop().replace(/\.tsx$/, "");
 
-// Collect imports from all routes (recursively)
-const imports = [];
-const usedNames = new Set();
-const componentNames = new Map();
-
-function getComponentName(importPath) {
-  if (componentNames.has(importPath)) return componentNames.get(importPath);
-  const base = importPath.split("/").pop();
-  let name = base;
-  let i = 2;
-  while (usedNames.has(name)) {
-    name = base + i++;
-  }
-  usedNames.add(name);
-  componentNames.set(importPath, name);
-  return name;
-}
-
-// Register layout
-const layoutName = getComponentName(manifest.layout.import);
-imports.push(`import { ${layoutName} } from "${manifest.layout.import}";`);
-
-// Recursively register all route components
-function collectImports(routes) {
-  for (const route of routes) {
-    if (route.component) {
-      const name = getComponentName(route.component.import);
-      imports.push(`import { ${name} } from "${route.component.import}";`);
-    }
-    if (route.children) {
-      collectImports(route.children);
-    }
-  }
-}
-collectImports(manifest.routes);
-
-// Generate route objects recursively
+// Generate lazy route objects recursively
 function generateRoute(route, indent) {
   const pad = " ".repeat(indent);
-  const parts = [];
 
   if (route.path === "/") {
-    parts.push(`${pad}{ index: true`);
-  } else {
-    parts.push(`${pad}{ path: "${route.path}"`);
+    // Index route
+    if (route.import) {
+      return `${pad}{ index: true, lazy: () => import("${route.import}").then(m => ({ Component: m.${route.name} })) }`;
+    }
+    return `${pad}{ index: true }`;
   }
 
-  if (route.component) {
-    const name = getComponentName(route.component.import);
-    parts[0] += `, Component: ${name}`;
+  const parts = [`${pad}{ path: "${route.path}"`];
+
+  if (route.import) {
+    parts[0] += `, lazy: () => import("${route.import}").then(m => ({ Component: m.${route.name} }))`;
   }
 
   if (route.children && route.children.length > 0) {
@@ -94,15 +62,15 @@ function generateRoute(route, indent) {
 }
 
 const routeEntries = manifest.routes.map((r) => generateRoute(r, 6));
+const layout = manifest.layout;
 
-// router.tsx
+// router.tsx — lazy imports only, no static imports needed
 const routerCode = `import { createBrowserRouter } from "react-router";
-${imports.join("\n")}
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: ${layoutName},
+    lazy: () => import("${layout.import}").then(m => ({ Component: m.${layout.name} })),
     children: [
 ${routeEntries.join(",\n")},
     ],

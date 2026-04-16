@@ -68,3 +68,20 @@ bzl_library(
     srcs = ["stylex_css.bzl"],
     deps = ["@aspect_rules_js//js:defs"],
 )
+
+bzl_library(
+    name = "react_app_manifest",
+    srcs = ["react_app_manifest.bzl"],
+    deps = [":providers"],
+)
+
+bzl_library(
+    name = "react_library",
+    srcs = ["react_library.bzl"],
+    deps = [":providers"],
+)
+
+bzl_library(
+    name = "providers",
+    srcs = ["providers.bzl"],
+)
