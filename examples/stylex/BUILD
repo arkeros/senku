@@ -23,6 +23,7 @@ react_app(
         "//devtools/build/js:set_cookie_parser",
         "//devtools/build/js:stylex",
     ],
+    components = [":Button"],
     layout = ":Layout",
     routes = [
         route(

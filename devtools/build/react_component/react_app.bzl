@@ -26,7 +26,7 @@ def route(path, component = None, children = None, import_path = None):
         r["children"] = children
     return r
 
-def react_app(name, layout, routes, browser_deps, html_template = None, **kwargs):
+def react_app(name, layout, routes, browser_deps, components = [], html_template = None, **kwargs):
     """Build a React application with Starlark-defined routes.
 
     Generates a React Router configuration from route definitions in BUILD files.
@@ -43,6 +43,8 @@ def react_app(name, layout, routes, browser_deps, html_template = None, **kwargs
         layout: label of the root layout react_component (renders <Outlet />)
         routes: list of route() dicts (supports nesting)
         browser_deps: list of browser_dep labels for the devserver
+        components: additional react_component targets whose StyleX styles
+            should be collected (for non-route components like Button)
         html_template: optional custom HTML template (defaults to built-in)
         **kwargs: passed through to downstream targets (e.g. visibility, tags)
     """
@@ -168,7 +170,7 @@ def react_app(name, layout, routes, browser_deps, html_template = None, **kwargs
     # Collect StyleX CSS from all components
     stylex_css(
         name = name + "_styles",
-        components = all_route_components,
+        components = all_route_components + components,
         output = name + "_styles.css",
     )
 
