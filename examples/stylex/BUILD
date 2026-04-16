@@ -1,4 +1,5 @@
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("//devtools/build/react_component:react_app.bzl", "react_app", "route")
 load("//devtools/build/react_component:react_component.bzl", "react_component")
 
@@ -63,5 +64,16 @@ build_test(
         ":app_styles",
         ":app_html",
         ":app_devserver",
+    ],
+)
+
+sh_test(
+    name = "app_test",
+    srcs = ["app_test.sh"],
+    data = [
+        ":app_html",
+        ":app_main",
+        ":app_router",
+        ":app_styles",
     ],
 )

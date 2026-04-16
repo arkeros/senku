@@ -68,57 +68,46 @@ def react_app(name, layout, routes, browser_deps, components = [], html_template
             target_name = label.lstrip(":")
             return "./" + target_name
 
-    # Convert a route dict to manifest format (handles one level of children)
-    def _route_to_manifest(r):
-        entry = {"path": r["path"]}
-        if "component" in r:
-            entry["component"] = {
-                "target": r["component"],
-                "import": r.get("import_path") or _import_path(r["component"]),
-            }
-        if "children" in r:
-            children = []
-            for c in r["children"]:
-                child = {"path": c["path"]}
-                if "component" in c:
-                    child["component"] = {
-                        "target": c["component"],
-                        "import": c.get("import_path") or _import_path(c["component"]),
+    # Convert a route list to manifest format iteratively.
+    # Uses a stack with (input_routes, output_list) pairs.
+    def _routes_to_manifest(route_list):
+        result = []
+        # Stack: (remaining_input_routes, output_list_to_append_to)
+        stack = [(route_list, result)]
+        for _ in range(1000):  # safety bound
+            if not stack:
+                break
+            routes_to_process, output = stack.pop()
+            for r in routes_to_process:
+                entry = {"path": r["path"]}
+                if "component" in r:
+                    entry["component"] = {
+                        "target": r["component"],
+                        "import": r.get("import_path") or _import_path(r["component"]),
                     }
-                if "children" in c:
-                    # Third level of nesting
-                    grandchildren = []
-                    for gc in c["children"]:
-                        grandchild = {"path": gc["path"]}
-                        if "component" in gc:
-                            grandchild["component"] = {
-                                "target": gc["component"],
-                                "import": gc.get("import_path") or _import_path(gc["component"]),
-                            }
-                        grandchildren.append(grandchild)
-                    child["children"] = grandchildren
-                children.append(child)
-            entry["children"] = children
-        return entry
+                if "children" in r:
+                    entry["children"] = []
+                    stack.append((r["children"], entry["children"]))
+                output.append(entry)
+        return result
 
-    # Collect all component labels from routes (up to 3 levels deep)
+    # Collect all component labels from routes (iterative, any depth)
     all_route_components = [layout]
-    for r in routes:
+    stack = list(routes)
+    for _ in range(1000):  # safety bound
+        if not stack:
+            break
+        r = stack.pop()
         if "component" in r:
             all_route_components.append(r["component"])
-        for c in r.get("children", []):
-            if "component" in c:
-                all_route_components.append(c["component"])
-            for gc in c.get("children", []):
-                if "component" in gc:
-                    all_route_components.append(gc["component"])
+        stack.extend(r.get("children", []))
 
     manifest = {
         "layout": {
             "target": layout,
             "import": _import_path(layout),
         },
-        "routes": [_route_to_manifest(r) for r in routes],
+        "routes": _routes_to_manifest(routes),
     }
 
     # Write manifest JSON
