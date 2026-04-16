@@ -109,6 +109,8 @@ const indexHtml = originalHtml
   .replace("{{HEAD}}", `<link rel="stylesheet" href="/${cssFile.split("/").pop()}" />`)
   .replace("{{SCRIPTS}}", `${mapTag}\n    <script type="module" src="/${entryFile}"></script>`);
 
+// Reads are intentionally synchronous per-request so edits are picked up
+// immediately without cache invalidation logic. Fine for a dev server.
 createServer((req, res) => {
   const url = req.url.split("?")[0];
 
