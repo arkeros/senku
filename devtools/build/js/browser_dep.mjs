@@ -10,7 +10,7 @@
  *   - <name>.json: manifest describing how the devserver should serve this dep
  *   - <name>.js: bundled ESM file (CJS deps only, empty for ESM deps)
  *
- * Usage: node esm_bundle.mjs --package <specifier> --output-js <file.js> --output-manifest <file.json>
+ * Usage: node browser_dep.mjs --package <specifier> --output-js <file.js> --output-manifest <file.json>
  */
 import { build } from "esbuild";
 import { createRequire } from "node:module";
@@ -33,7 +33,7 @@ for (let i = 0; i < args.length; i++) {
 }
 
 if (!pkg || !outputJs || !outputManifest) {
-  console.error("Usage: esm_bundle.mjs --package <specifier> --output-js <file.js> --output-manifest <file.json>");
+  console.error("Usage: browser_dep.mjs --package <specifier> --output-js <file.js> --output-manifest <file.json>");
   process.exit(1);
 }
 
