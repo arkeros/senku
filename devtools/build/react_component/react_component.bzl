@@ -63,6 +63,7 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_c
         source_map = True,
         transpiler = lambda **transpiler_kwargs: _stylex_transpiler(
             babel_config = babel_config,
+            stylex_deps = ts_deps,
             **transpiler_kwargs
         ),
         tsconfig = tsconfig,
@@ -74,12 +75,15 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_c
         **kwargs
     )
 
+    # Derive entry name from first source file: "Button.tsx" -> "Button"
+    _entry_name = srcs[0].rsplit("/", 1)[-1].replace(".tsx", "").replace(".ts", "")
+
     # Wrap in react_library to carry StylexInfo + ReactComponentInfo
     react_library(
         name = name,
         js_outs = [name + "_ts"],
         metadata = [name + "_ts_transpile_stylex_metadata"],
-        entry_name = name,
+        entry_name = _entry_name,
         deps = [_lib_dep(d) for d in component_deps],
         **{k: v for k, v in kwargs.items() if k == "visibility" or k == "tags"}
     )
@@ -119,7 +123,7 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_c
         entry_point = name + "_export_test.mjs",
     )
 
-def _stylex_transpiler(name, srcs, out_dir = None, resolve_json = False, babel_config = _DEFAULT_BABEL_CONFIG, **kwargs):
+def _stylex_transpiler(name, srcs, out_dir = None, resolve_json = False, babel_config = _DEFAULT_BABEL_CONFIG, stylex_deps = [], **kwargs):
     """Internal transpiler adapter for ts_project. Do not use directly."""
     outs = []
     metadata_outs = []
@@ -163,8 +167,11 @@ def _stylex_transpiler(name, srcs, out_dir = None, resolve_json = False, babel_c
             "$(location {})".format(metadata_out),
         ]
 
+        # Include dep outputs so the StyleX Babel plugin can resolve defineVars
+        # imports (e.g. ./tokens.stylex) across targets
         tool_srcs = [
             src,
+        ] + stylex_deps + [
             "//:node_modules/@babel/core",
             "//:node_modules/@babel/preset-typescript",
             "//:node_modules/@babel/preset-react",

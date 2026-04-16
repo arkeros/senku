@@ -29,6 +29,9 @@ importers:
       graphql-scalars:
         specifier: ^1.25.0
         version: 1.25.0(graphql@16.13.2)
+      open-props:
+        specifier: ^1.7.23
+        version: 1.7.23
       react:
         specifier: ^19.2.4
         version: 19.2.5
@@ -713,6 +716,9 @@ packages:
 
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
+
+  open-props@1.7.23:
+    resolution: {integrity: sha512-+xyrJmxV9QUBFbSwPROYhOg/FLXry+uuPr4R+B5EaE4556Oc18/8ZC/fL5A+/lbRSwNvA0Alh+C0KpyFWLmLZg==}
 
   path-is-absolute@1.0.1:
     resolution: {integrity: sha512-AVbw3UJ2e9bq64vSaS9Am0fje1Pa8pbGqTTsmXfaIiMpnr5DlDhfJOuLj9Sf95ZPVDAUerDfEk88MPmPe7UCQg==}
@@ -1490,6 +1496,8 @@ snapshots:
   once@1.4.0:
     dependencies:
       wrappy: 1.0.2
+
+  open-props@1.7.23: {}
 
   path-is-absolute@1.0.1: {}
 

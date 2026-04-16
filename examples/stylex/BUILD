@@ -4,9 +4,17 @@ load("//devtools/build/react_component:react_app.bzl", "react_app", "route")
 load("//devtools/build/react_component:react_component.bzl", "react_component")
 
 react_component(
+    name = "tokens",
+    srcs = ["tokens.stylex.ts"],
+    _export_test = False,
+    visibility = ["//examples/stylex:__subpackages__"],
+)
+
+react_component(
     name = "Button",
     srcs = ["Button.tsx"],
     visibility = ["//examples/stylex/pages:__subpackages__"],
+    deps = [":tokens"],
 )
 
 react_component(
@@ -15,8 +23,16 @@ react_component(
     deps = ["//:node_modules/react-router"],
 )
 
+genrule(
+    name = "open_props_css",
+    srcs = ["//:node_modules/open-props"],
+    outs = ["open-props.css"],
+    cmd = "cp $$(find $(locations //:node_modules/open-props) -name 'open-props.min.css' | head -1) $@",
+)
+
 react_app(
     name = "app",
+    base_css = [":open_props_css"],
     browser_deps = [
         "//devtools/build/js:react",
         "//devtools/build/js:react_router",
@@ -24,6 +40,7 @@ react_app(
         "//devtools/build/js:set_cookie_parser",
         "//devtools/build/js:stylex",
     ],
+    html_template = "index.html.tpl",
     layout = ":Layout",
     routes = [
         route(

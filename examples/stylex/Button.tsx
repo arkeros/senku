@@ -1,4 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
+import { color, font, radius, shadow, size } from "./tokens.stylex";
 
 type ButtonProps = {
   label: string;
@@ -8,22 +9,25 @@ type ButtonProps = {
 
 const styles = stylex.create({
   base: {
-    fontSize: 16,
-    lineHeight: 1.5,
-    borderRadius: 8,
-    paddingBlock: 8,
-    paddingInline: 16,
+    fontSize: font.size2,
+    lineHeight: font.lineHeight3,
+    fontWeight: font.weight5,
+    borderRadius: radius.sm,
+    paddingBlock: size.xs,
+    paddingInline: size.s,
     cursor: "pointer",
     border: "none",
+    boxShadow: shadow.sm,
   },
   primary: {
-    backgroundColor: "royalblue",
-    color: "white",
+    backgroundColor: color.primary,
+    color: color.white,
   },
   secondary: {
-    backgroundColor: "transparent",
-    color: "royalblue",
-    border: "1px solid royalblue",
+    backgroundColor: color.transparent,
+    color: color.primary,
+    border: `1px solid ${color.primaryLight}`,
+    boxShadow: "none",
   },
 });
 

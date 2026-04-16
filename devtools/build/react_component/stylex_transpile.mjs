@@ -38,10 +38,13 @@ if (!srcFile || !outFile || !metadataFile) {
 }
 
 const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
+const bindir = resolve(execroot, process.env.BAZEL_BINDIR || ".");
 const absSrc = resolve(execroot, srcFile);
 const code = readFileSync(absSrc, "utf-8");
 
-const babelOptions = { filename: absSrc, sourceMaps: true };
+// Use the bin-dir path as filename so StyleX resolves defineVars imports
+// from the output tree (where compiled .js files from deps live)
+const babelOptions = { filename: resolve(bindir, srcFile), sourceMaps: true };
 
 if (configFile) {
   babelOptions.configFile = resolve(execroot, configFile);

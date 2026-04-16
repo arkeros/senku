@@ -31,7 +31,7 @@ def route(path, component = None, children = None):
         r["children"] = children
     return r
 
-def react_app(name, layout, routes, browser_deps, html_template = None, **kwargs):
+def react_app(name, layout, routes, browser_deps, base_css = [], html_template = None, **kwargs):
     """Build a React application with Starlark-defined routes and lazy loading.
 
     Routes are defined in BUILD files and compiled to React Router's
@@ -141,9 +141,10 @@ def react_app(name, layout, routes, browser_deps, html_template = None, **kwargs
         ],
     )
 
-    # Collect StyleX CSS from all route components (transitive via StylexInfo)
+    # Collect base CSS + StyleX CSS from all route components (transitive via StylexInfo)
     stylex_css(
         name = name + "_styles",
+        base_css = base_css,
         components = all_route_components,
     )
 

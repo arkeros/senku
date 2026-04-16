@@ -4,6 +4,11 @@
     ["@babel/preset-react", { "runtime": "automatic" }]
   ],
   "plugins": [
-    "@stylexjs/babel-plugin"
+    ["@stylexjs/babel-plugin", {
+      "unstable_moduleResolution": {
+        "type": "commonJS",
+        "rootDir": "."
+      }
+    }]
   ]
 }
