@@ -23,16 +23,8 @@ react_component(
     deps = ["//:node_modules/react-router"],
 )
 
-genrule(
-    name = "open_props_css",
-    srcs = ["//:node_modules/open-props"],
-    outs = ["open-props.css"],
-    cmd = "cp $$(find $(locations //:node_modules/open-props) -name 'open-props.min.css' | head -1) $@",
-)
-
 react_app(
     name = "app",
-    base_css = [":open_props_css"],
     browser_deps = [
         "//devtools/build/js:react",
         "//devtools/build/js:react_router",
@@ -41,6 +33,7 @@ react_app(
         "//devtools/build/js:stylex",
     ],
     html_template = "index.html.tpl",
+    jit_open_props = True,
     layout = ":Layout",
     routes = [
         route(

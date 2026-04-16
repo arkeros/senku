@@ -31,6 +31,17 @@ js_binary(
     entry_point = "react_app_codegen.mjs",
 )
 
+# PostCSS JIT props: tree-shakes unused Open Props custom properties
+js_binary(
+    name = "postcss_jit_bin",
+    data = [
+        "//:node_modules/open-props",
+        "//:node_modules/postcss",
+        "//:node_modules/postcss-jit-props",
+    ],
+    entry_point = "postcss_jit.mjs",
+)
+
 copy_to_bin(
     name = "babel_config",
     srcs = ["babel.config.json"],

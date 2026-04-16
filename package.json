@@ -19,6 +19,8 @@
     "graphql-scalars": "^1.25.0",
     "cookie": "^1.0.0",
     "open-props": "^1.7.23",
+    "postcss": "^8.5.0",
+    "postcss-jit-props": "^1.0.14",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router": "^7.6.1",

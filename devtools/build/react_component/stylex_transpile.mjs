@@ -9,8 +9,11 @@
  * Usage: node stylex_transpile.mjs <src> --out-file <js> --metadata-file <json> [--config-file <cfg>]
  */
 import { transformSync } from "@babel/core";
+import { createRequire } from "node:module";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
+
+const _require = createRequire(import.meta.url);
 
 const args = process.argv.slice(2);
 let srcFile = null;
@@ -42,19 +45,39 @@ const bindir = resolve(execroot, process.env.BAZEL_BINDIR || ".");
 const absSrc = resolve(execroot, srcFile);
 const code = readFileSync(absSrc, "utf-8");
 
-// Use the bin-dir path as filename so StyleX resolves defineVars imports
-// from the output tree (where compiled .js files from deps live)
-const babelOptions = { filename: resolve(bindir, srcFile), sourceMaps: true };
-
-if (configFile) {
-  babelOptions.configFile = resolve(execroot, configFile);
-} else {
-  babelOptions.presets = [
+// Use the bin-dir path as filename. The source file is also copied to
+// bindir by ts_project, so defineVars resolution finds the .ts source
+// and generates consistent hashes across targets.
+const babelOptions = {
+  filename: resolve(bindir, srcFile),
+  sourceMaps: true,
+  // Don't load babel.config.json — configure everything here so we can
+  // set rootDir to the bindir for consistent defineVars hashes
+  configFile: false,
+  presets: [
     "@babel/preset-typescript",
     ["@babel/preset-react", { runtime: "automatic" }],
-  ];
-  babelOptions.plugins = ["@stylexjs/babel-plugin"];
-}
+  ],
+  plugins: [
+    ["@stylexjs/babel-plugin", {
+      unstable_moduleResolution: {
+        type: "custom",
+        rootDir: bindir,
+        // Strip file extension so .ts/.tsx/.js all produce the same hash.
+        // This ensures defineVars hashes match across Bazel targets.
+        getCanonicalFilePath: (filePath) => {
+          return relative(bindir, resolve(filePath)).replace(/\.[cm]?[jt]sx?$/, "");
+        },
+        filePathResolver: (importPath, sourceFilePath) => {
+          if (importPath.startsWith(".")) {
+            return resolve(dirname(sourceFilePath), importPath);
+          }
+          return null;
+        },
+      },
+    }],
+  ],
+};
 
 const result = transformSync(code, babelOptions);
 
