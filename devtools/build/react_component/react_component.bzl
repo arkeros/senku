@@ -7,7 +7,6 @@ load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load(":react_library.bzl", "react_library")
 
-_DEFAULT_BABEL_CONFIG = "//devtools/build/react_component:babel_config"
 _DEFAULT_TSCONFIG = "//:tsconfig"
 
 def _is_node_module(dep):
@@ -31,7 +30,7 @@ def _lib_dep(dep):
     """Map a component dep to its react_library target (unchanged — it's the public name)."""
     return dep
 
-def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_config = _DEFAULT_BABEL_CONFIG, _export_test = True, **kwargs):
+def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export_test = True, **kwargs):
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.
 
     Wraps ts_project with the StyleX Babel transpiler and a react_library rule
@@ -48,7 +47,6 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_c
         srcs: .ts/.tsx source files
         deps: other react_component targets or node_modules labels
         tsconfig: tsconfig.json label (optional)
-        babel_config: babel.config.json label
         **kwargs: passed through to ts_project (e.g. visibility, tags)
     """
 
@@ -62,7 +60,6 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_c
         declaration = True,
         source_map = True,
         transpiler = lambda **transpiler_kwargs: _stylex_transpiler(
-            babel_config = babel_config,
             stylex_deps = ts_deps,
             **transpiler_kwargs
         ),
@@ -123,7 +120,7 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_c
         entry_point = name + "_export_test.mjs",
     )
 
-def _stylex_transpiler(name, srcs, out_dir = None, resolve_json = False, babel_config = _DEFAULT_BABEL_CONFIG, stylex_deps = [], **kwargs):
+def _stylex_transpiler(name, srcs, out_dir = None, resolve_json = False, stylex_deps = [], **kwargs):
     """Internal transpiler adapter for ts_project. Do not use directly."""
     outs = []
     metadata_outs = []
@@ -177,10 +174,6 @@ def _stylex_transpiler(name, srcs, out_dir = None, resolve_json = False, babel_c
             "//:node_modules/@babel/preset-react",
             "//:node_modules/@stylexjs/babel-plugin",
         ]
-
-        if babel_config:
-            args.extend(["--config-file", "$(location {})".format(babel_config)])
-            tool_srcs.append(babel_config)
 
         js_run_binary(
             name = "{}_{}".format(name, idx),

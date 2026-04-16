@@ -6,7 +6,7 @@
  *   - .js.map file (source map)
  *   - .stylex.json file (StyleX CSS metadata for later collection)
  *
- * Usage: node stylex_transpile.mjs <src> --out-file <js> --metadata-file <json> [--config-file <cfg>]
+ * Usage: node stylex_transpile.mjs <src> --out-file <js> --metadata-file <json>
  */
 import { transformSync } from "@babel/core";
 import { createRequire } from "node:module";
@@ -19,15 +19,12 @@ const args = process.argv.slice(2);
 let srcFile = null;
 let outFile = null;
 let metadataFile = null;
-let configFile = null;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--out-file") {
     outFile = args[++i];
   } else if (args[i] === "--metadata-file") {
     metadataFile = args[++i];
-  } else if (args[i] === "--config-file") {
-    configFile = args[++i];
   } else if (!srcFile) {
     srcFile = args[i];
   }
@@ -35,7 +32,7 @@ for (let i = 0; i < args.length; i++) {
 
 if (!srcFile || !outFile || !metadataFile) {
   console.error(
-    "Usage: stylex_transpile.mjs <src> --out-file <js> --metadata-file <json> [--config-file <cfg>]"
+    "Usage: stylex_transpile.mjs <src> --out-file <js> --metadata-file <json>"
   );
   process.exit(1);
 }

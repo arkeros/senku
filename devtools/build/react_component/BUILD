@@ -1,5 +1,4 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary")
-load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -40,11 +39,6 @@ js_binary(
         "//:node_modules/postcss-jit-props",
     ],
     entry_point = "postcss_jit.mjs",
-)
-
-copy_to_bin(
-    name = "babel_config",
-    srcs = ["babel.config.json"],
 )
 
 exports_files(["index.html.tpl"])
