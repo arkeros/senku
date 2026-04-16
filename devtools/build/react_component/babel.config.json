@@ -1,0 +1,9 @@
+{
+  "presets": [
+    "@babel/preset-typescript",
+    ["@babel/preset-react", { "runtime": "automatic" }]
+  ],
+  "plugins": [
+    "@stylexjs/babel-plugin"
+  ]
+}
