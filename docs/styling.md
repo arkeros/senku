@@ -74,6 +74,25 @@ Compile-time atomic CSS via Babel plugin.
 - **Verdict**: the only option where the build system can reason about styles
   as data flowing through the dependency graph.
 
+## CSS serving strategy
+
+Panallet produces a single unified CSS file via `stylex_css`. This aligns with
+the recommendation from Naman Goel (StyleX's creator at Meta) in
+[Serving Atomic CSS Well](https://nmn.sh/blog/2025-09-16-serving-atomic-styles):
+
+- **Single file is the default** — atomic CSS deduplicates naturally. Each
+  declaration (e.g. `font-size:16px`) appears once regardless of how many
+  components use it. The file stays small even with many components.
+- **Per-route CSS splitting is only needed for extremely large apps** — our
+  lazy routes split JS per route, but CSS loads once upfront. This avoids
+  style recalculation penalties during client-side navigation.
+- **For SPAs, defer-load the full bundle after initial route** — a future
+  optimization: inline a small route-specific CSS, then background-load the
+  full stylesheet for instant subsequent navigations.
+
+Our transitive collection via `StylexInfo` depsets produces exactly the
+"single unified CSS file" the article advocates for.
+
 ## The tradeoff
 
 StyleX forces us to use Babel for transpilation instead of esbuild (which is
