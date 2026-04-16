@@ -73,14 +73,14 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
     )
 
     # Derive entry name from first source file: "Button.tsx" -> "Button"
-    _entry_name = srcs[0].rsplit("/", 1)[-1].replace(".tsx", "").replace(".ts", "")
+    entry_name = srcs[0].rsplit("/", 1)[-1].replace(".tsx", "").replace(".ts", "")
 
     # Wrap in react_library to carry StylexInfo + ReactComponentInfo
     react_library(
         name = name,
         js_outs = [name + "_ts"],
         metadata = [name + "_ts_transpile_stylex_metadata"],
-        entry_name = _entry_name,
+        entry_name = entry_name,
         deps = [_lib_dep(d) for d in component_deps],
         **{k: v for k, v in kwargs.items() if k == "visibility" or k == "tags"}
     )
