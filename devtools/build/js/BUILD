@@ -1,6 +1,7 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load(":browser_dep.bzl", "browser_dep")
+load(":browser_dep_group.bzl", "browser_dep_group")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -11,6 +12,15 @@ js_binary(
         "//:node_modules/esbuild",
     ],
     entry_point = "browser_dep.mjs",
+)
+
+# Tool binary for browser_dep_group rule
+js_binary(
+    name = "browser_dep_group_bin",
+    data = [
+        "//:node_modules/esbuild",
+    ],
+    entry_point = "browser_dep_group.mjs",
 )
 
 exports_files(["devserver.mjs"])
@@ -30,21 +40,13 @@ exports_files(["devserver.mjs"])
 # CJS packages are automatically bundled to ESM. ESM packages are served
 # directly from node_modules — no bundling overhead.
 
-browser_dep(
+browser_dep_group(
     name = "react",
-    package = "react",
-    deps = ["//:node_modules/react"],
-)
-
-browser_dep(
-    name = "react_jsx_runtime",
-    package = "react/jsx-runtime",
-    deps = ["//:node_modules/react"],
-)
-
-browser_dep(
-    name = "react_dom_client",
-    package = "react-dom/client",
+    packages = [
+        "react",
+        "react-dom/client",
+        "react/jsx-runtime",
+    ],
     deps = [
         "//:node_modules/react",
         "//:node_modules/react-dom",
@@ -92,4 +94,10 @@ bzl_library(
         "@aspect_rules_js//js:defs",
         "@bazel_lib//lib:copy_file",
     ],
+)
+
+bzl_library(
+    name = "browser_dep_group",
+    srcs = ["browser_dep_group.bzl"],
+    deps = ["@aspect_rules_js//js:defs"],
 )

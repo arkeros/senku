@@ -24,11 +24,11 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, *
     dep_data = []
 
     for dep in browser_deps:
-        # browser_dep outputs <name>.json, <name>.js, and <name>_node_modules
+        # browser_dep/browser_dep_group outputs include <name>.json
         manifest_files.append(dep + ".json")
-        dep_data.append(dep + ".json")
-        dep_data.append(dep + ".js")
-        dep_data.append(dep + "_node_modules")
+        dep_data.append(dep)  # default outputs (dir or .js)
+        dep_data.append(dep + ".json")  # manifest
+        dep_data.append(dep + "_node_modules")  # node_modules for ESM serving
 
     manifest_args = []
     for mf in manifest_files:

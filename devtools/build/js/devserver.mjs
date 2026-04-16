@@ -75,6 +75,22 @@ for (const mf of manifestFiles) {
       servedFiles[urlPath] = resolve(runfiles, relPath);
     }
     esmCount++;
+  } else if (manifest.type === "bundle-group") {
+    // Bundle group: entry files + shared chunks in a directory (sibling to manifest)
+    // The directory name matches the manifest name without .json
+    const groupDir = manifestPath.replace(/\.json$/, "");
+    for (const urlPath of Object.values(manifest.imports)) {
+      const fileName = urlPath.split("/").pop();
+      servedFiles[urlPath] = resolve(groupDir, fileName);
+    }
+    // Also serve shared chunks from the same directory
+    const { readdirSync } = await import("node:fs");
+    for (const file of readdirSync(groupDir)) {
+      if (file.endsWith(".js") && !servedFiles[`/deps/${file}`]) {
+        servedFiles[`/deps/${file}`] = resolve(groupDir, file);
+      }
+    }
+    bundleCount++;
   } else {
     // Bundle: serve the bundled .js file (sibling to manifest)
     const bundlePath = resolve(manifestDir, manifest.bundleFile);

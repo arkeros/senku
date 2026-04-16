@@ -18,8 +18,6 @@ react_app(
     name = "app",
     browser_deps = [
         "//devtools/build/js:react",
-        "//devtools/build/js:react_jsx_runtime",
-        "//devtools/build/js:react_dom_client",
         "//devtools/build/js:react_router",
         "//devtools/build/js:cookie",
         "//devtools/build/js:set_cookie_parser",
