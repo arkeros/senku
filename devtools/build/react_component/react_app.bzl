@@ -55,22 +55,9 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
     """
 
     # Flatten route tree: collect ordered component list and build
-    # index-based route config for the manifest rule
+    # index-based route config for the manifest rule (iterative — Starlark
+    # doesn't allow recursion)
     ordered_components = []
-
-    def _flatten_routes(route_list):
-        result = []
-        for r in route_list:
-            entry = {"path": r["path"]}
-            if "component" in r:
-                entry["component_idx"] = len(ordered_components)
-                ordered_components.append(r["component"])
-            if "children" in r:
-                entry["children"] = _flatten_routes(r["children"])
-            result.append(entry)
-        return result
-
-    # Starlark doesn't allow recursion — use iterative flattening
     flat_routes = []
     stack = [(routes, flat_routes)]
     for _ in range(1000):
