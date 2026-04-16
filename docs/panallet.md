@@ -232,29 +232,47 @@ on refresh.
 
 ### Browser Dependencies
 
-`browser_dep` targets are defined once in `//devtools/build/js` and shared across
-all apps:
+Targets are defined once in `//devtools/build/js` and shared across all apps.
+
+**`browser_dep`** — single package:
 
 ```python
-# //devtools/build/js/BUILD
 browser_dep(
-    name = "react",
-    package = "react",
-    deps = ["//:node_modules/react"],
+    name = "stylex",
+    package = "@stylexjs/stylex",
+    deps = ["//:node_modules/@stylexjs/stylex"],
 )
 ```
 
-Each `browser_dep` outputs:
-- `<name>.json` — manifest (type: "esm" or "bundle", import map entries, file list)
-- `<name>.js` — bundled ESM (CJS packages) or placeholder (ESM packages)
-- `<name>_node_modules` — filegroup of node_modules for runfiles
+**`browser_dep_group`** — multiple CJS packages that share internal state:
+
+```python
+browser_dep_group(
+    name = "react",
+    packages = [
+        "react",
+        "react/jsx-runtime",
+        "react-dom/client",
+    ],
+    deps = [
+        "//:node_modules/react",
+        "//:node_modules/react-dom",
+    ],
+)
+```
+
+Use `browser_dep_group` when CJS packages must share a single instance of their
+internals. React is the canonical example: `react`, `react/jsx-runtime`, and
+`react-dom/client` must use the same React instance or hooks fail. The group
+uses esbuild's `splitting` mode to produce separate entry files with a shared
+chunk containing the common code.
 
 #### Adding a new npm dependency
 
 1. Add to `package.json` and run `pnpm install`
-2. Add a `browser_dep` target in `//devtools/build/js/BUILD`
-3. If the package has transitive npm deps needed at runtime (e.g. `react-router` needs `react`), include them in `deps`
-4. Reference it from your `react_app`'s `browser_deps`
+2. Add a `browser_dep` (or `browser_dep_group`) in `//devtools/build/js/BUILD`
+3. If an ESM package imports bare specifiers at runtime (e.g. `react-router` imports `react` and `cookie`), add those as separate `browser_dep` targets and include them in `deps`
+4. Reference from your `react_app`'s `browser_deps`
 
 #### ESM Detection
 
@@ -284,11 +302,13 @@ expand_template(
 
 ```
 devtools/build/js/               — shared JS infrastructure
-├── browser_dep.bzl              — rule: prepare npm package for browser
+├── browser_dep.bzl              — rule: prepare single npm package for browser
 ├── browser_dep.mjs              — script: CJS→ESM + ESM manifest generation
+├── browser_dep_group.bzl        — rule: bundle multiple CJS packages with splitting
+├── browser_dep_group.mjs        — script: esbuild splitting for shared internals
 ├── devserver.bzl                — macro: dev server with import maps
 ├── devserver.mjs                — script: static file server + SPA fallback
-├── BUILD                        — shared browser_dep targets
+├── BUILD                        — shared browser_dep / browser_dep_group targets
 └── README.md
 
 devtools/build/react_component/  — React + StyleX specifics
