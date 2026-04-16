@@ -1,14 +1,15 @@
 "React component macro with Babel + StyleX transpilation for Bazel"
 
-load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
+load("@aspect_rules_js//js:defs.bzl", "js_run_binary", "js_test")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("@bazel_lib//lib:copy_file.bzl", "copy_file")
 load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
 
 _DEFAULT_BABEL_CONFIG = "//devtools/build/react_component:babel_config"
 _DEFAULT_TSCONFIG = "//:tsconfig"
 
-def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_config = _DEFAULT_BABEL_CONFIG, **kwargs):
+def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_config = _DEFAULT_BABEL_CONFIG, _export_test = True, **kwargs):
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.
 
     Wraps ts_project with the StyleX Babel transpiler. Each source file is
@@ -44,6 +45,39 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, babel_c
             "//:node_modules/react",
         ],
         **kwargs
+    )
+
+    if not _export_test:
+        return
+
+    # Verify the target name matches a named export in the compiled JS.
+    # Uses static text analysis (no import) to avoid resolving dependencies.
+    write_file(
+        name = name + "_export_test_script",
+        out = name + "_export_test.mjs",
+        content = [
+            'import { readFileSync } from "node:fs";',
+            'import { test } from "node:test";',
+            'import assert from "node:assert";',
+            "",
+            "const code = readFileSync(process.argv[2], 'utf-8');",
+            'const exportRe = /export\\s+(?:function|class|const|let|var)\\s+{}/;'.format(name),
+            'const reExportRe = /export\\s*\\{{[^}}]*\\b{}\\b[^}}]*\\}}/;'.format(name),
+            "",
+            'test("react_component {} exports {}", () => {{'.format(name, name),
+            "  assert.ok(",
+            "    exportRe.test(code) || reExportRe.test(code),",
+            '    `react_component "{}" expects a named export "{}". Check that the target name matches the exported component name.`'.format(name, name),
+            "  );",
+            "});",
+        ],
+    )
+
+    js_test(
+        name = name + "_export_test",
+        args = ["$(location {}.js)".format(name)],
+        data = [name + ".js"],
+        entry_point = name + "_export_test.mjs",
     )
 
 def _stylex_transpiler(name, srcs, out_dir = None, resolve_json = False, babel_config = _DEFAULT_BABEL_CONFIG, **kwargs):

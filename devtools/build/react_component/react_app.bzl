@@ -139,6 +139,7 @@ def react_app(name, layout, routes, browser_deps, components = [], html_template
     react_component(
         name = name + "_router",
         srcs = [name + "_router.tsx"],
+        _export_test = False,
         deps = all_route_components + [
             "//:node_modules/react-router",
         ],
@@ -148,6 +149,7 @@ def react_app(name, layout, routes, browser_deps, components = [], html_template
     react_component(
         name = name + "_main",
         srcs = [name + "_main.tsx"],
+        _export_test = False,
         deps = [
             ":" + name + "_router",
             "//:node_modules/react-dom",
