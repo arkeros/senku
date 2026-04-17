@@ -1,6 +1,7 @@
 import io
 import json
 import subprocess
+import threading
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -129,6 +130,39 @@ class TestFix(unittest.TestCase):
         result = fix(_comment(), "arkeros/senku", dry_run=True)
         mock_popen.assert_not_called()
         self.assertFalse(result.completed)
+
+    @patch("devtools.rabbitloop.claude._get_head_sha", side_effect=[SHA_BEFORE, SHA_BEFORE])
+    @patch("devtools.rabbitloop.claude.subprocess.Popen")
+    def test_handles_stream_stall(self, mock_popen, _sha):
+        """A claude process that stalls mid-stream (never emits a newline or
+        closes stdout) must still hit the overall timeout and be killed."""
+
+        class StallingStdout:
+            def __init__(self):
+                self._unblock = threading.Event()
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                self._unblock.wait(timeout=5)
+                raise StopIteration
+
+            def close(self):
+                self._unblock.set()
+
+        stream = StallingStdout()
+        mock_proc = MagicMock()
+        mock_proc.stdout = stream
+        mock_proc.kill = MagicMock(side_effect=lambda: stream.close())
+        mock_proc.wait = MagicMock(return_value=0)
+        mock_popen.return_value = mock_proc
+
+        with patch("devtools.rabbitloop.claude.CLAUDE_TIMEOUT_SECONDS", 0.1):
+            result = fix(_comment(), "arkeros/senku")
+
+        self.assertFalse(result.completed)
+        mock_proc.kill.assert_called_once()
 
     @patch("devtools.rabbitloop.claude._get_head_sha", side_effect=[SHA_BEFORE, SHA_BEFORE])
     @patch("devtools.rabbitloop.claude.subprocess.Popen")

@@ -1,11 +1,17 @@
 import dataclasses
 import json
+import queue
 import secrets
 import subprocess
+import threading
+import time
 
 from absl import logging
 
 from devtools.rabbitloop.github import ActionableComment
+
+CLAUDE_TIMEOUT_SECONDS = 300
+_STREAM_EOF = object()
 
 PROMPT_TEMPLATE = """\
 You are fixing a code review comment on a pull request for {repo}.
@@ -78,6 +84,38 @@ def _is_pushed() -> bool:
     if result.returncode != 0:
         return False
     return result.stdout.strip() == "0"
+
+
+def _iter_output_with_deadline(stdout, timeout_seconds: float):
+    """Yield lines from ``stdout`` under an overall wall-clock deadline.
+
+    Iterating ``proc.stdout`` directly blocks indefinitely if the subprocess
+    stalls without emitting a newline or closing the pipe. The reader is
+    moved to a daemon thread so the main loop can abandon a stalled read,
+    raise ``TimeoutExpired``, and let the caller kill the process.
+    """
+    q: queue.Queue = queue.Queue()
+
+    def _drain():
+        try:
+            for line in stdout:
+                q.put(line)
+        finally:
+            q.put(_STREAM_EOF)
+
+    threading.Thread(target=_drain, daemon=True).start()
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(cmd="claude", timeout=timeout_seconds)
+        try:
+            item = q.get(timeout=remaining)
+        except queue.Empty:
+            raise subprocess.TimeoutExpired(cmd="claude", timeout=timeout_seconds)
+        if item is _STREAM_EOF:
+            return
+        yield item
 
 
 def _has_tracking_upstream() -> bool:
@@ -162,7 +200,7 @@ def fix(
 
     try:
         text_parts = []
-        for line in proc.stdout:
+        for line in _iter_output_with_deadline(proc.stdout, CLAUDE_TIMEOUT_SECONDS):
             line = line.strip()
             if not line:
                 continue
@@ -197,7 +235,7 @@ def fix(
                 if "result" in event:
                     text_parts.append(event["result"])
         print()
-        proc.wait(timeout=300)
+        proc.wait(timeout=5)
         stdout = "".join(text_parts)
         returncode = proc.returncode
     except subprocess.TimeoutExpired:
