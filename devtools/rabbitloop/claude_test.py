@@ -62,6 +62,16 @@ def _mock_popen_events(events, returncode=0):
 
 class TestFix(unittest.TestCase):
 
+    def setUp(self):
+        # Pin the per-invocation nonce so existing tests can keep asserting
+        # on the literal "<promise>COMPLETE</promise>" marker.
+        patcher = patch(
+            "devtools.rabbitloop.claude._generate_nonce",
+            return_value="COMPLETE",
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
     @patch("devtools.rabbitloop.claude._get_head_sha", side_effect=[SHA_BEFORE, SHA_AFTER])
     @patch("devtools.rabbitloop.claude.subprocess.Popen")
@@ -215,6 +225,52 @@ class TestFix(unittest.TestCase):
         fix(_comment(), "arkeros/senku")
         info_log = " ".join(str(c) for c in mock_logging.info.call_args_list)
         self.assertIn("Tool result", info_log)
+
+    @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
+    @patch("devtools.rabbitloop.claude._get_head_sha", side_effect=[SHA_BEFORE, SHA_AFTER])
+    @patch("devtools.rabbitloop.claude.subprocess.Popen")
+    def test_spoofed_marker_without_nonce_is_not_completed(
+        self, mock_popen, _sha, _pushed
+    ):
+        # Simulate a reviewer quoting the literal marker in their comment
+        # body; Claude parrots it back but does not know the per-invocation
+        # nonce. Must not count as completion.
+        with patch(
+            "devtools.rabbitloop.claude._generate_nonce",
+            return_value="secret-nonce-123",
+        ):
+            mock_popen.return_value = _mock_popen("<promise>COMPLETE</promise>")
+            result = fix(_comment(), "arkeros/senku")
+        self.assertFalse(result.completed)
+
+    @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
+    @patch("devtools.rabbitloop.claude._get_head_sha", side_effect=[SHA_BEFORE, SHA_AFTER])
+    @patch("devtools.rabbitloop.claude.subprocess.Popen")
+    def test_completes_when_echoing_the_nonce(
+        self, mock_popen, _sha, _pushed
+    ):
+        with patch(
+            "devtools.rabbitloop.claude._generate_nonce",
+            return_value="secret-nonce-123",
+        ):
+            mock_popen.return_value = _mock_popen(
+                "<promise>secret-nonce-123</promise>"
+            )
+            result = fix(_comment(), "arkeros/senku")
+        self.assertTrue(result.completed)
+
+    @patch("devtools.rabbitloop.claude._get_head_sha", return_value=SHA_BEFORE)
+    @patch("devtools.rabbitloop.claude.subprocess.Popen")
+    def test_nonce_is_included_in_prompt(self, mock_popen, _sha):
+        with patch(
+            "devtools.rabbitloop.claude._generate_nonce",
+            return_value="secret-nonce-123",
+        ):
+            mock_popen.return_value = _mock_popen("nope")
+            fix(_comment(), "arkeros/senku")
+        call_args = mock_popen.call_args[0][0]
+        prompt = call_args[call_args.index("-p") + 1]
+        self.assertIn("secret-nonce-123", prompt)
 
     @patch("devtools.rabbitloop.claude.logging")
     @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
