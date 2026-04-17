@@ -179,9 +179,13 @@ if (isESM && !forceBundle) {
     files["/" + relPath] = relPath;
 
     const content = readFileSync(filePath, "utf-8");
-    const re = /\bfrom\s+["']([^"']+)["']/g;
+    // Matches: `from "x"` (static imports / re-exports), `import "x"`
+    // (side-effect imports), and `import("x")` (dynamic imports). Missing any
+    // of these would leave reachable chunks out of manifest.files and 404 at
+    // the devserver.
+    const re = /\bfrom\s+["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)|\bimport\s+["']([^"']+)["']/g;
     for (const match of content.matchAll(re)) {
-      const spec = match[1];
+      const spec = match[1] ?? match[2] ?? match[3];
       if (spec.startsWith(".") || spec.startsWith("/")) {
         // Relative import — resolve and walk
         const abs = resolveRelativeImport(filePath, spec);
