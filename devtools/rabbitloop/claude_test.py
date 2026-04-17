@@ -71,6 +71,14 @@ class TestFix(unittest.TestCase):
         )
         patcher.start()
         self.addCleanup(patcher.stop)
+        # Assume the preflight branch-state check passes by default;
+        # individual tests can override to exercise the failure path.
+        upstream_patcher = patch(
+            "devtools.rabbitloop.claude._has_tracking_upstream",
+            return_value=True,
+        )
+        upstream_patcher.start()
+        self.addCleanup(upstream_patcher.stop)
 
     @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
     @patch("devtools.rabbitloop.claude._get_head_sha", side_effect=[SHA_BEFORE, SHA_AFTER])
@@ -165,6 +173,17 @@ class TestFix(unittest.TestCase):
     def test_handles_missing_claude_binary(self, _popen, _sha):
         result = fix(_comment(), "arkeros/senku")
         self.assertFalse(result.completed)
+
+    @patch("devtools.rabbitloop.claude.subprocess.Popen")
+    def test_refuses_to_fix_without_tracking_upstream(self, mock_popen):
+        # Override the default setUp patch to simulate no upstream.
+        with patch(
+            "devtools.rabbitloop.claude._has_tracking_upstream",
+            return_value=False,
+        ):
+            result = fix(_comment(), "arkeros/senku")
+        self.assertFalse(result.completed)
+        mock_popen.assert_not_called()
 
     @patch("devtools.rabbitloop.claude.logging")
     @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
@@ -304,6 +323,27 @@ class TestGitHelpers(unittest.TestCase):
     @patch("devtools.rabbitloop.claude.subprocess.run", side_effect=FileNotFoundError("git"))
     def test_is_pushed_returns_false_when_git_missing(self, _run):
         self.assertFalse(_is_pushed())
+
+    @patch("devtools.rabbitloop.claude.subprocess.run", side_effect=FileNotFoundError("git"))
+    def test_has_tracking_upstream_returns_false_when_git_missing(self, _run):
+        from devtools.rabbitloop.claude import _has_tracking_upstream
+        self.assertFalse(_has_tracking_upstream())
+
+    def test_has_tracking_upstream_true_when_rev_parse_succeeds(self):
+        from devtools.rabbitloop.claude import _has_tracking_upstream
+        mock_result = MagicMock(returncode=0, stdout="origin/main\n")
+        with patch(
+            "devtools.rabbitloop.claude.subprocess.run", return_value=mock_result
+        ):
+            self.assertTrue(_has_tracking_upstream())
+
+    def test_has_tracking_upstream_false_when_no_upstream(self):
+        from devtools.rabbitloop.claude import _has_tracking_upstream
+        mock_result = MagicMock(returncode=128, stdout="")
+        with patch(
+            "devtools.rabbitloop.claude.subprocess.run", return_value=mock_result
+        ):
+            self.assertFalse(_has_tracking_upstream())
 
 
 if __name__ == "__main__":
