@@ -80,6 +80,8 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
             'import assert from "node:assert";',
             "",
             "const code = readFileSync(process.argv[2], 'utf-8');",
+            # Doubled braces ({{ }}) escape literal { } for str.format below;
+            # single {} is the name substitution.
             'const exportRe = /export\\s+(?:function|class|const|let|var)\\s+{}/;'.format(name),
             'const reExportRe = /export\\s*\\{{[^}}]*\\b{}\\b[^}}]*\\}}/;'.format(name),
             "",
