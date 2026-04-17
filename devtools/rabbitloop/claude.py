@@ -33,6 +33,17 @@ class FixResult:
     returncode: int = 0
 
 
+def _summarize_tool_input(name: str, input_data: dict) -> str:
+    if name == "Bash":
+        cmd = input_data.get("command", "")
+        return (cmd[:200] + "...") if len(cmd) > 200 else cmd
+    if name in ("Read", "Edit", "Write", "NotebookEdit"):
+        return input_data.get("file_path", "")
+    if name in ("Grep", "Glob"):
+        return input_data.get("pattern", "")
+    return ""
+
+
 def _get_head_sha() -> str | None:
     try:
         result = subprocess.run(
@@ -131,7 +142,20 @@ def fix(
                         print(block["text"], end="", flush=True)
                         text_parts.append(block["text"])
                     elif block.get("type") == "tool_use":
-                        logging.info("Tool call: %s", block.get("name", ""))
+                        name = block.get("name", "")
+                        summary = _summarize_tool_input(name, block.get("input", {}))
+                        if summary:
+                            logging.info("Tool call: %s %s", name, summary)
+                        else:
+                            logging.info("Tool call: %s", name)
+            elif event_type == "user":
+                message = event.get("message", {})
+                for block in message.get("content", []):
+                    if block.get("type") == "tool_result":
+                        if block.get("is_error"):
+                            logging.warning("Tool result: error")
+                        else:
+                            logging.info("Tool result: ok")
             elif event_type == "result":
                 if "result" in event:
                     text_parts.append(event["result"])
