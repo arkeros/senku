@@ -8,7 +8,7 @@ Autonomous PR review fixer. Polls GitHub for review comments from bots (CodeRabb
 poll GitHub PR
   → find unresolved bot review comments with 👍 from owner
   → for each: fire `claude --dangerously-skip-permissions` with the comment context
-  → if Claude echoes a per-invocation nonce: resolve the thread via GraphQL
+  → if Claude echoes a per-invocation nonce, a new commit is detected, and that commit is verified as pushed: resolve the thread via GraphQL
   → sleep and repeat
 ```
 
