@@ -1,3 +1,4 @@
+import subprocess
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -6,6 +7,7 @@ import requests
 from devtools.rabbitloop.github import (
     ActionableComment,
     GitHubClient,
+    _get_gh_token,
     _parse_threads,
 )
 
@@ -232,6 +234,27 @@ class TestResolveThread(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             client.resolve_thread("T_123")
+
+
+class TestGetGhToken(unittest.TestCase):
+
+    @patch("devtools.rabbitloop.github.subprocess.run")
+    def test_raises_runtime_error_when_gh_missing(self, mock_run):
+        mock_run.side_effect = FileNotFoundError("gh")
+        with self.assertRaises(RuntimeError) as ctx:
+            _get_gh_token()
+        self.assertIn("gh", str(ctx.exception).lower())
+
+    @patch("devtools.rabbitloop.github.subprocess.run")
+    def test_raises_runtime_error_when_gh_not_authenticated(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1,
+            cmd=["gh", "auth", "token"],
+            stderr="not logged in",
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            _get_gh_token()
+        self.assertIn("not logged in", str(ctx.exception))
 
 
 if __name__ == "__main__":

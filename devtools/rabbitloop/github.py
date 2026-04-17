@@ -85,12 +85,25 @@ class ReviewThread:
 
 
 def _get_gh_token() -> str:
-    result = subprocess.run(
-        ["gh", "auth", "token"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "token"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "GitHub CLI ('gh') is not installed or not on PATH. "
+            "Install 'gh' and ensure it is available on PATH."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        detail = f": {stderr}" if stderr else ""
+        raise RuntimeError(
+            "Failed to get GitHub token via 'gh auth token'"
+            f"{detail}. Run 'gh auth login' and try again."
+        ) from exc
     return result.stdout.strip()
 
 
