@@ -13,7 +13,7 @@
  *        --manifest <file.json> [--manifest ...] [--port <n>]
  */
 import { createServer } from "node:http";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, extname, dirname, resolve, sep } from "node:path";
 
 const MIME = {
@@ -84,7 +84,6 @@ for (const mf of manifestFiles) {
       servedFiles[urlPath] = resolve(groupDir, fileName);
     }
     // Also serve shared chunks from the same directory
-    const { readdirSync } = await import("node:fs");
     for (const file of readdirSync(groupDir)) {
       if (file.endsWith(".js") && !servedFiles[`/deps/${file}`]) {
         servedFiles[`/deps/${file}`] = resolve(groupDir, file);
