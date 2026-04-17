@@ -13,7 +13,7 @@ BUILD files (Starlark)
     │                           │
     │                         tsc ──► .d.ts (type-checking, parallel)
     │
-    ├── react_app         ── codegen ──► router.tsx + main.tsx
+    ├── react_app         ── codegen ──► {name}_router.tsx + {name}_main.tsx
     │                           │
     │                      json.encode() route manifest
     │
@@ -268,6 +268,9 @@ internals. React is the canonical example: `react`, `react/jsx-runtime`, and
 uses esbuild's `splitting` mode to produce separate entry files with a shared
 chunk containing the common code.
 
+Reach for `browser_dep` first — `browser_dep_group` is rarely needed outside of
+framework packages that rely on shared module identity.
+
 #### Adding a new npm dependency
 
 1. Add to `package.json` and run `pnpm install`
@@ -314,7 +317,7 @@ devtools/build/js/               — shared JS infrastructure
 
 devtools/build/react_component/  — React + StyleX specifics
 ├── react_app.bzl                — macro: route() + react_app()
-├── react_app_codegen.mjs        — script: generates router.tsx + main.tsx
+├── react_app_codegen.mjs        — script: generates {name}_router.tsx + {name}_main.tsx
 ├── react_component.bzl          — macro: wraps ts_project with Babel transpiler
 ├── stylex_css.bzl               — macro: collect StyleX CSS
 ├── stylex_transpile.mjs         — script: Babel single-pass transpilation
