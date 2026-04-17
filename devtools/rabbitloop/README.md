@@ -40,7 +40,6 @@ bazel run //devtools/rabbitloop -- --repo arkeros/senku --pr 42 --interval 60 --
 | `--interval` | 120 | Polling interval in seconds |
 | `--once` | false | Run a single iteration then exit |
 | `--dry-run` | false | Log what would be done without invoking Claude or resolving threads |
-| `--log-level` | INFO | `DEBUG`, `INFO`, or `WARNING` |
 
 ## Prerequisites
 
