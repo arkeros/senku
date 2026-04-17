@@ -14,12 +14,17 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, e
         name: target name
         entry_point: the index component target (e.g. ":index")
         components: list of component targets to serve
-        browser_deps: list of browser_dep target labels (e.g. ["//devtools/build/js:react_jsx_runtime"])
+        browser_deps: list of browser_dep target labels (e.g. ["//devtools/build/js:react_jsx_runtime"]).
+            Order matters: the first manifest that defines a specifier wins in the import map,
+            so list explicit browser_dep/browser_dep_group targets before any that pull in
+            transitive ESM discoveries (see devserver.mjs:63-70).
         html_template: label of the index.html.tpl template
         css: label of the CSS target
         **kwargs: passed through to js_binary (e.g. visibility, tags)
     """
-    # Collect manifest files and node_modules deps from browser_dep targets
+    # Collect manifest files and node_modules deps from browser_dep targets.
+    # Order is preserved end-to-end: first manifest wins in the import map, so
+    # explicit deps must come before targets that expose transitive discoveries.
     manifest_files = []
     dep_data = []
 
