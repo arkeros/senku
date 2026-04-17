@@ -1,6 +1,6 @@
 # rabbitloop
 
-Autonomous PR review fixer. Polls GitHub for review comments from bots (CodeRabbit, Copilot) that you've approved with a 👍, dispatches a Claude instance to fix each one, and resolves the thread on success.
+Autonomous PR review fixer. Polls GitHub for review comments from bots (CodeRabbit, GitHub Actions) that you've approved with a 👍, dispatches a Claude instance to fix each one, and resolves the thread on success.
 
 ## How it works
 
@@ -50,4 +50,4 @@ bazel run //devtools/rabbitloop -- --repo arkeros/senku --pr 42 --interval 60 --
 ## Supported bots
 
 - [CodeRabbit](https://coderabbit.ai/) (`coderabbitai`)
-- GitHub Copilot (`github-actions[bot]`)
+- GitHub Actions (`github-actions[bot]`)
