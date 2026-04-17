@@ -136,11 +136,12 @@ The CSS is extracted at build time — no runtime CSS-in-JS overhead.
 `react_app` uses `json.encode()` to serialize the route tree to a JSON manifest,
 then runs a codegen script that generates:
 
-**`router.tsx`** — React Router `createBrowserRouter` config:
+**`app_router.tsx`** — React Router `createBrowserRouter` config:
 ```tsx
 import { createBrowserRouter } from "react-router";
 import { Layout } from "./Layout";
 import { Home } from "./pages/Home";
+import { About } from "./pages/About";
 
 export const router = createBrowserRouter([
   {
@@ -154,7 +155,7 @@ export const router = createBrowserRouter([
 ]);
 ```
 
-**`main.tsx`** — entry point:
+**`app_main.tsx`** — entry point:
 ```tsx
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router";
