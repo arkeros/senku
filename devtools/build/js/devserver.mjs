@@ -141,12 +141,12 @@ createServer((req, res) => {
     relPath = decodeURIComponent(url.slice(1));
   } catch {
     res.writeHead(400);
-    res.end("Invalid path");
+    res.end("Invalid URL encoding");
     return;
   }
   if (relPath.includes("\0")) {
     res.writeHead(400);
-    res.end("Invalid path");
+    res.end("Null byte in path");
     return;
   }
   const candidates = [join(jsDir, relPath), join(jsDir, relPath + ".js")];
