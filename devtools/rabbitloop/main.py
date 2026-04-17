@@ -43,9 +43,11 @@ def run_once(
 def main(argv):
     del argv  # Unused.
 
-    if "/" not in FLAGS.repo:
+    repo_parts = FLAGS.repo.split("/", 1)
+    if len(repo_parts) != 2 or not repo_parts[0] or not repo_parts[1] or "/" in repo_parts[1]:
         raise app.UsageError("--repo must be in OWNER/REPO format")
-    owner = FLAGS.owner or FLAGS.repo.split("/")[0]
+    repo_owner, _ = repo_parts
+    owner = FLAGS.owner or repo_owner
 
     logging.info(
         "rabbitloop starting: repo=%s pr=#%d owner=%s interval=%ds",
