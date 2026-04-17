@@ -78,6 +78,11 @@ const babelOptions = {
 
 const result = transformSync(code, babelOptions);
 
+if (!result || result.code == null) {
+  console.error(`Babel transformation failed for ${srcFile}`);
+  process.exit(1);
+}
+
 const absOut = resolve(execroot, outFile);
 const absMap = absOut + ".map";
 const absMetadata = resolve(execroot, metadataFile);
