@@ -61,6 +61,9 @@ def _react_app_manifest_impl(ctx):
                 stack.append((r["children"], entry["children"]))
             routes_out.append(entry)
 
+    if stack:
+        fail("Route tree too deep (exceeded 1000 iterations). Simplify route structure or increase limit.")
+
     manifest = {
         "layout": {
             "import": _rel_path(layout_info.js_entry),
