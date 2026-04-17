@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import secrets
 import subprocess
 
 from absl import logging
@@ -22,8 +23,12 @@ Instructions:
 1. Read the file and understand the review comment.
 2. Implement the requested fix.
 3. Commit and push your changes.
-4. If and only if you successfully committed and pushed the fix, output the exact string <promise>COMPLETE</promise>.
+4. If and only if you successfully committed and pushed the fix, output the exact string <promise>{nonce}</promise>.
 """
+
+
+def _generate_nonce() -> str:
+    return secrets.token_hex(8)
 
 
 @dataclasses.dataclass
@@ -80,12 +85,14 @@ def fix(
     repo: str,
     dry_run: bool = False,
 ) -> FixResult:
+    nonce = _generate_nonce()
     prompt = PROMPT_TEMPLATE.format(
         repo=repo,
         file_path=comment.file_path,
         line=comment.line,
         diff_hunk=comment.diff_hunk,
         comment_body=comment.comment_body,
+        nonce=nonce,
     )
 
     if dry_run:
@@ -171,7 +178,7 @@ def fix(
         )
         return FixResult(completed=False)
 
-    promised = "<promise>COMPLETE</promise>" in stdout
+    promised = f"<promise>{nonce}</promise>" in stdout
     head_after = _get_head_sha()
     committed = head_before is not None and head_after != head_before
     pushed = _is_pushed() if committed else False
