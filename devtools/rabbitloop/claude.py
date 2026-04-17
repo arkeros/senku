@@ -34,11 +34,15 @@ class FixResult:
 
 
 def _get_head_sha() -> str | None:
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        logging.error("`git` not found on PATH")
+        return None
     if result.returncode != 0:
         return None
     return result.stdout.strip()
@@ -46,11 +50,15 @@ def _get_head_sha() -> str | None:
 
 def _is_pushed() -> bool:
     """Check that local HEAD has been pushed to the remote tracking branch."""
-    result = subprocess.run(
-        ["git", "rev-list", "@{u}..HEAD", "--count"],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "@{u}..HEAD", "--count"],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        logging.error("`git` not found on PATH")
+        return False
     if result.returncode != 0:
         return False
     return result.stdout.strip() == "0"
@@ -71,14 +79,20 @@ def fix(
 
     if dry_run:
         logging.info(
-            "DRY RUN: would invoke claude for %s:%s",
+            "DRY RUN: would invoke claude for %s:%s\n  %s",
             comment.file_path,
             comment.line,
+            comment.url,
         )
         logging.debug("Prompt:\n%s", prompt)
         return FixResult(completed=False)
 
-    logging.info("Invoking claude for %s:%s", comment.file_path, comment.line)
+    logging.info(
+        "Invoking claude for %s:%s\n  %s",
+        comment.file_path,
+        comment.line,
+        comment.url,
+    )
 
     head_before = _get_head_sha()
 
@@ -94,6 +108,11 @@ def fix(
             stderr=subprocess.STDOUT,
             text=True,
         )
+    except FileNotFoundError:
+        logging.error("`claude` CLI not found on PATH")
+        return FixResult(completed=False)
+
+    try:
         text_parts = []
         for line in proc.stdout:
             line = line.strip()

@@ -13,6 +13,7 @@ def _comment(**kwargs):
         file_path="src/foo.py",
         line=10,
         diff_hunk="@@",
+        url="https://github.com/arkeros/senku/pull/42#discussion_r1001",
     )
     defaults.update(kwargs)
     return ActionableComment(**defaults)

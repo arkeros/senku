@@ -19,6 +19,7 @@ query($owner: String!, $repo: String!, $pr: Int!) {
           comments(first: 10) {
             nodes {
               id
+              databaseId
               author { login }
               body
               path
@@ -54,6 +55,7 @@ class ActionableComment:
     file_path: str
     line: int | None
     diff_hunk: str
+    url: str
 
 
 @dataclasses.dataclass
@@ -64,6 +66,7 @@ class Reaction:
 @dataclasses.dataclass
 class Comment:
     id: str
+    database_id: int
     author_login: str
     body: str
     path: str
@@ -103,6 +106,7 @@ def _parse_threads(data: dict) -> list[ReviewThread]:
             ]
             comments.append(Comment(
                 id=c["id"],
+                database_id=c["databaseId"],
                 author_login=c["author"]["login"],
                 body=c["body"],
                 path=c["path"],
@@ -169,6 +173,10 @@ class GitHubClient:
             if owner not in reaction_logins:
                 continue
 
+            url = (
+                f"https://github.com/{repo}/pull/{pr}"
+                f"#discussion_r{comment.database_id}"
+            )
             actionable.append(
                 ActionableComment(
                     thread_id=thread.id,
@@ -176,6 +184,7 @@ class GitHubClient:
                     file_path=comment.path,
                     line=comment.line,
                     diff_hunk=comment.diff_hunk,
+                    url=url,
                 )
             )
 
