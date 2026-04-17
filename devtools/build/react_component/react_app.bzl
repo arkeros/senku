@@ -73,6 +73,8 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
                 entry["children"] = []
                 stack.append((r["children"], entry["children"]))
             output.append(entry)
+    if stack:
+        fail("route tree flattening exceeded 1000 iterations; route manifest would be truncated")
 
     all_route_components = [layout] + ordered_components
 
