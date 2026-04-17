@@ -26,14 +26,18 @@ flags.mark_flags_as_required(["repo", "pr"])
 def run_once(
     client: GitHubClient, repo: str, pr: int, owner: str,
     dry_run: bool = False,
-) -> None:
+) -> bool:
+    """Returns True if any fix completed (caller can skip sleep)."""
     comments = client.fetch_actionable_comments(repo, pr, owner)
     # TODO: parallelize — comments are independent but processed sequentially,
     # so 10 comments × 5min timeout = 50min worst case per iteration.
+    made_progress = False
     for comment in comments:
         result = fix(comment, repo, dry_run=dry_run)
         if result.completed:
             client.resolve_thread(comment.thread_id)
+            made_progress = True
+    return made_progress
 
 
 def main(argv):
@@ -54,9 +58,14 @@ def main(argv):
     client = GitHubClient()
 
     while True:
-        run_once(client, FLAGS.repo, FLAGS.pr, owner, dry_run=FLAGS.dry_run)
+        made_progress = run_once(
+            client, FLAGS.repo, FLAGS.pr, owner, dry_run=FLAGS.dry_run
+        )
         if FLAGS.once:
             break
+        if made_progress:
+            logging.info("Progress made, polling again immediately")
+            continue
         logging.info("Sleeping %d seconds...", FLAGS.interval)
         time.sleep(FLAGS.interval)
 
