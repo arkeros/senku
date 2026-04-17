@@ -9,15 +9,22 @@ def _react_library_impl(ctx):
     # Collect transitive metadata from deps
     transitive = [dep[StylexInfo].metadata for dep in ctx.attr.deps if StylexInfo in dep]
 
-    # Find the main .js entry file (matches entry_name)
+    # Find the main entry file (matches entry_name) among supported JS module outputs
     js_entry = None
+    expected_entries = [
+        ctx.attr.entry_name + ".js",
+        ctx.attr.entry_name + ".mjs",
+    ]
     for f in ctx.files.js_outs:
-        if f.basename == ctx.attr.entry_name + ".js":
+        if f.basename in expected_entries:
             js_entry = f
             break
 
     if not js_entry:
-        fail("react_library: could not find {}.js in js_outs".format(ctx.attr.entry_name))
+        fail("react_library: could not find {}.js or {}.mjs in js_outs".format(
+            ctx.attr.entry_name,
+            ctx.attr.entry_name,
+        ))
 
     return [
         DefaultInfo(files = depset(ctx.files.js_outs)),
