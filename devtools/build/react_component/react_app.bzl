@@ -141,6 +141,7 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
             "{{SCRIPTS}}": '<script src="/{}_bundle.js"></script>'.format(name),
         },
         template = tpl_name,
+        **kwargs
     )
 
     # esbuild and devserver need _ts targets (which carry JsInfo)
@@ -158,6 +159,7 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
             "//:node_modules/react-router",
             "//:node_modules/@stylexjs/stylex",
         ],
+        **kwargs
     )
 
     # Dev server
@@ -169,4 +171,5 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
         browser_deps = browser_deps,
         html_template = tpl_name,
         css = ":" + name + "_styles",
+        **kwargs
     )
