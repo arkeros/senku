@@ -77,12 +77,6 @@ def _react_app_manifest_impl(ctx):
         content = json.encode_indent(manifest, indent = "  "),
     )
 
-    # Also output router_module name for the main.tsx codegen
-    ctx.actions.write(
-        output = ctx.outputs.router_name,
-        content = ctx.attr.router_module_name,
-    )
-
     return [DefaultInfo(files = depset([ctx.outputs.manifest]))]
 
 react_app_manifest = rule(
@@ -101,13 +95,8 @@ react_app_manifest = rule(
             mandatory = True,
             doc = "JSON-encoded route tree with component_idx references",
         ),
-        "router_module_name": attr.string(
-            mandatory = True,
-            doc = "Name of the generated router module (for main.tsx import)",
-        ),
     },
     outputs = {
         "manifest": "%{name}.json",
-        "router_name": "%{name}_router_name.txt",
     },
 )

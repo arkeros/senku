@@ -83,7 +83,6 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
         layout = layout,
         route_components = ordered_components,
         route_config = json.encode(flat_routes),
-        router_module_name = name + "_router",
     )
 
     # Generate router.tsx and main.tsx from manifest
