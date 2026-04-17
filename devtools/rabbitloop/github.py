@@ -133,6 +133,7 @@ class GitHubClient:
         response = self._session.post(
             GITHUB_GRAPHQL_URL,
             json={"query": query, "variables": variables},
+            timeout=30,
         )
         response.raise_for_status()
         data = response.json()
