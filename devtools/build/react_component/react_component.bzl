@@ -3,8 +3,8 @@
 load("@aspect_rules_js//js:defs.bzl", "js_test")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load(":_stylex_outputs.bzl", "stylex_outputs")
 load(":labels.bzl", "is_node_module", "ts_dep")
-load(":react_library.bzl", "react_library")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
 _DEFAULT_TSCONFIG = "//:tsconfig"
@@ -12,17 +12,20 @@ _DEFAULT_TSCONFIG = "//:tsconfig"
 def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export_test = True, **kwargs):
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.
 
-    Wraps ts_project with the StyleX Babel transpiler and a react_library rule
-    that carries StylexInfo and ReactComponentInfo providers.
+    Wraps ts_project with the StyleX Babel transpiler and a thin rule that
+    propagates StylexInfo transitively. The public target's DefaultInfo
+    surfaces the ts_project outputs (including `{name}.js`), which
+    react_app_manifest looks up by naming convention — no routing-specific
+    provider required.
 
     Produces the following targets:
-      - :{name}              — react_library (public, carries providers)
+      - :{name}              — public target (DefaultInfo from ts_project + StylexInfo)
       - :{name}_ts           — ts_project (internal, JS + .d.ts outputs)
       - :{name}_typecheck    — tsc type-check (from ts_project)
       - :{name}_export_test  — verifies named export matches target name
 
     Args:
-        name: target name (must match the exported component name)
+        name: target name (must match the exported component name and the JS entry)
         srcs: .ts/.tsx source files
         deps: other react_component targets or node_modules labels
         tsconfig: tsconfig.json label (optional)
@@ -51,17 +54,13 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
         **kwargs
     )
 
-    # Use the target name as the canonical exported symbol name.
-    # This keeps ReactComponentInfo aligned with the export test and
-    # downstream code generation even when the source filename differs.
-    entry_name = name
-
-    # Wrap in react_library to carry StylexInfo + ReactComponentInfo
-    react_library(
+    # Thin wrapper that re-exposes ts_project outputs and propagates
+    # StylexInfo transitively. Downstream consumers (react_app_manifest,
+    # stylex_css) read files from DefaultInfo by naming convention.
+    stylex_outputs(
         name = name,
         js_outs = [name + "_ts"],
         metadata = [name + "_ts_transpile_stylex_metadata"],
-        entry_name = entry_name,
         deps = component_deps,
         **{k: v for k, v in kwargs.items() if k == "visibility" or k == "tags"}
     )

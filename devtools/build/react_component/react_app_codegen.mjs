@@ -2,8 +2,8 @@
  * Generates router.tsx and main.tsx from a route manifest JSON.
  *
  * The manifest is produced by the react_app_manifest rule with actual
- * file paths from ReactComponentInfo providers. Routes use lazy loading
- * via dynamic import() for per-route code splitting.
+ * file paths resolved from each component target's DefaultInfo. Routes
+ * use lazy loading via dynamic import() for per-route code splitting.
  *
  * Usage: node react_app_codegen.mjs --manifest <file.json> --out-router <router.tsx> --out-main <main.tsx>
  */

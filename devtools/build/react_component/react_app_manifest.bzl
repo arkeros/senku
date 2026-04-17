@@ -1,14 +1,30 @@
-"Rule that generates route manifest from ReactComponentInfo providers"
+"Rule that generates a route manifest from component targets"
 
-load(":providers.bzl", "ReactComponentInfo")
+def _find_js_entry(target):
+    """Return the .js File in target's DefaultInfo whose basename is {name}.js.
+
+    react_component targets follow the convention that the target name matches
+    both the exported React component and the JS entry filename (enforced by
+    the export-name test on each react_component). The manifest rule leans on
+    that same convention here — no provider needed.
+    """
+    expected = target.label.name + ".js"
+    for f in target[DefaultInfo].files.to_list():
+        if f.basename == expected:
+            return f
+    fail(
+        "react_app_manifest: target {} does not produce {} among its outputs. ".format(target.label, expected) +
+        "The react_component target name must match its JS entry filename (and its exported component name).",
+    )
 
 def _react_app_manifest_impl(ctx):
     # Parse the route config (flattened at loading time by the macro)
     route_config = json.decode(ctx.attr.route_config)
 
-    # Read ReactComponentInfo from layout and route components
-    layout_info = ctx.attr.layout[ReactComponentInfo]
-    component_infos = [c[ReactComponentInfo] for c in ctx.attr.route_components]
+    layout_js = _find_js_entry(ctx.attr.layout)
+    layout_name = ctx.attr.layout.label.name
+    route_js = [_find_js_entry(c) for c in ctx.attr.route_components]
+    route_names = [c.label.name for c in ctx.attr.route_components]
 
     # Compute the output directory for relative path calculation
     manifest_dir = ctx.outputs.manifest.dirname
@@ -42,7 +58,7 @@ def _react_app_manifest_impl(ctx):
                 rel = rel + "/" + downs if rel else downs
             return "./" + rel + "/" + file_base if rel else "./" + file_base
 
-    # Enrich route config with actual import paths from providers (iterative)
+    # Enrich route config with actual import paths (iterative)
     enriched_routes = []
     stack = [(route_config, enriched_routes)]
     for _ in range(1000):
@@ -53,9 +69,8 @@ def _react_app_manifest_impl(ctx):
             entry = {"path": r["path"]}
             if "component_idx" in r:
                 idx = r["component_idx"]
-                info = component_infos[idx]
-                entry["import"] = _rel_path(info.js_entry)
-                entry["name"] = info.name
+                entry["import"] = _rel_path(route_js[idx])
+                entry["name"] = route_names[idx]
             if "children" in r:
                 entry["children"] = []
                 stack.append((r["children"], entry["children"]))
@@ -66,8 +81,8 @@ def _react_app_manifest_impl(ctx):
 
     manifest = {
         "layout": {
-            "import": _rel_path(layout_info.js_entry),
-            "name": layout_info.name,
+            "import": _rel_path(layout_js),
+            "name": layout_name,
         },
         "routes": enriched_routes,
     }
@@ -84,12 +99,10 @@ react_app_manifest = rule(
     attrs = {
         "layout": attr.label(
             mandatory = True,
-            providers = [ReactComponentInfo],
             doc = "The layout react_component target",
         ),
         "route_components": attr.label_list(
-            providers = [ReactComponentInfo],
-            doc = "Ordered list of route components (indexed by route_config)",
+            doc = "Ordered list of route react_component targets (indexed by route_config)",
         ),
         "route_config": attr.string(
             mandatory = True,

@@ -1,29 +1,11 @@
 "StyleX design-token module: ts_project + StyleX Babel transpile, emits StylexInfo"
 
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+load(":_stylex_outputs.bzl", "stylex_outputs")
 load(":labels.bzl", "is_node_module", "ts_dep")
-load(":providers.bzl", "StylexInfo")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
 _DEFAULT_TSCONFIG = "//:tsconfig"
-
-def _stylex_library_impl(ctx):
-    own_metadata = [f for f in ctx.files.metadata if f.path.endswith(".stylex.json")]
-    transitive = [dep[StylexInfo].metadata for dep in ctx.attr.deps if StylexInfo in dep]
-
-    return [
-        DefaultInfo(files = depset(ctx.files.js_outs)),
-        StylexInfo(metadata = depset(own_metadata, transitive = transitive)),
-    ]
-
-_stylex_library_rule = rule(
-    implementation = _stylex_library_impl,
-    attrs = {
-        "js_outs": attr.label_list(allow_files = True, doc = "JS outputs from ts_project"),
-        "metadata": attr.label_list(allow_files = True, doc = ".stylex.json metadata files"),
-        "deps": attr.label_list(doc = "Other StylexInfo-bearing targets (for transitive metadata)"),
-    },
-)
 
 def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs):
     """Build a StyleX design-token module (e.g. `tokens.stylex.ts`).
@@ -63,7 +45,7 @@ def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs
         **kwargs
     )
 
-    _stylex_library_rule(
+    stylex_outputs(
         name = name,
         js_outs = [name + "_ts"],
         metadata = [name + "_ts_transpile_stylex_metadata"],

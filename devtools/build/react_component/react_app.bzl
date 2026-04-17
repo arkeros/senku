@@ -29,8 +29,9 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
 
     Routes are defined in BUILD files and compiled to React Router's
     createBrowserRouter config with lazy() imports for per-route code splitting.
-    Import paths are derived from actual .js output files via ReactComponentInfo
-    providers — no naming convention assumptions.
+    Import paths are derived from each component target's DefaultInfo by
+    looking up `{target_name}.js` — the same naming convention enforced by
+    react_component's export-name test.
 
     Produces:
       - :{name}_devserver — dev server with unbundled ESM
@@ -71,7 +72,7 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
 
     all_route_components = [layout] + ordered_components
 
-    # Generate route manifest using ReactComponentInfo providers
+    # Generate route manifest — looks up .js entries from each target's DefaultInfo
     manifest_name = name + "_manifest"
     react_app_manifest(
         name = manifest_name,

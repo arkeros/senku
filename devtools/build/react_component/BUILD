@@ -62,8 +62,8 @@ bzl_library(
     name = "react_component",
     srcs = ["react_component.bzl"],
     deps = [
+        ":_stylex_outputs",
         ":labels",
-        ":react_library",
         ":stylex_transpile",
         "@aspect_rules_js//js:defs",
         "@aspect_rules_ts//ts:defs",
@@ -75,11 +75,17 @@ bzl_library(
     name = "stylex_library",
     srcs = ["stylex_library.bzl"],
     deps = [
+        ":_stylex_outputs",
         ":labels",
-        ":providers",
         ":stylex_transpile",
         "@aspect_rules_ts//ts:defs",
     ],
+)
+
+bzl_library(
+    name = "_stylex_outputs",
+    srcs = ["_stylex_outputs.bzl"],
+    deps = [":providers"],
 )
 
 bzl_library(
@@ -99,18 +105,6 @@ bzl_library(
 )
 
 bzl_library(
-    name = "react_app_manifest",
-    srcs = ["react_app_manifest.bzl"],
-    deps = [":providers"],
-)
-
-bzl_library(
-    name = "react_library",
-    srcs = ["react_library.bzl"],
-    deps = [":providers"],
-)
-
-bzl_library(
     name = "labels",
     srcs = ["labels.bzl"],
 )
@@ -118,4 +112,9 @@ bzl_library(
 bzl_library(
     name = "providers",
     srcs = ["providers.bzl"],
+)
+
+bzl_library(
+    name = "react_app_manifest",
+    srcs = ["react_app_manifest.bzl"],
 )

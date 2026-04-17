@@ -6,11 +6,3 @@ StylexInfo = provider(
         "metadata": "depset of .stylex.json Files",
     },
 )
-
-ReactComponentInfo = provider(
-    doc = "React component build outputs for route generation",
-    fields = {
-        "js_entry": "File: the main .js output file",
-        "name": "string: the exported component name (matches target name)",
-    },
-)
