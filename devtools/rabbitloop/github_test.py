@@ -134,6 +134,13 @@ class TestFetchActionableComments(unittest.TestCase):
         result = client.fetch_actionable_comments("arkeros/senku", 42, OWNER)
         self.assertEqual(len(result), 1)
 
+    def test_accepts_copilot_bot(self):
+        client = self._client_with_response(
+            _make_graphql_response([_thread(author="copilot-pull-request-reviewer")])
+        )
+        result = client.fetch_actionable_comments("arkeros/senku", 42, OWNER)
+        self.assertEqual(len(result), 1)
+
     def test_empty_pr_returns_empty_list(self):
         client = self._client_with_response(
             _make_graphql_response([])
