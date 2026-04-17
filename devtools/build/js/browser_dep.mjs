@@ -15,7 +15,12 @@
 import { build } from "esbuild";
 import { createRequire, builtinModules } from "node:module";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve, relative } from "node:path";
+import { dirname, join, resolve, relative, sep } from "node:path";
+
+// node_modules lives on the local filesystem with OS-native separators, but
+// manifest keys/values are URL-shaped and must use forward slashes.
+const NODE_MODULES_SEGMENT = `${sep}node_modules${sep}`;
+const toUrlPath = sep === "/" ? (p) => p : (p) => p.split(sep).join("/");
 
 const args = process.argv.slice(2);
 let pkg = null;
@@ -152,12 +157,12 @@ for (const f of [absOutputJs, absOutputManifest]) {
 
 if (isESM && !forceBundle) {
   // Find the node_modules root to compute serve paths
-  const nodeModulesIdx = resolved.indexOf("/node_modules/");
+  const nodeModulesIdx = resolved.indexOf(NODE_MODULES_SEGMENT);
   if (nodeModulesIdx === -1) {
-    throw new Error(`Expected resolved path to contain /node_modules/: ${resolved}`);
+    throw new Error(`Expected resolved path to contain ${NODE_MODULES_SEGMENT}: ${resolved}`);
   }
-  const nodeModulesRoot = resolved.substring(0, nodeModulesIdx + "/node_modules/".length);
-  const entryServePath = "/node_modules/" + relative(nodeModulesRoot, resolved);
+  const nodeModulesRoot = resolved.substring(0, nodeModulesIdx + NODE_MODULES_SEGMENT.length);
+  const entryServePath = "/node_modules/" + toUrlPath(relative(nodeModulesRoot, resolved));
 
   // Walk all files reachable from the entry, collecting:
   // - files: relative imports (chunks) that need to be served
@@ -170,7 +175,7 @@ if (isESM && !forceBundle) {
     if (seen.has(filePath)) return;
     seen.add(filePath);
 
-    const relPath = "node_modules/" + relative(nodeModulesRoot, filePath);
+    const relPath = "node_modules/" + toUrlPath(relative(nodeModulesRoot, filePath));
     files["/" + relPath] = relPath;
 
     const content = readFileSync(filePath, "utf-8");
@@ -185,7 +190,7 @@ if (isESM && !forceBundle) {
         // Bare specifier — add to import map
         try {
           const dep = resolvePackage(spec);
-          imports[spec] = "/node_modules/" + relative(nodeModulesRoot, dep.resolved);
+          imports[spec] = "/node_modules/" + toUrlPath(relative(nodeModulesRoot, dep.resolved));
         } catch {
           // Can't resolve (Node.js builtin, etc.)
         }
