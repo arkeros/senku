@@ -39,6 +39,8 @@ def run_once(
 def main(argv):
     del argv  # Unused.
 
+    if "/" not in FLAGS.repo:
+        raise app.UsageError("--repo must be in OWNER/REPO format")
     owner = FLAGS.owner or FLAGS.repo.split("/")[0]
 
     logging.info(
