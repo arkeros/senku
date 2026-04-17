@@ -13,7 +13,7 @@
  * Usage: node browser_dep.mjs --package <specifier> --output-js <file.js> --output-manifest <file.json>
  */
 import { build } from "esbuild";
-import { createRequire } from "node:module";
+import { createRequire, builtinModules } from "node:module";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, relative } from "node:path";
 
@@ -117,8 +117,16 @@ function discoverBareImports(filePath, seen = new Set()) {
         if (dep.isESM) {
           Object.assign(importMap, discoverBareImports(dep.resolved, seen));
         }
-      } catch {
-        // Can't resolve — skip (might be a Node.js builtin)
+      } catch (err) {
+        // Node.js builtins can't be resolved via require.resolve — expected,
+        // skip silently. Anything else (broken symlink, corrupt package.json,
+        // permissions) is a real problem worth surfacing.
+        const bareName = spec.replace(/^node:/, "").split("/")[0];
+        if (!builtinModules.includes(bareName)) {
+          console.warn(
+            `browser_dep: failed to resolve "${spec}" in ${filePath}: ${err.message}`,
+          );
+        }
       }
     }
   }
