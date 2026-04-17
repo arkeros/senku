@@ -26,7 +26,13 @@ if (!input || !output) {
 const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
 const css = readFileSync(resolve(execroot, input), "utf-8");
 
-const result = await postcss([postcssJitProps(OpenProps)]).process(css, { from: undefined });
+let result;
+try {
+  result = await postcss([postcssJitProps(OpenProps)]).process(css, { from: undefined });
+} catch (err) {
+  console.error(`PostCSS failed on ${input}: ${err.message}`);
+  process.exit(1);
+}
 
 const absOutput = resolve(execroot, output);
 mkdirSync(dirname(absOutput), { recursive: true });

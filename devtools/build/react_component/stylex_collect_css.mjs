@@ -36,11 +36,23 @@ const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
 const allRules = [];
 
 for (const file of metadataFiles) {
-  const rules = JSON.parse(readFileSync(resolve(execroot, file), "utf-8"));
+  let rules;
+  try {
+    rules = JSON.parse(readFileSync(resolve(execroot, file), "utf-8"));
+  } catch (err) {
+    console.error(`Failed to parse StyleX metadata from ${file}: ${err.message}`);
+    process.exit(1);
+  }
   allRules.push(...rules);
 }
 
-const css = stylexPlugin.processStylexRules(allRules, useLayers);
+let css;
+try {
+  css = stylexPlugin.processStylexRules(allRules, useLayers);
+} catch (err) {
+  console.error(`Failed to process StyleX rules into CSS: ${err.message}`);
+  process.exit(1);
+}
 const resolvedOutput = resolve(execroot, outputPath);
 mkdirSync(dirname(resolvedOutput), { recursive: true });
 writeFileSync(resolvedOutput, css);
