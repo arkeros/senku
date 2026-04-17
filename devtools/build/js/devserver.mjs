@@ -14,7 +14,7 @@
  */
 import { createServer } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
-import { join, extname, dirname, resolve } from "node:path";
+import { join, extname, dirname, resolve, sep } from "node:path";
 
 const MIME = {
   ".html": "text/html",
@@ -134,10 +134,25 @@ createServer((req, res) => {
     return;
   }
 
-  // Serve component JS files (try .js extension for extensionless imports)
-  const relPath = url.slice(1);
+  // Serve component JS files (try .js extension for extensionless imports).
+  // Resolve the URL against jsDir and confirm the result stays inside it, so a
+  // crafted URL like /../../etc/passwd can't escape the served directory.
+  let relPath;
+  try {
+    relPath = decodeURIComponent(url.slice(1));
+  } catch {
+    res.writeHead(400);
+    res.end("Invalid path");
+    return;
+  }
+  if (relPath.includes("\0")) {
+    res.writeHead(400);
+    res.end("Invalid path");
+    return;
+  }
   const candidates = [join(jsDir, relPath), join(jsDir, relPath + ".js")];
   for (const jsPath of candidates) {
+    if (jsPath !== jsDir && !jsPath.startsWith(jsDir + sep)) continue;
     if (existsSync(jsPath)) {
       const ext = extname(jsPath) || ".js";
       res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
