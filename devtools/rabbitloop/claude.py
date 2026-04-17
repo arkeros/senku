@@ -1,4 +1,5 @@
 import dataclasses
+import json
 import subprocess
 
 from absl import logging
@@ -82,19 +83,52 @@ def fix(
     head_before = _get_head_sha()
 
     try:
-        result = subprocess.run(
-            ["claude", "--dangerously-skip-permissions", "-p", prompt],
-            capture_output=True,
+        proc = subprocess.Popen(
+            [
+                "claude", "--dangerously-skip-permissions",
+                "--verbose",
+                "--output-format", "stream-json",
+                "-p", prompt,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=300,
         )
+        text_parts = []
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                print(line, flush=True)
+                continue
+            event_type = event.get("type")
+            if event_type == "assistant":
+                message = event.get("message", {})
+                for block in message.get("content", []):
+                    if block.get("type") == "text":
+                        print(block["text"], end="", flush=True)
+                        text_parts.append(block["text"])
+                    elif block.get("type") == "tool_use":
+                        logging.info("Tool call: %s", block.get("name", ""))
+            elif event_type == "result":
+                if "result" in event:
+                    text_parts.append(event["result"])
+        print()
+        proc.wait(timeout=300)
+        stdout = "".join(text_parts)
+        returncode = proc.returncode
     except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
         logging.warning(
             "Claude timed out fixing %s:%s", comment.file_path, comment.line
         )
         return FixResult(completed=False)
 
-    promised = "<promise>COMPLETE</promise>" in result.stdout
+    promised = "<promise>COMPLETE</promise>" in stdout
     head_after = _get_head_sha()
     committed = head_before is not None and head_after != head_before
     pushed = _is_pushed() if committed else False
@@ -125,11 +159,11 @@ def fix(
             comment.file_path,
             comment.line,
         )
-        logging.debug("Claude stdout:\n%s", result.stdout)
+        logging.debug("Claude stdout:\n%s", stdout)
 
     completed = promised and committed and pushed
     return FixResult(
         completed=completed,
-        stdout=result.stdout,
-        returncode=result.returncode,
+        stdout=stdout,
+        returncode=returncode,
     )
