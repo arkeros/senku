@@ -48,6 +48,18 @@ def _mock_popen(result_text, returncode=0):
     return mock_proc
 
 
+def _events_to_stream(events):
+    return "\n".join(json.dumps(e) for e in events) + "\n"
+
+
+def _mock_popen_events(events, returncode=0):
+    proc = MagicMock()
+    proc.stdout = io.StringIO(_events_to_stream(events))
+    proc.returncode = returncode
+    proc.wait.return_value = returncode
+    return proc
+
+
 class TestFix(unittest.TestCase):
 
     @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
@@ -143,6 +155,88 @@ class TestFix(unittest.TestCase):
     def test_handles_missing_claude_binary(self, _popen, _sha):
         result = fix(_comment(), "arkeros/senku")
         self.assertFalse(result.completed)
+
+    @patch("devtools.rabbitloop.claude.logging")
+    @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
+    @patch("devtools.rabbitloop.claude._get_head_sha", side_effect=[SHA_BEFORE, SHA_AFTER])
+    @patch("devtools.rabbitloop.claude.subprocess.Popen")
+    def test_logs_bash_command_with_tool_call(
+        self, mock_popen, _sha, _pushed, mock_logging
+    ):
+        events = [
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "name": "Bash",
+                 "input": {"command": "git push origin feat/x"}},
+            ]}},
+            {"type": "result", "result": "<promise>COMPLETE</promise>"},
+        ]
+        mock_popen.return_value = _mock_popen_events(events)
+        fix(_comment(), "arkeros/senku")
+        info_log = " ".join(str(c) for c in mock_logging.info.call_args_list)
+        self.assertIn("Bash", info_log)
+        self.assertIn("git push origin feat/x", info_log)
+
+    @patch("devtools.rabbitloop.claude.logging")
+    @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
+    @patch("devtools.rabbitloop.claude._get_head_sha", side_effect=[SHA_BEFORE, SHA_AFTER])
+    @patch("devtools.rabbitloop.claude.subprocess.Popen")
+    def test_logs_read_file_path_with_tool_call(
+        self, mock_popen, _sha, _pushed, mock_logging
+    ):
+        events = [
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "name": "Read",
+                 "input": {"file_path": "lib/bar.py"}},
+            ]}},
+            {"type": "result", "result": "<promise>COMPLETE</promise>"},
+        ]
+        mock_popen.return_value = _mock_popen_events(events)
+        fix(_comment(), "arkeros/senku")
+        info_log = " ".join(str(c) for c in mock_logging.info.call_args_list)
+        self.assertIn("lib/bar.py", info_log)
+
+    @patch("devtools.rabbitloop.claude.logging")
+    @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
+    @patch("devtools.rabbitloop.claude._get_head_sha", side_effect=[SHA_BEFORE, SHA_AFTER])
+    @patch("devtools.rabbitloop.claude.subprocess.Popen")
+    def test_logs_tool_result_events(
+        self, mock_popen, _sha, _pushed, mock_logging
+    ):
+        events = [
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "name": "Bash", "input": {"command": "echo hi"}},
+            ]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "content": "hi", "is_error": False},
+            ]}},
+            {"type": "result", "result": "<promise>COMPLETE</promise>"},
+        ]
+        mock_popen.return_value = _mock_popen_events(events)
+        fix(_comment(), "arkeros/senku")
+        info_log = " ".join(str(c) for c in mock_logging.info.call_args_list)
+        self.assertIn("Tool result", info_log)
+
+    @patch("devtools.rabbitloop.claude.logging")
+    @patch("devtools.rabbitloop.claude._is_pushed", return_value=True)
+    @patch("devtools.rabbitloop.claude._get_head_sha", side_effect=[SHA_BEFORE, SHA_AFTER])
+    @patch("devtools.rabbitloop.claude.subprocess.Popen")
+    def test_logs_tool_result_error_as_warning(
+        self, mock_popen, _sha, _pushed, mock_logging
+    ):
+        events = [
+            {"type": "assistant", "message": {"content": [
+                {"type": "tool_use", "name": "Bash", "input": {"command": "false"}},
+            ]}},
+            {"type": "user", "message": {"content": [
+                {"type": "tool_result", "content": "oops", "is_error": True},
+            ]}},
+            {"type": "result", "result": "<promise>COMPLETE</promise>"},
+        ]
+        mock_popen.return_value = _mock_popen_events(events)
+        fix(_comment(), "arkeros/senku")
+        warning_log = " ".join(str(c) for c in mock_logging.warning.call_args_list)
+        self.assertIn("Tool result", warning_log)
+        self.assertIn("error", warning_log)
 
 
 class TestGitHelpers(unittest.TestCase):
