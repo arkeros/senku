@@ -80,6 +80,25 @@ def _is_pushed() -> bool:
     return result.stdout.strip() == "0"
 
 
+def _has_tracking_upstream() -> bool:
+    """Check that HEAD is on a branch with a configured upstream.
+
+    Without an upstream, `_is_pushed()` always returns False, which would
+    silently route every successful fix into the "committed but not pushed"
+    warning branch — losing Claude's work without resolving the thread.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        logging.error("`git` not found on PATH")
+        return False
+    return result.returncode == 0
+
+
 def fix(
     comment: ActionableComment,
     repo: str,
@@ -103,6 +122,17 @@ def fix(
             comment.url,
         )
         logging.debug("Prompt:\n%s", prompt)
+        return FixResult(completed=False)
+
+    if not _has_tracking_upstream():
+        logging.error(
+            "Refusing to fix %s:%s — HEAD has no tracking upstream. "
+            "Set one with `git push -u origin HEAD`. "
+            "Without it, Claude's pushed commit cannot be verified and the "
+            "fix would be silently dropped.",
+            comment.file_path,
+            comment.line,
+        )
         return FixResult(completed=False)
 
     logging.info(
