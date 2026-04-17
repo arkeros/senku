@@ -15,7 +15,7 @@ npm.npm_translate_lock(
     bins = {
         # Babel CLI for custom ts_project transpilers
         "@babel/cli": [
-            "babel=./bin/babel-cli.js",
+            "babel=./bin/babel.js",
         ],
         # derived from "bin" attribute in node_modules/typescript/package.json
         "typescript": [
