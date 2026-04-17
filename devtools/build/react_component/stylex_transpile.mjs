@@ -9,11 +9,8 @@
  * Usage: node stylex_transpile.mjs <src> --out-file <js> --metadata-file <json>
  */
 import { transformSync } from "@babel/core";
-import { createRequire } from "node:module";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
-
-const _require = createRequire(import.meta.url);
 
 const args = process.argv.slice(2);
 let srcFile = null;
