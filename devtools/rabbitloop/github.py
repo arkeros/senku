@@ -6,7 +6,9 @@ from absl import logging
 
 GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
 
-BOT_AUTHORS = frozenset({"coderabbitai", "github-actions[bot]"})
+BOT_AUTHORS = frozenset(
+    {"coderabbitai", "github-actions[bot]", "copilot-pull-request-reviewer"}
+)
 
 REVIEW_THREADS_QUERY = """
 query($owner: String!, $repo: String!, $pr: Int!) {
