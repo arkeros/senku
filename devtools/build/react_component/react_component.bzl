@@ -72,8 +72,10 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
         **kwargs
     )
 
-    # Derive entry name from first source file: "Button.tsx" -> "Button"
-    entry_name = srcs[0].rsplit("/", 1)[-1].replace(".tsx", "").replace(".ts", "")
+    # Use the target name as the canonical exported symbol name.
+    # This keeps ReactComponentInfo aligned with the export test and
+    # downstream code generation even when the source filename differs.
+    entry_name = name
 
     # Wrap in react_library to carry StylexInfo + ReactComponentInfo
     react_library(
