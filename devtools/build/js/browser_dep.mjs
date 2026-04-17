@@ -13,7 +13,7 @@
  * Usage: node browser_dep.mjs --package <specifier> --output-js <file.js> --output-manifest <file.json>
  */
 import { build } from "esbuild";
-import { createRequire, builtinModules } from "node:module";
+import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, relative, sep } from "node:path";
 
@@ -90,54 +90,6 @@ function resolvePackage(specifier) {
 }
 
 const { resolved, isESM } = resolvePackage(pkg);
-
-/**
- * Recursively discover bare import specifiers from an ESM file.
- * Returns a map of specifier -> resolved absolute file path.
- */
-function discoverBareImports(filePath, seen = new Set()) {
-  if (seen.has(filePath)) return {};
-  seen.add(filePath);
-
-  const content = readFileSync(filePath, "utf-8");
-  const importMap = {};
-
-  // Match: from "specifier" (handles multiline imports like import {\n...\n} from "...")
-  const re = /\bfrom\s+["']([^"']+)["']/g;
-  for (const match of content.matchAll(re)) {
-    const spec = match[1];
-
-    if (spec.startsWith(".") || spec.startsWith("/")) {
-      // Relative import — resolve and recurse
-      const absPath = resolveRelativeImport(filePath, spec);
-      if (absPath) {
-        Object.assign(importMap, discoverBareImports(absPath, seen));
-      }
-    } else {
-      // Bare specifier — resolve and add to map
-      try {
-        const dep = resolvePackage(spec);
-        importMap[spec] = dep.resolved;
-        // Recurse into ESM deps
-        if (dep.isESM) {
-          Object.assign(importMap, discoverBareImports(dep.resolved, seen));
-        }
-      } catch (err) {
-        // Node.js builtins can't be resolved via require.resolve — expected,
-        // skip silently. Anything else (broken symlink, corrupt package.json,
-        // permissions) is a real problem worth surfacing.
-        const bareName = spec.replace(/^node:/, "").split("/")[0];
-        if (!builtinModules.includes(bareName)) {
-          console.warn(
-            `browser_dep: failed to resolve "${spec}" in ${filePath}: ${err.message}`,
-          );
-        }
-      }
-    }
-  }
-
-  return importMap;
-}
 
 function resolveRelativeImport(fromFile, spec) {
   const base = resolve(dirname(fromFile), spec);
