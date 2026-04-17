@@ -81,6 +81,32 @@ class TestRunOnce(unittest.TestCase):
         call_kwargs = mock_fix.call_args.kwargs
         self.assertTrue(call_kwargs.get("dry_run", False))
 
+    @patch("devtools.rabbitloop.main.fix")
+    def test_returns_true_when_any_fix_completed(self, mock_fix):
+        client = _mock_client([_comment()])
+        mock_fix.return_value = FixResult(completed=True)
+
+        result = run_once(client, "arkeros/senku", 42, "arkeros", dry_run=False)
+
+        self.assertTrue(result)
+
+    @patch("devtools.rabbitloop.main.fix")
+    def test_returns_false_when_no_fix_completed(self, mock_fix):
+        client = _mock_client([_comment()])
+        mock_fix.return_value = FixResult(completed=False)
+
+        result = run_once(client, "arkeros/senku", 42, "arkeros", dry_run=False)
+
+        self.assertFalse(result)
+
+    @patch("devtools.rabbitloop.main.fix")
+    def test_returns_false_when_no_comments(self, mock_fix):
+        client = _mock_client([])
+
+        result = run_once(client, "arkeros/senku", 42, "arkeros", dry_run=False)
+
+        self.assertFalse(result)
+
 
 if __name__ == "__main__":
     unittest.main()
