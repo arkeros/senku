@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from unittest.mock import patch, MagicMock
 
-from devtools.rabbitloop.claude import fix, FixResult
+from devtools.rabbitloop.claude import fix, FixResult, _get_head_sha, _is_pushed
 from devtools.rabbitloop.github import ActionableComment
 
 SHA_BEFORE = "aaa1111"
@@ -18,6 +18,7 @@ def _comment(**kwargs):
         file_path="src/foo.py",
         line=10,
         diff_hunk="@@ -8,3 +8,3 @@",
+        url="https://github.com/arkeros/senku/pull/42#discussion_r1001",
     )
     defaults.update(kwargs)
     return ActionableComment(**defaults)
@@ -136,6 +137,23 @@ class TestFix(unittest.TestCase):
         mock_popen.return_value = _mock_popen("some output\n<promise>COMPLETE</promise>")
         result = fix(_comment(), "arkeros/senku")
         self.assertIn("some output", result.stdout)
+
+    @patch("devtools.rabbitloop.claude._get_head_sha", return_value=SHA_BEFORE)
+    @patch("devtools.rabbitloop.claude.subprocess.Popen", side_effect=FileNotFoundError("claude"))
+    def test_handles_missing_claude_binary(self, _popen, _sha):
+        result = fix(_comment(), "arkeros/senku")
+        self.assertFalse(result.completed)
+
+
+class TestGitHelpers(unittest.TestCase):
+
+    @patch("devtools.rabbitloop.claude.subprocess.run", side_effect=FileNotFoundError("git"))
+    def test_get_head_sha_returns_none_when_git_missing(self, _run):
+        self.assertIsNone(_get_head_sha())
+
+    @patch("devtools.rabbitloop.claude.subprocess.run", side_effect=FileNotFoundError("git"))
+    def test_is_pushed_returns_false_when_git_missing(self, _run):
+        self.assertFalse(_is_pushed())
 
 
 if __name__ == "__main__":

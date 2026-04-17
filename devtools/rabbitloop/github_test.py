@@ -47,6 +47,7 @@ def _thread(
             "nodes": [
                 {
                     "id": "C_1",
+                    "databaseId": 1001,
                     "author": {"login": author},
                     "body": body,
                     "path": path,
