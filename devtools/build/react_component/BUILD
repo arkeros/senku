@@ -47,13 +47,14 @@ bzl_library(
     name = "react_app",
     srcs = ["react_app.bzl"],
     deps = [
+        ":labels",
+        ":react_app_manifest",
         ":react_component",
         ":stylex_css",
         "//devtools/build/js:devserver",
         "@aspect_rules_esbuild//esbuild:defs",
         "@aspect_rules_js//js:defs",
         "@bazel_lib//lib:expand_template",
-        "@bazel_skylib//rules:write_file",
     ],
 )
 
@@ -61,8 +62,31 @@ bzl_library(
     name = "react_component",
     srcs = ["react_component.bzl"],
     deps = [
+        ":labels",
+        ":react_library",
+        ":stylex_transpile",
         "@aspect_rules_js//js:defs",
         "@aspect_rules_ts//ts:defs",
+        "@bazel_skylib//rules:write_file",
+    ],
+)
+
+bzl_library(
+    name = "stylex_library",
+    srcs = ["stylex_library.bzl"],
+    deps = [
+        ":labels",
+        ":providers",
+        ":stylex_transpile",
+        "@aspect_rules_ts//ts:defs",
+    ],
+)
+
+bzl_library(
+    name = "stylex_transpile",
+    srcs = ["stylex_transpile.bzl"],
+    deps = [
+        "@aspect_rules_js//js:defs",
         "@bazel_lib//lib:copy_file",
         "@bazel_lib//lib:copy_to_bin",
     ],
@@ -84,6 +108,11 @@ bzl_library(
     name = "react_library",
     srcs = ["react_library.bzl"],
     deps = [":providers"],
+)
+
+bzl_library(
+    name = "labels",
+    srcs = ["labels.bzl"],
 )
 
 bzl_library(

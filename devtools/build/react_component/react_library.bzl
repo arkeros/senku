@@ -1,5 +1,12 @@
 "Wrapper rule that carries StylexInfo and ReactComponentInfo providers"
 
+# TODO: ReactComponentInfo.js_entry is only consumed for layout / route
+# components (react_app_manifest reads it to generate lazy import paths).
+# react_app's generated `_router` and `_main` react_component targets still
+# fill it with bogus values that nobody reads. Consider splitting the rule
+# so non-layout/non-route targets don't need an entry, or making js_entry
+# optional on ReactComponentInfo.
+
 load(":providers.bzl", "ReactComponentInfo", "StylexInfo")
 
 def _react_library_impl(ctx):

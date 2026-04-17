@@ -2,11 +2,11 @@ load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("//devtools/build/react_component:react_app.bzl", "react_app", "route")
 load("//devtools/build/react_component:react_component.bzl", "react_component")
+load("//devtools/build/react_component:stylex_library.bzl", "stylex_library")
 
-react_component(
+stylex_library(
     name = "tokens",
     srcs = ["tokens.stylex.ts"],
-    _export_test = False,
     visibility = ["//examples/stylex:__subpackages__"],
 )
 

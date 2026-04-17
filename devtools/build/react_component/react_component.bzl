@@ -1,34 +1,13 @@
 "React component macro with Babel + StyleX transpilation for Bazel"
 
-load("@aspect_rules_js//js:defs.bzl", "js_run_binary", "js_test")
+load("@aspect_rules_js//js:defs.bzl", "js_test")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
-load("@bazel_lib//lib:copy_file.bzl", "copy_file")
-load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load(":labels.bzl", "is_node_module", "ts_dep")
 load(":react_library.bzl", "react_library")
+load(":stylex_transpile.bzl", "stylex_transpile")
 
 _DEFAULT_TSCONFIG = "//:tsconfig"
-
-def _is_node_module(dep):
-    """Check if a dep is a node_modules label."""
-    return "node_modules" in dep
-
-def _ts_dep(dep):
-    """Map a component dep to its ts_project target name."""
-    if _is_node_module(dep):
-        return dep
-    if dep.startswith("//"):
-        # Cross-package: "//examples/stylex/pages:Home" -> "//examples/stylex/pages:Home_ts"
-        if ":" in dep:
-            return dep + "_ts"
-        else:
-            return dep + ":" + dep.split("/")[-1] + "_ts"
-    # Same package: ":Button" -> ":Button_ts"
-    return dep + "_ts"
-
-def _lib_dep(dep):
-    """Map a component dep to its react_library target (unchanged — it's the public name)."""
-    return dep
 
 def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export_test = True, **kwargs):
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.
@@ -51,15 +30,15 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
     """
 
     # Separate component deps from node_module deps
-    component_deps = [d for d in deps if not _is_node_module(d)]
-    ts_deps = [_ts_dep(d) for d in deps]
+    component_deps = [d for d in deps if not is_node_module(d)]
+    ts_deps = [ts_dep(d) for d in deps]
 
     ts_project(
         name = name + "_ts",
         srcs = srcs,
         declaration = True,
         source_map = True,
-        transpiler = lambda **transpiler_kwargs: _stylex_transpiler(
+        transpiler = lambda **transpiler_kwargs: stylex_transpile(
             stylex_deps = ts_deps,
             **transpiler_kwargs
         ),
@@ -83,7 +62,7 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
         js_outs = [name + "_ts"],
         metadata = [name + "_ts_transpile_stylex_metadata"],
         entry_name = entry_name,
-        deps = [_lib_dep(d) for d in component_deps],
+        deps = component_deps,
         **{k: v for k, v in kwargs.items() if k == "visibility" or k == "tags"}
     )
 
@@ -122,82 +101,3 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
         entry_point = name + "_export_test.mjs",
     )
 
-def _stylex_transpiler(name, srcs, out_dir = None, resolve_json = False, stylex_deps = [], **kwargs):
-    """Internal transpiler adapter for ts_project. Do not use directly."""
-    outs = []
-    metadata_outs = []
-
-    for idx, src in enumerate(srcs):
-        # Copy JSON files through without transpilation
-        if resolve_json and src.endswith(".json"):
-            if out_dir:
-                copy_file(
-                    name = "{}_{}".format(name, idx),
-                    src = src,
-                    out = "%s/%s" % (out_dir, src),
-                )
-            else:
-                copy_to_bin(
-                    name = "{}_{}".format(name, idx),
-                    srcs = [src],
-                )
-            outs.append(":{}_{}".format(name, idx))
-            continue
-
-        # Skip declaration files — tsc handles those
-        if src.endswith(".d.ts") or src.endswith(".d.mts"):
-            continue
-
-        if not (src.endswith(".ts") or src.endswith(".tsx") or src.endswith(".mts")):
-            fail("react_component transpiler supports .[m]ts, .tsx, or .json files, found: %s" % src)
-
-        out_pre = "%s/" % out_dir if out_dir else ""
-
-        # Predict output paths
-        js_out = out_pre + src.replace(".mts", ".mjs").replace(".tsx", ".js").replace(".ts", ".js")
-        map_out = js_out + ".map"
-        metadata_out = out_pre + src.replace(".mts", ".mjs.stylex.json").replace(".tsx", ".stylex.json").replace(".ts", ".stylex.json")
-
-        args = [
-            "$(location {})".format(src),
-            "--out-file",
-            "$(location {})".format(js_out),
-            "--metadata-file",
-            "$(location {})".format(metadata_out),
-        ]
-
-        # Include dep outputs so the StyleX Babel plugin can resolve defineVars
-        # imports (e.g. ./tokens.stylex) across targets
-        tool_srcs = [
-            src,
-        ] + stylex_deps + [
-            "//:node_modules/@babel/core",
-            "//:node_modules/@babel/preset-typescript",
-            "//:node_modules/@babel/preset-react",
-            "//:node_modules/@stylexjs/babel-plugin",
-        ]
-
-        js_run_binary(
-            name = "{}_{}".format(name, idx),
-            srcs = tool_srcs,
-            outs = [js_out, map_out, metadata_out],
-            args = args,
-            tool = "//devtools/build/react_component:stylex_transpile_bin",
-            **kwargs
-        )
-
-        outs.append(js_out)
-        outs.append(map_out)
-        metadata_outs.append(metadata_out)
-
-    # The filegroup that ts_project() references for JS outputs
-    native.filegroup(
-        name = name,
-        srcs = outs,
-    )
-
-    # Metadata filegroup for CSS collection
-    native.filegroup(
-        name = name + "_stylex_metadata",
-        srcs = metadata_outs,
-    )

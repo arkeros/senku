@@ -4,17 +4,10 @@ load("@aspect_rules_esbuild//esbuild:defs.bzl", "esbuild")
 load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
 load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("//devtools/build/js:devserver.bzl", "devserver")
+load(":labels.bzl", "ts_dep")
 load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
 load(":stylex_css.bzl", "stylex_css")
-
-def _to_ts(label):
-    """Map a react_component label to its internal _ts target."""
-    if label.startswith("//"):
-        if ":" in label:
-            return label + "_ts"
-        return label + ":" + label.split("/")[-1] + "_ts"
-    return label + "_ts"
 
 def route(path, component = None, children = None):
     """Define a route mapping a URL path to a react_component target.
@@ -151,7 +144,7 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
     )
 
     # esbuild and devserver need _ts targets (which carry JsInfo)
-    all_ts_targets = [_to_ts(c) for c in all_route_components]
+    all_ts_targets = [ts_dep(c) for c in all_route_components]
 
     # Production bundle
     esbuild(
