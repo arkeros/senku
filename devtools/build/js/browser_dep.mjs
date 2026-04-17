@@ -145,6 +145,9 @@ for (const f of [absOutputJs, absOutputManifest]) {
 if (isESM && !forceBundle) {
   // Find the node_modules root to compute serve paths
   const nodeModulesIdx = resolved.indexOf("/node_modules/");
+  if (nodeModulesIdx === -1) {
+    throw new Error(`Expected resolved path to contain /node_modules/: ${resolved}`);
+  }
   const nodeModulesRoot = resolved.substring(0, nodeModulesIdx + "/node_modules/".length);
   const entryServePath = "/node_modules/" + relative(nodeModulesRoot, resolved);
 
