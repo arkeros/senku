@@ -4,7 +4,7 @@ import { Link } from "react-router";
 const styles = stylex.create({
   heading: { fontSize: 24, fontWeight: 700, marginBottom: 16 },
   list: { display: "flex", flexDirection: "column", gap: 8 },
-  link: { color: "royalblue", textDecoration: "none" },
+  link: { color: "royalblue", textDecoration: "underline" },
 });
 
 export function ConcertsHome() {
