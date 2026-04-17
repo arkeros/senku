@@ -1,24 +1,25 @@
 import * as stylex from "@stylexjs/stylex";
 import { Link, Outlet } from "react-router";
+import { color, font, size } from "./tokens.stylex";
 
 const styles = stylex.create({
   layout: {
-    fontFamily: "system-ui, sans-serif",
+    fontFamily: font.sans,
     minHeight: "100vh",
   },
   nav: {
     display: "flex",
-    gap: 16,
-    padding: 16,
-    borderBottom: "1px solid #e0e0e0",
+    gap: size.s,
+    padding: size.s,
+    borderBottom: `1px solid ${color.border}`,
   },
   link: {
-    color: "royalblue",
+    color: color.primary,
     textDecoration: "none",
-    fontWeight: 500,
+    fontWeight: font.weight5,
   },
   content: {
-    padding: 24,
+    padding: size.m,
   },
 });
 

@@ -1,8 +1,9 @@
 import * as stylex from "@stylexjs/stylex";
+import { color, font, size } from "../../tokens.stylex";
 
 const styles = stylex.create({
-  heading: { fontSize: 24, fontWeight: 700, marginBottom: 16 },
-  text: { fontSize: 16, lineHeight: 1.6, color: "#444" },
+  heading: { fontSize: font.size4, fontWeight: font.weight7, marginBottom: size.s },
+  text: { fontSize: font.size2, lineHeight: font.lineHeight3, color: color.textMuted },
 });
 
 export function Trending() {

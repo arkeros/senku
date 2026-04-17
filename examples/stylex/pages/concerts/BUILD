@@ -11,10 +11,14 @@ react_component(
 react_component(
     name = "City",
     srcs = ["City.tsx"],
-    deps = ["//:node_modules/react-router"],
+    deps = [
+        "//:node_modules/react-router",
+        "//examples/stylex:tokens",
+    ],
 )
 
 react_component(
     name = "Trending",
     srcs = ["Trending.tsx"],
+    deps = ["//examples/stylex:tokens"],
 )

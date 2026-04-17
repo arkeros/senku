@@ -11,4 +11,5 @@ react_component(
 react_component(
     name = "About",
     srcs = ["About.tsx"],
+    deps = ["//examples/stylex:tokens"],
 )

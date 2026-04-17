@@ -20,7 +20,10 @@ react_component(
 react_component(
     name = "Layout",
     srcs = ["Layout.tsx"],
-    deps = ["//:node_modules/react-router"],
+    deps = [
+        ":tokens",
+        "//:node_modules/react-router",
+    ],
 )
 
 react_app(

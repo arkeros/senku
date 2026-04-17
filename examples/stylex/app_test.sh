@@ -32,7 +32,8 @@ echo "=== CSS tests ==="
 grep -q 'cursor:pointer' "$CSS" || { echo "FAIL: missing Button cursor style"; exit 1; }
 grep -q 'border-radius' "$CSS" || { echo "FAIL: missing Button border-radius"; exit 1; }
 grep -q 'min-height:100vh' "$CSS" || { echo "FAIL: missing Layout min-height"; exit 1; }
-grep -q 'font-family:system-ui' "$CSS" || { echo "FAIL: missing Layout font-family"; exit 1; }
+grep -q 'font-family:var(' "$CSS" || { echo "FAIL: missing Layout font-family rule"; exit 1; }
+grep -q -- '--font-sans' "$CSS" || { echo "FAIL: missing --font-sans from Open Props (token chain broken)"; exit 1; }
 grep -q 'text-decoration:none' "$CSS" || { echo "FAIL: missing link text-decoration"; exit 1; }
 echo "PASS: css"
 
