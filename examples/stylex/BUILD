@@ -21,6 +21,7 @@ react_component(
 react_component(
     name = "Layout",
     srcs = ["Layout.tsx"],
+    assets = ["panallet_logo.png"],
     deps = [
         ":tokens",
         "//:node_modules/react-router",
