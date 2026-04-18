@@ -105,6 +105,12 @@ bzl_library(
 )
 
 bzl_library(
+    name = "output_group_test",
+    testonly = True,
+    deps = ["@bazel_skylib//rules:build_test"],
+)
+
+bzl_library(
     name = "labels",
     srcs = ["labels.bzl"],
 )
