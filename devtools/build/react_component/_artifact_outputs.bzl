@@ -21,7 +21,11 @@ artifact_outputs = rule(
     implementation = _artifact_outputs_impl,
     attrs = {
         "js_outs": attr.label_list(allow_files = True, doc = "JS outputs from ts_project"),
-        "metadata": attr.label_list(allow_files = True, doc = ".stylex.json metadata files"),
+        "metadata": attr.label_list(
+            allow_files = True,
+            default = [],
+            doc = ".stylex.json metadata files (empty for non-StyleX rules like asset_library)",
+        ),
         "deps": attr.label_list(doc = "Dependency targets (traversed by collection aspects)"),
     },
 )
