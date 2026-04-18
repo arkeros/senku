@@ -17,8 +17,8 @@ def _hash_assets_impl(ctx):
     if not ctx.files.srcs:
         fail("_hash_assets: srcs must not be empty (target %s)" % ctx.label)
 
-    tree = ctx.actions.declare_directory(ctx.label.name + "_assets")
-    manifest = ctx.actions.declare_file(ctx.label.name + "_assets.manifest.json")
+    tree = ctx.actions.declare_directory(ctx.label.name + "_dir")
+    manifest = ctx.actions.declare_file(ctx.label.name + ".manifest.json")
 
     args = ctx.actions.args()
     args.add("--out-dir", tree.path)

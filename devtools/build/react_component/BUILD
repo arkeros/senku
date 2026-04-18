@@ -1,4 +1,4 @@
-load("@aspect_rules_js//js:defs.bzl", "js_binary")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_test")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -39,6 +39,19 @@ js_binary(
         "//:node_modules/postcss-jit-props",
     ],
     entry_point = "postcss_jit.mjs",
+)
+
+# Asset codegen: reads a hash_and_copy manifest and emits <Component>.assets.ts
+# with typed URL consts. Identifier derivation rules live here.
+js_binary(
+    name = "asset_codegen_bin",
+    entry_point = "asset_codegen.mjs",
+)
+
+js_test(
+    name = "asset_codegen_test",
+    data = ["asset_codegen.mjs"],
+    entry_point = "asset_codegen_test.mjs",
 )
 
 exports_files(["index.html.tpl"])
@@ -117,6 +130,11 @@ bzl_library(
 bzl_library(
     name = "_hash_assets",
     srcs = ["_hash_assets.bzl"],
+)
+
+bzl_library(
+    name = "asset_codegen",
+    srcs = ["asset_codegen.bzl"],
 )
 
 bzl_library(
