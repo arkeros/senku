@@ -30,10 +30,11 @@ def _asset_pipeline_impl(ctx):
     if len(trees) != len(manifests):
         fail("asset_pipeline: collected %d trees but %d manifests; hash_assets should emit pairs" % (len(trees), len(manifests)))
 
-    # The tree output is pre-declared via the rule's `outputs` template so
-    # it's referenceable as a label from other rules (e.g. `data` deps on
-    # js_binary). declare_file/declare_directory in-impl does NOT create
-    # a target-level label — consumers would see "missing input file".
+    # Only the manifest is pre-declared via the rule's `outputs` template,
+    # so it gets a separate output label (`:%{name}.json`). The asset tree
+    # is declared in the implementation and returned in DefaultInfo, which
+    # still makes it a valid output of this target, but not as a distinct
+    # sibling label such as `:target_flat` unless exposed separately.
     manifest = ctx.outputs.manifest
     flat_dir = ctx.actions.declare_directory(ctx.label.name + "_flat")
 
