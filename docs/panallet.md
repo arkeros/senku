@@ -323,8 +323,13 @@ react_app(
 
 Three artifacts are generated:
 
-- `:{name}_env_tpl` — `env.js.tpl` with `${KEY}` placeholders. The OCI image runs
+- `:{name}_env_tpl` — `env.js.tpl` with `${KEY_B64}` placeholders. The OCI image runs
   `envsubst` on container start to materialize real values before nginx serves `/env.js`.
+  Each placeholder is decoded at runtime with `atob`, so the container must set
+  `KEY_B64` to the base64-encoding of the desired UTF-8 value
+  (e.g. `API_URL_B64="$(printf '%s' "$API_URL" | base64 -w0)"`). This indirection
+  keeps substituted bytes inside the base64 alphabet (`[A-Za-z0-9+/=]`), so values
+  containing `"`, newlines, or `</script>` cannot corrupt the script or inject code.
 - `:{name}_env_dev` — `env.js` with dev defaults baked in. The devserver serves it at
   `/env.js` and injects a `<script>` tag before the main bundle.
 - `:{name}_env_component` — `react_component` wrapping a generated `{name}_env.ts` that
