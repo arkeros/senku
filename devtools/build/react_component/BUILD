@@ -62,6 +62,12 @@ js_binary(
     entry_point = "asset_manifest_merge.mjs",
 )
 
+js_test(
+    name = "asset_manifest_merge_test",
+    data = ["asset_manifest_merge.mjs"],
+    entry_point = "asset_manifest_merge_test.mjs",
+)
+
 exports_files(["index.html.tpl"])
 
 bzl_library(
