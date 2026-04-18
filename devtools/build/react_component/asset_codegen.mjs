@@ -61,7 +61,8 @@ export function deriveIdentifier(basename) {
   return ident + "Url";
 }
 
-function generate(manifest, urlPrefix) {
+export function generate(manifest, urlPrefix) {
+  const normalizedPrefix = urlPrefix.endsWith("/") ? urlPrefix : urlPrefix + "/";
   const entries = Object.entries(manifest).sort(([a], [b]) => (a < b ? -1 : 1));
   const byIdent = new Map();
   const lines = ["// generated — do not edit", ""];
@@ -76,7 +77,7 @@ function generate(manifest, urlPrefix) {
       );
     }
     byIdent.set(ident, original);
-    lines.push(`export const ${ident}: string = ${JSON.stringify(urlPrefix + hashed)};`);
+    lines.push(`export const ${ident}: string = ${JSON.stringify(normalizedPrefix + hashed)};`);
   }
   return lines.join("\n") + "\n";
 }

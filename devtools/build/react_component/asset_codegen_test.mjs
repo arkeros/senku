@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { deriveIdentifier } from "./asset_codegen.mjs";
+import { deriveIdentifier, generate } from "./asset_codegen.mjs";
 
 test("deriveIdentifier: camelCase on hyphen", () => {
   assert.equal(deriveIdentifier("icon-large.png"), "iconLargeUrl");
@@ -40,4 +40,14 @@ test("deriveIdentifier: distinct stems produce distinct identifiers", () => {
   // Regression guard for the collision path — ensures different extensions
   // on the same stem DO collide (feature, not bug).
   assert.equal(deriveIdentifier("logo.svg"), deriveIdentifier("logo.png"));
+});
+
+test("generate: urlPrefix missing trailing slash is normalized", () => {
+  const out = generate({ "logo.svg": "logo.abc123.svg" }, "/assets");
+  assert.match(out, /"\/assets\/logo\.abc123\.svg"/);
+});
+
+test("generate: urlPrefix with trailing slash is preserved", () => {
+  const out = generate({ "logo.svg": "logo.abc123.svg" }, "/assets/");
+  assert.match(out, /"\/assets\/logo\.abc123\.svg"/);
 });
