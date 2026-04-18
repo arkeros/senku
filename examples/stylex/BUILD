@@ -28,6 +28,24 @@ react_component(
     ],
 )
 
+react_component(
+    name = "AppError",
+    srcs = ["AppError.tsx"],
+    deps = [
+        ":tokens",
+        "//:node_modules/react-router",
+    ],
+)
+
+react_component(
+    name = "RouteError",
+    srcs = ["RouteError.tsx"],
+    deps = [
+        ":tokens",
+        "//:node_modules/react-router",
+    ],
+)
+
 react_app(
     name = "app",
     browser_deps = [
@@ -37,6 +55,7 @@ react_app(
         "//devtools/build/js:set_cookie_parser",
         "//devtools/build/js:stylex",
     ],
+    error_component = ":AppError",
     html_template = "index.html.tpl",
     jit_open_props = True,
     layout = ":Layout",
@@ -47,6 +66,7 @@ react_app(
         ),
         route(
             component = "//examples/stylex/pages:About",
+            error_component = ":RouteError",
             path = "about",
         ),
         route(
@@ -65,6 +85,10 @@ react_app(
                 ),
             ],
             path = "concerts",
+        ),
+        route(
+            component = "//examples/stylex/pages:NotFound",
+            path = "*",
         ),
     ],
 )
