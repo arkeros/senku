@@ -28,50 +28,74 @@ const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
 const manifest = JSON.parse(readFileSync(resolve(execroot, manifestFile), "utf-8"));
 const routerModuleName = "./" + outRouter.split("/").pop().replace(/\.tsx$/, "");
 
+// Collect error components as top-of-file static imports. Error boundaries
+// must be synchronously available — if a lazy Component fails to load, a
+// lazy errorElement could fail the same way and mask the real error.
+const errorImports = new Map(); // name -> relative import path
+function collectErrorImports(routes) {
+  for (const r of routes) {
+    if (r.error_name) errorImports.set(r.error_name, r.error_import);
+    if (r.children) collectErrorImports(r.children);
+  }
+}
+if (manifest.layout.error_name) {
+  errorImports.set(manifest.layout.error_name, manifest.layout.error_import);
+}
+collectErrorImports(manifest.routes);
+
+const errorImportLines = Array.from(errorImports.entries())
+  .map(([name, path]) => `import { ${name} } from "${path}";`)
+  .join("\n");
+
 // Generate lazy route objects recursively
 function generateRoute(route, indent) {
   const pad = " ".repeat(indent);
+  const props = [];
 
   if (route.path === "/") {
-    // Index route
-    if (route.import) {
-      return `${pad}{ index: true, lazy: () => import("${route.import}").then(m => ({ Component: m.${route.name} })) }`;
-    }
-    return `${pad}{ index: true }`;
+    props.push("index: true");
+  } else {
+    props.push(`path: "${route.path}"`);
   }
 
-  const parts = [`${pad}{ path: "${route.path}"`];
-
   if (route.import) {
-    parts[0] += `, lazy: () => import("${route.import}").then(m => ({ Component: m.${route.name} }))`;
+    props.push(`lazy: () => import("${route.import}").then(m => ({ Component: m.${route.name} }))`);
+  }
+
+  if (route.error_name) {
+    props.push(`errorElement: <${route.error_name} />`);
   }
 
   if (route.children && route.children.length > 0) {
-    parts[0] += `, children: [`;
+    const lines = [`${pad}{ ${props.join(", ")}, children: [`];
     for (let i = 0; i < route.children.length; i++) {
-      parts.push(generateRoute(route.children[i], indent + 2));
-      if (i < route.children.length - 1) {
-        parts[parts.length - 1] += ",";
-      }
+      const childLine = generateRoute(route.children[i], indent + 2);
+      lines.push(i < route.children.length - 1 ? childLine + "," : childLine);
     }
-    parts.push(`${pad}]`);
+    lines.push(`${pad}] }`);
+    return lines.join("\n");
   }
 
-  parts[parts.length - 1] += " }";
-  return parts.join("\n");
+  return `${pad}{ ${props.join(", ")} }`;
 }
 
 const routeEntries = manifest.routes.map((r) => generateRoute(r, 6));
 const layout = manifest.layout;
 
-// router.tsx — lazy imports only, no static imports needed
-const routerCode = `import { createBrowserRouter } from "react-router";
+const layoutErrorLine = layout.error_name
+  ? `    errorElement: <${layout.error_name} />,\n`
+  : "";
 
+const errorImportsBlock = errorImportLines ? errorImportLines + "\n" : "";
+
+// router.tsx — lazy imports for route components, static imports for error boundaries
+const routerCode = `import { createBrowserRouter } from "react-router";
+${errorImportsBlock}
 export const router = createBrowserRouter([
   {
     path: "/",
     lazy: () => import("${layout.import}").then(m => ({ Component: m.${layout.name} })),
-    children: [
+${layoutErrorLine}    children: [
 ${routeEntries.join(",\n")},
     ],
   },

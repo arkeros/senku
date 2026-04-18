@@ -11,22 +11,30 @@ load(":react_component.bzl", "react_component")
 load(":route_tree.bzl", "walk_route_tree")
 load(":stylex_css.bzl", "stylex_css")
 
-def route(path, component = None, children = None):
+def route(path, component = None, children = None, error_component = None):
     """Define a route mapping a URL path to a react_component target.
 
     Args:
-        path: URL path (e.g. "/", "about", ":city")
+        path: URL path (e.g. "/", "about", ":city"). `"*"` is a catch-all
+            (rendered when no other route matches — use for 404 pages).
         component: label of a react_component target (optional for grouping routes)
         children: list of nested route() dicts (optional)
+        error_component: label of a react_component target rendered when this
+            route (or any descendant without its own error_component) throws.
+            Compiles to React Router's `errorElement`. The component is
+            statically imported at the top of the generated router so it is
+            available even when a lazy Component import fails.
     """
     r = {"path": path}
     if component:
         r["component"] = component
     if children:
         r["children"] = children
+    if error_component:
+        r["error_component"] = error_component
     return r
 
-def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_template = None, **kwargs):
+def react_app(name, layout, routes, browser_deps, error_component = None, jit_open_props = False, html_template = None, **kwargs):
     """Build a React application with Starlark-defined routes and lazy loading.
 
     Routes are defined in BUILD files and compiled to React Router's
@@ -46,6 +54,9 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
         layout: label of the root layout react_component (renders <Outlet />)
         routes: list of route() dicts (supports nesting)
         browser_deps: list of browser_dep labels for the devserver
+        error_component: optional label of a react_component rendered when the
+            layout or any route without its own error_component throws. Acts as
+            the app-wide error boundary.
         html_template: optional custom HTML template (defaults to built-in)
         **kwargs: passed through to downstream targets (e.g. visibility, tags)
     """
@@ -55,21 +66,27 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
     ordered_components = []
 
     def _collect(r):
-        if "component" not in r:
-            return {}
-        idx = len(ordered_components)
-        ordered_components.append(r["component"])
-        return {"component_idx": idx}
+        fields = {}
+        if "component" in r:
+            fields["component_idx"] = len(ordered_components)
+            ordered_components.append(r["component"])
+        if "error_component" in r:
+            fields["error_component_idx"] = len(ordered_components)
+            ordered_components.append(r["error_component"])
+        return fields
 
     flat_routes = walk_route_tree(routes, _collect)
 
     all_route_components = [layout] + ordered_components
+    if error_component:
+        all_route_components = all_route_components + [error_component]
 
     # Generate route manifest — looks up .js entries from each target's DefaultInfo
     manifest_name = name + "_manifest"
     react_app_manifest(
         name = manifest_name,
         layout = layout,
+        layout_error_component = error_component,
         route_components = ordered_components,
         route_config = json.encode(flat_routes),
     )

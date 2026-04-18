@@ -13,3 +13,12 @@ react_component(
     srcs = ["About.tsx"],
     deps = ["//examples/stylex:tokens"],
 )
+
+react_component(
+    name = "NotFound",
+    srcs = ["NotFound.tsx"],
+    deps = [
+        "//:node_modules/react-router",
+        "//examples/stylex:tokens",
+    ],
+)

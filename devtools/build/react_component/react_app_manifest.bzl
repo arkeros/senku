@@ -61,21 +61,30 @@ def _react_app_manifest_impl(ctx):
             return "./" + rel + "/" + file_base if rel else "./" + file_base
 
     def _enrich(r):
-        if "component_idx" not in r:
-            return {}
-        idx = r["component_idx"]
-        return {
-            "import": _rel_path(route_js[idx]),
-            "name": route_names[idx],
-        }
+        fields = {}
+        if "component_idx" in r:
+            idx = r["component_idx"]
+            fields["import"] = _rel_path(route_js[idx])
+            fields["name"] = route_names[idx]
+        if "error_component_idx" in r:
+            idx = r["error_component_idx"]
+            fields["error_import"] = _rel_path(route_js[idx])
+            fields["error_name"] = route_names[idx]
+        return fields
 
     enriched_routes = walk_route_tree(route_config, _enrich)
 
+    layout_entry = {
+        "import": _rel_path(layout_js),
+        "name": layout_name,
+    }
+    if ctx.attr.layout_error_component:
+        err_target = ctx.attr.layout_error_component
+        layout_entry["error_import"] = _rel_path(_find_js_entry(err_target))
+        layout_entry["error_name"] = err_target.label.name
+
     manifest = {
-        "layout": {
-            "import": _rel_path(layout_js),
-            "name": layout_name,
-        },
+        "layout": layout_entry,
         "routes": enriched_routes,
     }
 
@@ -92,6 +101,9 @@ react_app_manifest = rule(
         "layout": attr.label(
             mandatory = True,
             doc = "The layout react_component target",
+        ),
+        "layout_error_component": attr.label(
+            doc = "Optional react_component rendered as the app-wide errorElement on the layout route",
         ),
         "route_components": attr.label_list(
             doc = "Ordered list of route react_component targets (indexed by route_config)",

@@ -14,6 +14,15 @@ grep -q 'createBrowserRouter' "$ROUTER" || { echo "FAIL: missing createBrowserRo
 grep -q 'path: "concerts"' "$ROUTER" || { echo "FAIL: missing concerts route"; exit 1; }
 grep -q 'path: ":city"' "$ROUTER" || { echo "FAIL: missing :city param route"; exit 1; }
 grep -q 'Component: m.Layout' "$ROUTER" || { echo "FAIL: missing Layout component reference"; exit 1; }
+# errorElement + 404 support (#94). JSX compiles <Name /> to _jsx(Name, {}),
+# so assert on the compiled form here — the source shape is covered by the
+# router_ts typecheck test.
+grep -q 'import { AppError }' "$ROUTER" || { echo "FAIL: missing AppError static import"; exit 1; }
+grep -q 'import { RouteError }' "$ROUTER" || { echo "FAIL: missing RouteError static import"; exit 1; }
+grep -q 'errorElement: .*_jsx(AppError' "$ROUTER" || { echo "FAIL: missing app-level errorElement"; exit 1; }
+grep -q 'errorElement: .*_jsx(RouteError' "$ROUTER" || { echo "FAIL: missing route-level errorElement"; exit 1; }
+grep -q 'path: "\*"' "$ROUTER" || { echo "FAIL: missing 404 catch-all path"; exit 1; }
+grep -q 'import("./pages/NotFound")' "$ROUTER" || { echo "FAIL: missing NotFound lazy import"; exit 1; }
 echo "PASS: router"
 
 # Test generated main entry point
