@@ -155,7 +155,7 @@ createServer((req, res) => {
   }
 
   if (envJs && url === "/env.js") {
-    res.writeHead(200, { "Content-Type": "application/javascript" });
+    res.writeHead(200, { "Content-Type": mimeFor(".js") });
     res.end(envJs);
     return;
   }
