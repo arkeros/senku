@@ -5,8 +5,10 @@ groups via the matching `*_aspect` in _artifact_aspect.bzl — no
 per-kind provider, no per-kind wrapper rule. See the design note in
 _artifact_aspect.bzl for the broader picture.
 
-Today only the `stylex_metadata` group is wired. When #95 (assets)
-lands, the rule gains an `assets` attr and exposes a second group.
+This rule directly exposes the `stylex_metadata` output group. Asset
+handling is already wired separately via dependency traversal and
+aspects (for example `hash_assets`), rather than through an `assets`
+attr on `artifact_outputs`.
 """
 
 def _artifact_outputs_impl(ctx):
