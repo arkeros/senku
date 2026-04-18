@@ -9,6 +9,7 @@ load(":labels.bzl", "ts_dep")
 load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
 load(":route_tree.bzl", "walk_route_tree")
+load(":runtime_config.bzl", "runtime_config_artifacts", "validate_runtime_config")
 load(":stylex_css.bzl", "stylex_css")
 
 def route(path, component = None, children = None, error_component = None):
@@ -34,7 +35,7 @@ def route(path, component = None, children = None, error_component = None):
         r["error_component"] = error_component
     return r
 
-def react_app(name, layout, routes, browser_deps, error_component = None, jit_open_props = False, html_template = None, **kwargs):
+def react_app(name, layout, routes, browser_deps, error_component = None, jit_open_props = False, html_template = None, runtime_config = None, **kwargs):
     """Build a React application with Starlark-defined routes and lazy loading.
 
     Routes are defined in BUILD files and compiled to React Router's
@@ -48,6 +49,8 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
       - :{name}_bundle — production esbuild bundle
       - :{name}_styles — collected StyleX CSS (transitive via stylex_metadata_aspect)
       - :{name}_html — production index.html
+      - :{name}_env_tpl / :{name}_env_dev / :{name}_env_component — when
+        `runtime_config` is set (see arg docs)
 
     Args:
         name: target name prefix
@@ -58,8 +61,24 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
             layout or any route without its own error_component throws. Acts as
             the app-wide error boundary.
         html_template: optional custom HTML template (defaults to built-in)
+        runtime_config: optional `{UPPER_SNAKE: dev_default}` dict declaring
+            environment-specific string values (API_URL, feature flags) that
+            differ across deployments without rebuilding the bundle. In prod,
+            a `${KEY}`-templated `env.js` ships for envsubst-at-container-start;
+            in dev the devserver synthesizes `env.js` from the defaults. App
+            code depends on `:{name}_env_component` and imports a typed
+            `getEnv` helper — undeclared keys fail `tsc`. See
+            `runtime_config.bzl`.
         **kwargs: passed through to downstream targets (e.g. visibility, tags)
     """
+
+    if runtime_config:
+        validate_runtime_config(runtime_config)
+        runtime_config_artifacts(
+            name = name,
+            runtime_config = runtime_config,
+            forward_kwargs = {k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")},
+        )
 
     # Flatten route tree: collect ordered component list and build
     # index-based route config for the manifest rule. Dedupe by label so a
@@ -165,13 +184,15 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     # HTML template
     tpl_name = html_template or "//devtools/build/react_component:index.html.tpl"
 
-    # Production HTML
+    # When runtime_config is set, the `/env.js` bootstrap must load before the
+    # main bundle so `window.__ENV__` is set before any module script runs.
+    env_script_tag = '<script src="/env.js"></script>' if runtime_config else ""
     expand_template(
         name = name + "_html",
         out = name + "_index.html",
         substitutions = {
             "{{HEAD}}": '<link rel="stylesheet" href="/{}_styles.css" />'.format(name),
-            "{{SCRIPTS}}": '<script src="/{}_bundle.js"></script>'.format(name),
+            "{{SCRIPTS}}": '{}<script src="/{}_bundle.js"></script>'.format(env_script_tag, name),
         },
         template = tpl_name,
         **kwargs
@@ -209,5 +230,6 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         css = ":" + name + "_styles",
         assets_manifest = ":" + name + "_assets.json",
         assets_dir = ":" + name + "_assets",
+        runtime_config_dev = (":" + name + "_env_dev") if runtime_config else None,
         **kwargs
     )

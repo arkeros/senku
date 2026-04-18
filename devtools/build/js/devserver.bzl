@@ -3,7 +3,7 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary")
 load("@bazel_lib//lib:copy_file.bzl", "copy_file")
 
-def devserver(name, entry_point, components, browser_deps, html_template, css, entry_js = None, assets_manifest = None, assets_dir = None, **kwargs):
+def devserver(name, entry_point, components, browser_deps, html_template, css, entry_js = None, assets_manifest = None, assets_dir = None, runtime_config_dev = None, **kwargs):
     """Dev server that serves React components as unbundled ESM with import maps.
 
     Uses pre-built browser_dep targets (defined once, shared across apps)
@@ -25,6 +25,10 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, e
             URL → runfiles path for content-hashed static assets.
         assets_dir: optional label pointing at the flat assets TreeArtifact
             (sibling to `assets_manifest`). Must be set together with it.
+        runtime_config_dev: optional label of a `_env_dev.js` artifact from
+            react_app's runtime_config. When set, the devserver serves its
+            contents at `/env.js` and injects a `<script>` tag before the
+            main bundle, matching the production bootstrap order.
         **kwargs: passed through to js_binary (e.g. visibility, tags)
     """
     # Collect manifest files and node_modules deps from browser_dep targets.
@@ -57,6 +61,12 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, e
     elif assets_manifest or assets_dir:
         fail("devserver: assets_manifest and assets_dir must be set together")
 
+    runtime_config_args = []
+    runtime_config_data = []
+    if runtime_config_dev:
+        runtime_config_args = ["--runtime-config", "$(location {})".format(runtime_config_dev)]
+        runtime_config_data = [runtime_config_dev]
+
     if not entry_js:
         entry_js = entry_point.lstrip(":") + ".js" if entry_point.startswith(":") else entry_point + ".js"
 
@@ -84,8 +94,8 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, e
             "$(location {})".format(css),
             "--html",
             "$(location :{})".format(html_copy),
-        ] + manifest_args + asset_args,
-        data = components + dep_data + asset_data + [
+        ] + manifest_args + asset_args + runtime_config_args,
+        data = components + dep_data + asset_data + runtime_config_data + [
             css,
             ":" + html_copy,
             entry_js,

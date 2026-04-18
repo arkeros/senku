@@ -29,7 +29,7 @@ function mimeFor(ext) {
 
 // Parse args
 const args = process.argv.slice(2);
-let jsDirArg, cssFile, htmlFile, assetsManifestArg, assetsDirArg, port = 3000;
+let jsDirArg, cssFile, htmlFile, assetsManifestArg, assetsDirArg, runtimeConfigArg, port = 3000;
 const manifestFiles = [];
 
 for (let i = 0; i < args.length; i++) {
@@ -40,6 +40,7 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--manifest") manifestFiles.push(args[++i]);
   else if (args[i] === "--assets-manifest") assetsManifestArg = args[++i];
   else if (args[i] === "--assets-dir") assetsDirArg = args[++i];
+  else if (args[i] === "--runtime-config") runtimeConfigArg = args[++i];
 }
 
 if (!jsDirArg || !cssFile || !htmlFile) {
@@ -129,13 +130,18 @@ if (assetsManifestArg && assetsDirArg) {
   }
 }
 
+// Load runtime_config bootstrap (/env.js). Set window.__ENV__ before any
+// module script runs so getEnv() reads populated values on first render.
+const envJs = runtimeConfigArg ? readFileSync(resolve(runfiles, runtimeConfigArg), "utf-8") : null;
+
 // Build index.html with import map
 const originalHtml = readFileSync(htmlFile, "utf-8");
 const mapJson = JSON.stringify({ imports: importMap }, null, 2);
 const mapTag = `<script type="importmap">\n${mapJson}\n</script>`;
+const envTag = envJs ? '<script src="/env.js"></script>\n    ' : "";
 const indexHtml = originalHtml
   .replace("{{HEAD}}", `<link rel="stylesheet" href="/${cssFile.split("/").pop()}" />`)
-  .replace("{{SCRIPTS}}", `${mapTag}\n    <script type="module" src="/${entryFile}"></script>`);
+  .replace("{{SCRIPTS}}", `${envTag}${mapTag}\n    <script type="module" src="/${entryFile}"></script>`);
 
 // Reads are intentionally synchronous for simplicity — this is a dev server,
 // not a production one, so the overhead doesn't matter.
@@ -145,6 +151,12 @@ createServer((req, res) => {
   if (url === "/" || url === "/index.html") {
     res.writeHead(200, { "Content-Type": "text/html" });
     res.end(indexHtml);
+    return;
+  }
+
+  if (envJs && url === "/env.js") {
+    res.writeHead(200, { "Content-Type": "application/javascript" });
+    res.end(envJs);
     return;
   }
 

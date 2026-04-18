@@ -87,11 +87,21 @@ bzl_library(
         ":react_app_manifest",
         ":react_component",
         ":route_tree",
+        ":runtime_config",
         ":stylex_css",
         "//devtools/build/js:devserver",
         "@aspect_rules_esbuild//esbuild:defs",
         "@aspect_rules_js//js:defs",
         "@bazel_lib//lib:expand_template",
+    ],
+)
+
+bzl_library(
+    name = "runtime_config",
+    srcs = ["runtime_config.bzl"],
+    deps = [
+        ":react_component",
+        "@bazel_skylib//rules:write_file",
     ],
 )
 
