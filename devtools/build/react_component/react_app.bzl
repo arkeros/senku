@@ -72,7 +72,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         **kwargs: passed through to downstream targets (e.g. visibility, tags)
     """
 
-    if runtime_config:
+    if runtime_config != None:
         validate_runtime_config(runtime_config)
         runtime_config_artifacts(
             name = name,
@@ -186,7 +186,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
 
     # When runtime_config is set, the `/env.js` bootstrap must load before the
     # main bundle so `window.__ENV__` is set before any module script runs.
-    env_script_tag = '<script src="/env.js"></script>' if runtime_config else ""
+    env_script_tag = '<script src="/env.js"></script>' if runtime_config != None else ""
     expand_template(
         name = name + "_html",
         out = name + "_index.html",
@@ -230,6 +230,6 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         css = ":" + name + "_styles",
         assets_manifest = ":" + name + "_assets.json",
         assets_dir = ":" + name + "_assets",
-        runtime_config_dev = (":" + name + "_env_dev") if runtime_config else None,
+        runtime_config_dev = (":" + name + "_env_dev") if runtime_config != None else None,
         **kwargs
     )

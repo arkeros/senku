@@ -26,9 +26,11 @@ def _is_key_rest(ch):
     return ch in _ALPHA_UPPER.elems() or ch in _DIGITS.elems() or ch == "_"
 
 def validate_runtime_config(cfg):
-    """Fails with a clear message if cfg is not `{UPPER_SNAKE: string}`."""
+    """Fails with a clear message if cfg is not a non-empty `{UPPER_SNAKE: string}`."""
     if type(cfg) != "dict":
         fail("runtime_config must be a dict, got {}".format(type(cfg)))
+    if not cfg:
+        fail("runtime_config must not be empty; omit the argument to disable runtime config entirely")
     for k, v in cfg.items():
         if type(k) != "string" or not k:
             fail("runtime_config: keys must be non-empty strings, got {}".format(k))
