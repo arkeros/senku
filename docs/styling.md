@@ -23,8 +23,8 @@ plugin produces two outputs per file:
 This split is what makes StyleX Bazel-native. The metadata file is a build
 artifact that can be:
 
-- Collected transitively via `StylexInfo` providers (Button's styles flow
-  through Home → Button deps automatically)
+- Collected transitively via the `stylex_metadata_aspect` walking `deps`
+  (Button's styles flow through Home → Button deps automatically)
 - Merged by `stylex_css` into a single stylesheet using `processStylexRules()`
 - Produced in a single Babel pass alongside the JS output (no double compilation)
 
@@ -90,8 +90,8 @@ the recommendation from Naman Goel (StyleX's creator at Meta) in
   optimization: inline a small route-specific CSS, then background-load the
   full stylesheet for instant subsequent navigations.
 
-Our transitive collection via `StylexInfo` depsets produces exactly the
-"single unified CSS file" the article advocates for.
+Our transitive collection via the `stylex_metadata_aspect` produces exactly
+the "single unified CSS file" the article advocates for.
 
 ## The tradeoff
 
