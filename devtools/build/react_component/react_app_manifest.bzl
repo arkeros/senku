@@ -1,5 +1,7 @@
 "Rule that generates a route manifest from component targets"
 
+load(":route_tree.bzl", "walk_route_tree")
+
 def _find_js_entry(target):
     """Return the .js File in target's DefaultInfo whose basename is {name}.js.
 
@@ -58,26 +60,16 @@ def _react_app_manifest_impl(ctx):
                 rel = rel + "/" + downs if rel else downs
             return "./" + rel + "/" + file_base if rel else "./" + file_base
 
-    # Enrich route config with actual import paths (iterative)
-    enriched_routes = []
-    stack = [(route_config, enriched_routes)]
-    for _ in range(1000):
-        if not stack:
-            break
-        routes_in, routes_out = stack.pop()
-        for r in routes_in:
-            entry = {"path": r["path"]}
-            if "component_idx" in r:
-                idx = r["component_idx"]
-                entry["import"] = _rel_path(route_js[idx])
-                entry["name"] = route_names[idx]
-            if "children" in r:
-                entry["children"] = []
-                stack.append((r["children"], entry["children"]))
-            routes_out.append(entry)
+    def _enrich(r):
+        if "component_idx" not in r:
+            return {}
+        idx = r["component_idx"]
+        return {
+            "import": _rel_path(route_js[idx]),
+            "name": route_names[idx],
+        }
 
-    if stack:
-        fail("Route tree too deep (exceeded 1000 iterations). Simplify route structure or increase limit.")
+    enriched_routes = walk_route_tree(route_config, _enrich)
 
     manifest = {
         "layout": {

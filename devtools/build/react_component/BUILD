@@ -77,6 +77,7 @@ bzl_library(
         ":labels",
         ":react_app_manifest",
         ":react_component",
+        ":route_tree",
         ":stylex_css",
         "//devtools/build/js:devserver",
         "@aspect_rules_esbuild//esbuild:defs",
@@ -149,6 +150,12 @@ bzl_library(
 )
 
 bzl_library(
+    name = "react_app_manifest",
+    srcs = ["react_app_manifest.bzl"],
+    deps = [":route_tree"],
+)
+
+bzl_library(
     name = "_artifact_aspect",
     srcs = ["_artifact_aspect.bzl"],
 )
@@ -174,6 +181,6 @@ bzl_library(
 )
 
 bzl_library(
-    name = "react_app_manifest",
-    srcs = ["react_app_manifest.bzl"],
+    name = "route_tree",
+    srcs = ["route_tree.bzl"],
 )

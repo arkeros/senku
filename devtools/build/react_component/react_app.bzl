@@ -8,6 +8,7 @@ load(":asset_pipeline.bzl", "asset_pipeline")
 load(":labels.bzl", "ts_dep")
 load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
+load(":route_tree.bzl", "walk_route_tree")
 load(":stylex_css.bzl", "stylex_css")
 
 def route(path, component = None, children = None):
@@ -50,26 +51,17 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
     """
 
     # Flatten route tree: collect ordered component list and build
-    # index-based route config for the manifest rule (iterative — Starlark
-    # doesn't allow recursion)
+    # index-based route config for the manifest rule.
     ordered_components = []
-    flat_routes = []
-    stack = [(routes, flat_routes)]
-    for _ in range(1000):
-        if not stack:
-            break
-        route_list, output = stack.pop()
-        for r in route_list:
-            entry = {"path": r["path"]}
-            if "component" in r:
-                entry["component_idx"] = len(ordered_components)
-                ordered_components.append(r["component"])
-            if "children" in r:
-                entry["children"] = []
-                stack.append((r["children"], entry["children"]))
-            output.append(entry)
-    if stack:
-        fail("route tree flattening exceeded 1000 iterations; route manifest would be truncated")
+
+    def _collect(r):
+        if "component" not in r:
+            return {}
+        idx = len(ordered_components)
+        ordered_components.append(r["component"])
+        return {"component_idx": idx}
+
+    flat_routes = walk_route_tree(routes, _collect)
 
     all_route_components = [layout] + ordered_components
 
