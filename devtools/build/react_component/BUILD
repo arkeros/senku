@@ -115,6 +115,11 @@ bzl_library(
 )
 
 bzl_library(
+    name = "_hash_assets",
+    srcs = ["_hash_assets.bzl"],
+)
+
+bzl_library(
     name = "labels",
     srcs = ["labels.bzl"],
 )
