@@ -3,11 +3,18 @@
 _MAX_DEPTH = 1000
 
 def walk_route_tree(routes, visit):
-    """Walk routes in pre-order, producing a parallel tree.
+    """Walk routes iteratively, producing a parallel tree.
+
+    Parent entries are created before any of their descendants, but this is not
+    a strict depth-first pre-order traversal: all siblings in the current input
+    list are processed before descending into children, and because pending
+    child lists are stored on a LIFO stack, the last sibling's children are
+    processed first.
 
     For each input route dict, the returned tree contains {"path": r["path"]}
     merged with whatever fields `visit(r)` returns. If the input route has
-    "children", they are recursed into and attached as "children" on the output.
+    "children", they are iteratively processed and attached as "children" on
+    the output.
 
     Args:
         routes: list of route dicts (each must have "path")
