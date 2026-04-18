@@ -4,10 +4,10 @@ Walks `components` via the `assets_aspect` + `asset_manifest_aspect` to
 collect every hashed asset tree + per-leaf manifest reachable through
 `deps`. Produces:
 
-  - `<name>/` — a single flat TreeArtifact with all hashed asset files,
+  - `<name>_flat/` — a single flat TreeArtifact with all hashed asset files,
     ready to be served at `/assets/` or copied into a prod bundle.
   - `<name>.json` — devserver manifest mapping URL path → filename under
-    `<name>/` (consumed by `devserver.mjs`).
+    `<name>_flat/` (consumed by `devserver.mjs`).
 
 Mirrors the browser_dep_group shape (manifest + sibling directory),
 so the devserver can treat asset serving uniformly with npm-dep serving.
