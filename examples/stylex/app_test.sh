@@ -65,7 +65,10 @@ echo "=== Runtime config tests ==="
 grep -q 'window\.__ENV__ = {' "$ENV_DEV" || { echo "FAIL: dev env.js missing window.__ENV__ init"; exit 1; }
 grep -q '"API_URL": "http://localhost:8080"' "$ENV_DEV" || { echo "FAIL: dev env.js missing API_URL literal"; exit 1; }
 grep -q 'window\.__ENV__ = {' "$ENV_TPL" || { echo "FAIL: env.js.tpl missing window.__ENV__ init"; exit 1; }
-grep -q '"API_URL": "\${API_URL}"' "$ENV_TPL" || { echo "FAIL: env.js.tpl missing \${API_URL} placeholder"; exit 1; }
+# Prod placeholder is base64-wrapped — the base64 alphabet is inert inside a JS string literal,
+# so operator-supplied values cannot break out of the quotes or inject script.
+grep -qF '"API_URL": atob("${API_URL_B64}")' "$ENV_TPL" \
+  || { echo "FAIL: env.js.tpl missing atob(\${API_URL_B64}) placeholder"; exit 1; }
 echo "PASS: runtime config"
 
 # Asset pipeline: devserver manifest + hashed file in the flat dir.
