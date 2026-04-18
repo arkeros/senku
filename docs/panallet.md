@@ -302,6 +302,68 @@ expand_template(
 )
 ```
 
+### Runtime Config
+
+Values that differ per *deployment* (API URLs, feature flags, tenant IDs) ride a separate
+channel from the bundle. The goal is one bundle artifact that promotes across environments
+— dev, QA, preprod, prod — without rebuilding.
+
+Declare them on `react_app`:
+
+```python
+react_app(
+    name = "app",
+    ...,
+    runtime_config = {
+        "API_URL": "http://localhost:8080",   # dev default
+        "FEATURE_X": "false",
+    },
+)
+```
+
+Three artifacts are generated:
+
+- `:{name}_env_tpl` — `env.js.tpl` with `${KEY}` placeholders. The OCI image runs
+  `envsubst` on container start to materialize real values before nginx serves `/env.js`.
+- `:{name}_env_dev` — `env.js` with dev defaults baked in. The devserver serves it at
+  `/env.js` and injects a `<script>` tag before the main bundle.
+- `:{name}_env_component` — `react_component` wrapping a generated `{name}_env.ts` that
+  exports a typed `getEnv(key)`. The literal key union comes from the Starlark dict,
+  so undeclared keys fail `tsc`.
+
+App code:
+
+```tsx
+// examples/stylex/pages/Home.tsx
+import { getEnv } from "../app_env";
+
+export function Home() {
+  return <p>API: {getEnv("API_URL")}</p>;
+  // getEnv("TYPO") — TS2345: not assignable to "API_URL"
+}
+```
+
+```python
+# examples/stylex/pages/BUILD
+react_component(
+    name = "Home",
+    srcs = ["Home.tsx"],
+    deps = ["//examples/stylex:app_env_component"],
+)
+```
+
+Both dev and prod load `/env.js` before the bundle, so `window.__ENV__` is populated
+before any React render. Script ordering is enforced by the expand_template substitution
+and by the devserver injection.
+
+Scope rule: env reads belong in app-owned components, not cross-app shared libraries.
+The generated helper is per-`react_app`, so there's no monorepo-wide `getEnv` for shared
+code to import — shared components should take config as props.
+
+Distinct from build-time defines (#97): `runtime_config` is for values that change
+across *deployments* without rebuilding. Build-time defines (`NODE_ENV` for React's
+prod DCE, etc.) are a separate mechanism baked into the bundle.
+
 ## File Layout
 
 ```
@@ -319,6 +381,7 @@ devtools/build/react_component/  — React + StyleX specifics
 ├── react_app.bzl                — macro: route() + react_app()
 ├── react_app_codegen.mjs        — script: generates {name}_router.tsx + {name}_main.tsx
 ├── react_component.bzl          — macro: wraps ts_project with Babel transpiler
+├── runtime_config.bzl           — macro: env.js.tpl + env_dev.js + typed getEnv helper
 ├── stylex_css.bzl               — macro: collect StyleX CSS
 ├── stylex_transpile.mjs         — script: Babel single-pass transpilation
 ├── stylex_collect_css.mjs       — script: merge .stylex.json → .css
