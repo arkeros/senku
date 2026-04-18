@@ -27,6 +27,9 @@ js_binary(
 # Route codegen: generates router.tsx + main.tsx from route manifest
 js_binary(
     name = "react_app_codegen_bin",
+    data = [
+        "//:node_modules/ramda",
+    ],
     entry_point = "react_app_codegen.mjs",
 )
 

@@ -9,6 +9,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import * as R from "ramda";
 
 const args = process.argv.slice(2);
 let manifestFile, outRouter, outMain;
@@ -28,54 +29,55 @@ const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
 const manifest = JSON.parse(readFileSync(resolve(execroot, manifestFile), "utf-8"));
 const routerModuleName = "./" + outRouter.split("/").pop().replace(/\.tsx$/, "");
 
-// Collect error components as top-of-file static imports. Error boundaries
-// must be synchronously available — if a lazy Component fails to load, a
-// lazy errorElement could fail the same way and mask the real error.
+// Error boundaries must be statically imported — a lazy boundary risks the
+// same failure that triggered it, masking the real error. We resolve each
+// (importPath, name) to a locally unique identifier in a single pass, then
+// look it up during route generation; the manifest is never mutated.
 //
-// Two different packages may export the same error-component name (manifest
-// uses the component's exported identifier, which is not globally unique).
-// Key by (importPath, name) and alias same-named imports to a locally unique
-// identifier so they can coexist in the generated router module.
-const errorImports = new Map(); // `${path}\0${name}` -> { name, path, localName }
+// Two packages may export error components with the same name (manifest uses
+// the exported identifier, which isn't globally unique). First seen wins the
+// original identifier; later (path, name) entries are aliased with a
+// path-derived suffix.
 
-function makeErrorImportKey(importPath, name) {
-  return `${importPath}\0${name}`;
-}
+const toIdentifierSuffix = R.pipe(
+  R.replace(/[^A-Za-z0-9_$]+/g, "_"),
+  R.replace(/^([^A-Za-z_$])/, "_$1"),
+);
 
-function toIdentifierSuffix(value) {
-  return value.replace(/[^A-Za-z0-9_$]+/g, "_").replace(/^([^A-Za-z_$])/, "_$1");
-}
+const hasErrorRef = (r) => Boolean(r.error_name && r.error_import);
+const errorKey = (r) => `${r.error_import}\0${r.error_name}`;
 
-function getErrorImportLocalName(importPath, name) {
-  const key = makeErrorImportKey(importPath, name);
-  const existing = errorImports.get(key);
-  if (existing) return existing.localName;
+// Depth-first flatten of the nested route tree.
+const flattenRoutes = R.chain((r) =>
+  r.children ? [r, ...flattenRoutes(r.children)] : [r],
+);
 
-  let localName = name;
-  if (Array.from(errorImports.values()).some((entry) => entry.localName === localName)) {
-    localName = `${name}__${toIdentifierSuffix(importPath)}`;
-  }
+// All error-component references in traversal order (layout first).
+const collectErrorRefs = (m) =>
+  R.filter(hasErrorRef, [m.layout, ...flattenRoutes(m.routes)]);
 
-  errorImports.set(key, { name, path: importPath, localName });
-  return localName;
-}
+// Resolve (path, name) -> { path, name, localName }, aliasing collisions.
+const buildErrorImportTable = R.pipe(
+  R.uniqBy(errorKey),
+  (refs) =>
+    R.mapAccum(
+      (seen, ref) => {
+        const { error_import: path, error_name: name } = ref;
+        const localName = seen.has(name)
+          ? `${name}__${toIdentifierSuffix(path)}`
+          : name;
+        return [new Set(seen).add(name), [errorKey(ref), { path, name, localName }]];
+      },
+      new Set(),
+      refs,
+    )[1],
+  (entries) => new Map(entries),
+);
 
-function collectErrorImports(routes) {
-  for (const r of routes) {
-    if (r.error_name && r.error_import) {
-      r.error_name = getErrorImportLocalName(r.error_import, r.error_name);
-    }
-    if (r.children) collectErrorImports(r.children);
-  }
-}
+const errorImports = buildErrorImportTable(collectErrorRefs(manifest));
 
-if (manifest.layout.error_name && manifest.layout.error_import) {
-  manifest.layout.error_name = getErrorImportLocalName(
-    manifest.layout.error_import,
-    manifest.layout.error_name,
-  );
-}
-collectErrorImports(manifest.routes);
+const resolveErrorLocalName = (path, name) =>
+  errorImports.get(`${path}\0${name}`).localName;
 
 const errorImportLines = Array.from(errorImports.values())
   .map(({ name, path, localName }) =>
@@ -100,8 +102,9 @@ function generateRoute(route, indent) {
     props.push(`lazy: () => import("${route.import}").then(m => ({ Component: m.${route.name} }))`);
   }
 
-  if (route.error_name) {
-    props.push(`errorElement: <${route.error_name} />`);
+  if (hasErrorRef(route)) {
+    const localName = resolveErrorLocalName(route.error_import, route.error_name);
+    props.push(`errorElement: <${localName} />`);
   }
 
   if (route.children && route.children.length > 0) {
@@ -120,8 +123,8 @@ function generateRoute(route, indent) {
 const routeEntries = manifest.routes.map((r) => generateRoute(r, 6));
 const layout = manifest.layout;
 
-const layoutErrorLine = layout.error_name
-  ? `    errorElement: <${layout.error_name} />,\n`
+const layoutErrorLine = hasErrorRef(layout)
+  ? `    errorElement: <${resolveErrorLocalName(layout.error_import, layout.error_name)} />,\n`
   : "";
 
 const errorImportsBlock = errorImportLines ? errorImportLines + "\n" : "";
