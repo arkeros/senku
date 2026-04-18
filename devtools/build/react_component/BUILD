@@ -118,6 +118,17 @@ bzl_library(
 )
 
 bzl_library(
+    name = "asset_library",
+    srcs = ["asset_library.bzl"],
+    deps = [
+        ":_artifact_outputs",
+        ":_hash_assets",
+        ":asset_codegen",
+        "@aspect_rules_ts//ts:defs",
+    ],
+)
+
+bzl_library(
     name = "_artifact_aspect",
     srcs = ["_artifact_aspect.bzl"],
 )
