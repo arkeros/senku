@@ -52,7 +52,21 @@ echo "=== HTML tests ==="
 
 grep -q 'app_bundle.js' "$HTML" || { echo "FAIL: missing bundle script tag"; exit 1; }
 grep -q 'app_styles.css' "$HTML" || { echo "FAIL: missing stylesheet link"; exit 1; }
+# runtime_config: /env.js must precede the bundle so window.__ENV__ is set before module eval.
+grep -qE '<script src="/env\.js"></script><script src="/app_bundle\.js">' "$HTML" \
+  || { echo "FAIL: /env.js script tag missing or not ordered before app_bundle"; exit 1; }
 echo "PASS: html"
+
+# Runtime config bootstraps: dev has literal default, prod has ${VAR} placeholder.
+ENV_DEV="examples/stylex/app_env_dev.js"
+ENV_TPL="examples/stylex/app_env.js.tpl"
+echo "=== Runtime config tests ==="
+
+grep -q 'window\.__ENV__ = {' "$ENV_DEV" || { echo "FAIL: dev env.js missing window.__ENV__ init"; exit 1; }
+grep -q '"API_URL": "http://localhost:8080"' "$ENV_DEV" || { echo "FAIL: dev env.js missing API_URL literal"; exit 1; }
+grep -q 'window\.__ENV__ = {' "$ENV_TPL" || { echo "FAIL: env.js.tpl missing window.__ENV__ init"; exit 1; }
+grep -q '"API_URL": "\${API_URL}"' "$ENV_TPL" || { echo "FAIL: env.js.tpl missing \${API_URL} placeholder"; exit 1; }
+echo "PASS: runtime config"
 
 # Asset pipeline: devserver manifest + hashed file in the flat dir.
 # Locks in the #95 acceptance — the asset flows end-to-end.

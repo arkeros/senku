@@ -92,6 +92,9 @@ react_app(
             path = "*",
         ),
     ],
+    runtime_config = {
+        "API_URL": "http://localhost:8080",
+    },
 )
 
 build_test(
@@ -103,6 +106,9 @@ build_test(
         ":app_styles",
         ":app_html",
         ":app_devserver",
+        ":app_env_tpl",
+        ":app_env_dev",
+        ":app_env_component",
     ],
 )
 
@@ -112,6 +118,8 @@ sh_test(
     data = [
         ":app_assets",
         ":app_assets.json",
+        ":app_env_dev",
+        ":app_env_tpl",
         ":app_html",
         ":app_main_ts",
         ":app_router_ts",
