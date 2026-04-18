@@ -95,8 +95,7 @@ sh_test(
 )
 
 # Locks in that react_component exposes StyleX metadata via OutputGroupInfo —
-# the generic path that asset collection and other build-time metadata will
-# share. Fails today; goes green when _artifact_aspect/_artifact_outputs land.
+# the generic path that asset collection and other build-time metadata share.
 require_output_group_test(
     name = "button_stylex_output_group_test",
     group = "stylex_metadata",
