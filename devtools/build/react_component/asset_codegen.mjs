@@ -13,6 +13,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import * as R from "ramda";
 
 // rules_js' js_binary wrapper cds into bazel-bin but exposes the execroot
 // via this env var — paths from Bazel args are relative to execroot, so
@@ -61,24 +62,46 @@ export function deriveIdentifier(basename) {
   return ident + "Url";
 }
 
+const enrichEntry = ([original, hashed]) => ({
+  original,
+  hashed,
+  ident: deriveIdentifier(original),
+});
+
+// Returns the first ident with more than one originating filename, or
+// undefined if every ident is unique. Groups preserve insertion order, so the
+// returned originals are in the same order as the sorted input.
+const findCollision = R.pipe(
+  R.groupBy(R.prop("ident")),
+  R.toPairs,
+  R.find(([, items]) => items.length > 1),
+);
+
+const emitLine = (normalizedPrefix) => ({ ident, hashed }) =>
+  `export const ${ident}: string = ${JSON.stringify(normalizedPrefix + hashed)};`;
+
 export function generate(manifest, urlPrefix) {
   const normalizedPrefix = urlPrefix.endsWith("/") ? urlPrefix : urlPrefix + "/";
-  const entries = Object.entries(manifest).sort(([a], [b]) => (a < b ? -1 : 1));
-  const byIdent = new Map();
-  const lines = ["// generated — do not edit", ""];
+  const enriched = R.pipe(
+    R.toPairs,
+    R.sortBy(R.head),
+    R.map(enrichEntry),
+  )(manifest);
 
-  for (const [original, hashed] of entries) {
-    const ident = deriveIdentifier(original);
-    const existing = byIdent.get(ident);
-    if (existing) {
-      throw new Error(
-        `asset_codegen: identifier collision — "${existing}" and "${original}" both produce "${ident}". ` +
-          "Rename one or give the files distinct stems.",
-      );
-    }
-    byIdent.set(ident, original);
-    lines.push(`export const ${ident}: string = ${JSON.stringify(normalizedPrefix + hashed)};`);
+  const collision = findCollision(enriched);
+  if (collision) {
+    const [ident, items] = collision;
+    throw new Error(
+      `asset_codegen: identifier collision — "${items[0].original}" and "${items[1].original}" both produce "${ident}". ` +
+        "Rename one or give the files distinct stems.",
+    );
   }
+
+  const lines = [
+    "// generated — do not edit",
+    "",
+    ...R.map(emitLine(normalizedPrefix), enriched),
+  ];
   return lines.join("\n") + "\n";
 }
 

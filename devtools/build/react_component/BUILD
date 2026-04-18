@@ -48,12 +48,18 @@ js_binary(
 # with typed URL consts. Identifier derivation rules live here.
 js_binary(
     name = "asset_codegen_bin",
+    data = [
+        "//:node_modules/ramda",
+    ],
     entry_point = "asset_codegen.mjs",
 )
 
 js_test(
     name = "asset_codegen_test",
-    data = ["asset_codegen.mjs"],
+    data = [
+        "asset_codegen.mjs",
+        "//:node_modules/ramda",
+    ],
     entry_point = "asset_codegen_test.mjs",
 )
 
