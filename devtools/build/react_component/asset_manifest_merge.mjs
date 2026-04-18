@@ -30,7 +30,7 @@ import { resolve, join } from "node:path";
 
 const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const out = { outDir: null, manifest: null, urlPrefix: "/assets/", pairs: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -45,6 +45,7 @@ function parseArgs(argv) {
   }
   if (!out.outDir) throw new Error("asset_manifest_merge: --out-dir is required");
   if (!out.manifest) throw new Error("asset_manifest_merge: --manifest is required");
+  if (!out.urlPrefix.endsWith("/")) out.urlPrefix += "/";
   return out;
 }
 
@@ -84,4 +85,7 @@ function main() {
   writeFileSync(resolve(execroot, args.manifest), JSON.stringify(out, null, 2) + "\n");
 }
 
-main();
+// Only run when invoked as a script (not when imported by tests).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}
