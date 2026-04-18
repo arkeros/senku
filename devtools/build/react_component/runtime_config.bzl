@@ -2,13 +2,25 @@
 
 Emits three targets from an `{KEY: dev_default}` dict:
 
-  * `:{name}_env_tpl`      — env.js.tpl with `${KEY}` placeholders for
-                              envsubst-at-container-start in prod images
+  * `:{name}_env_tpl`      — env.js.tpl with `${KEY_B64}` placeholders for
+                              envsubst-at-container-start in prod images.
+                              Each value is expected to arrive as base64 and
+                              is decoded at runtime with `atob`; base64's
+                              alphabet (`[A-Za-z0-9+/=]`) cannot break the
+                              surrounding JS string literal, so values may
+                              contain arbitrary bytes — including `"`,
+                              newlines, or `</script>` — without corrupting
+                              the script or enabling injection.
   * `:{name}_env_dev`      — env.js with literal dev defaults for the devserver
   * `:{name}_env_component` — react_component wrapping a generated typed
                               getEnv() helper; the key union is derived from
                               the dict so `getEnv("TYPO")` is a TS compile
                               error
+
+Deploy contract: for each runtime_config key `KEY`, the container must set
+env var `KEY_B64` to the base64-encoding of the desired UTF-8 value
+(e.g. `API_URL_B64="$(printf '%s' "$API_URL" | base64 -w0)"`). Unset vars
+become empty strings.
 
 See `react_app(runtime_config = ...)`.
 """
@@ -54,7 +66,12 @@ def _env_js_lines(cfg, dev):
         if dev:
             lines.append("  \"{}\": \"{}\"{}".format(k, _js_string_escape(cfg[k]), sep))
         else:
-            lines.append("  \"{}\": \"${{{}}}\"{}".format(k, k, sep))
+            # Prod: operator supplies `${KEY}_B64` as base64(UTF-8 value). The
+            # base64 alphabet [A-Za-z0-9+/=] is inert inside a JS string
+            # literal, so envsubst cannot produce invalid syntax or inject
+            # script even if the decoded value contains `"`, newlines, or
+            # `</script>`.
+            lines.append("  \"{}\": atob(\"${{{}_B64}}\"){}".format(k, k, sep))
     lines.append("};")
     lines.append("")
     return lines
