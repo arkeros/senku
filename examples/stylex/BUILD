@@ -85,6 +85,8 @@ sh_test(
     name = "app_test",
     srcs = ["app_test.sh"],
     data = [
+        ":app_assets",
+        ":app_assets.json",
         ":app_html",
         ":app_main_ts",
         ":app_router_ts",

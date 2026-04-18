@@ -45,4 +45,16 @@ grep -q 'app_bundle.js' "$HTML" || { echo "FAIL: missing bundle script tag"; exi
 grep -q 'app_styles.css' "$HTML" || { echo "FAIL: missing stylesheet link"; exit 1; }
 echo "PASS: html"
 
+# Asset pipeline: devserver manifest + hashed file in the flat dir.
+# Locks in the #95 acceptance — the asset flows end-to-end.
+ASSETS_MANIFEST="examples/stylex/app_assets.json"
+ASSETS_DIR="examples/stylex/app_assets_flat"
+echo "=== Asset pipeline tests ==="
+
+grep -q '"type": "assets"' "$ASSETS_MANIFEST" || { echo "FAIL: manifest missing type field"; exit 1; }
+grep -qE '"/assets/panallet_logo\.[0-9a-f]{12}\.png"' "$ASSETS_MANIFEST" || { echo "FAIL: manifest missing hashed logo URL"; exit 1; }
+HASHED=$(grep -oE 'panallet_logo\.[0-9a-f]{12}\.png' "$ASSETS_MANIFEST" | head -1)
+[ -f "$ASSETS_DIR/$HASHED" ] || { echo "FAIL: hashed logo file $HASHED not in $ASSETS_DIR"; exit 1; }
+echo "PASS: asset pipeline (hashed as $HASHED)"
+
 echo "All tests passed."
