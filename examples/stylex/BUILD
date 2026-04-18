@@ -1,5 +1,6 @@
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load("//devtools/build/react_component:output_group_test.bzl", "require_output_group_test")
 load("//devtools/build/react_component:react_app.bzl", "react_app", "route")
 load("//devtools/build/react_component:react_component.bzl", "react_component")
 load("//devtools/build/react_component:stylex_library.bzl", "stylex_library")
@@ -88,4 +89,19 @@ sh_test(
         ":app_router_ts",
         ":app_styles",
     ],
+)
+
+# Locks in that react_component exposes StyleX metadata via OutputGroupInfo —
+# the generic path that asset collection and other build-time metadata will
+# share. Fails today; goes green when _artifact_aspect/_artifact_outputs land.
+require_output_group_test(
+    name = "button_stylex_output_group_test",
+    group = "stylex_metadata",
+    target = ":Button",
+)
+
+require_output_group_test(
+    name = "tokens_stylex_output_group_test",
+    group = "stylex_metadata",
+    target = ":tokens",
 )
