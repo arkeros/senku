@@ -1,14 +1,15 @@
 "Rule to collect StyleX metadata transitively and generate a CSS stylesheet"
 
-load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
-load(":providers.bzl", "StylexInfo")
+load(":_artifact_aspect.bzl", "StylexMetadataCollection", "stylex_metadata_aspect")
 
 def _stylex_css_impl(ctx):
-    # Collect metadata transitively from all components via StylexInfo
+    # Collect metadata transitively via the output-group aspect. Each
+    # visited target contributes its own .stylex.json files via
+    # OutputGroupInfo(stylex_metadata=...); the aspect walks deps.
     all_metadata = depset(transitive = [
-        dep[StylexInfo].metadata
+        dep[StylexMetadataCollection].files
         for dep in ctx.attr.components
-        if StylexInfo in dep
+        if StylexMetadataCollection in dep
     ])
     metadata_files = all_metadata.to_list()
 
@@ -60,7 +61,8 @@ stylex_css = rule(
     implementation = _stylex_css_impl,
     attrs = {
         "components": attr.label_list(
-            doc = "react_component targets (StylexInfo collected transitively)",
+            aspects = [stylex_metadata_aspect],
+            doc = "react_component / stylex_library targets (stylex metadata collected transitively via aspect)",
         ),
         "jit_open_props": attr.bool(
             default = False,

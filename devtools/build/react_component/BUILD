@@ -101,13 +101,18 @@ bzl_library(
 bzl_library(
     name = "stylex_css",
     srcs = ["stylex_css.bzl"],
-    deps = ["@aspect_rules_js//js:defs"],
+    deps = [":_artifact_aspect"],
 )
 
 bzl_library(
     name = "output_group_test",
     testonly = True,
     deps = ["@bazel_skylib//rules:build_test"],
+)
+
+bzl_library(
+    name = "_artifact_aspect",
+    srcs = ["_artifact_aspect.bzl"],
 )
 
 bzl_library(
