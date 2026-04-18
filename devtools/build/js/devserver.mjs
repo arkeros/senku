@@ -15,31 +15,17 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, extname, dirname, resolve, sep } from "node:path";
+import mime from "mime";
 
-const MIME = {
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "application/javascript",
-  ".mjs": "application/javascript",
-  ".map": "application/json",
-  ".json": "application/json",
-  // Images and fonts served from /assets/ — without these the browser
-  // gets application/octet-stream and refuses to render/load.
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".gif": "image/gif",
-  ".ico": "image/x-icon",
-  ".avif": "image/avif",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-  ".ttf": "font/ttf",
-  ".otf": "font/otf",
-  ".mp4": "video/mp4",
-  ".webm": "video/webm",
-};
+// .mjs is served from the same origin as .js; `mime` returns
+// "text/javascript" for both by default which is what modern browsers
+// want. .map is JSON. For anything the user drops into an asset_library
+// that mime doesn't know, we fall back to application/octet-stream —
+// acceptable because the browser will still download it, just not
+// render it inline.
+function mimeFor(ext) {
+  return mime.getType(ext) || "application/octet-stream";
+}
 
 // Parse args
 const args = process.argv.slice(2);
@@ -155,7 +141,7 @@ createServer((req, res) => {
   // Serve dep files (bundled CJS or raw ESM from node_modules)
   if (servedFiles[url]) {
     const ext = extname(url) || ".js";
-    res.writeHead(200, { "Content-Type": MIME[ext] || "application/javascript" });
+    res.writeHead(200, { "Content-Type": mimeFor(ext) });
     res.end(readFileSync(servedFiles[url]));
     return;
   }
@@ -187,7 +173,7 @@ createServer((req, res) => {
     if (jsPath !== jsDir && !jsPath.startsWith(jsDir + sep)) continue;
     if (existsSync(jsPath)) {
       const ext = extname(jsPath) || ".js";
-      res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
+      res.writeHead(200, { "Content-Type": mimeFor(ext) });
       res.end(readFileSync(jsPath));
       return;
     }

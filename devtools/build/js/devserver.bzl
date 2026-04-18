@@ -89,6 +89,7 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, e
             css,
             ":" + html_copy,
             entry_js,
+            "//:node_modules/mime",
         ],
         **kwargs
     )
