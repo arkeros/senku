@@ -93,6 +93,10 @@ the recommendation from Naman Goel (StyleX's creator at Meta) in
 Our transitive collection via the `stylex_metadata_aspect` produces exactly
 the "single unified CSS file" the article advocates for.
 
+For non-CSS assets (images, fonts, SVGs referenced via `<img src={...}>`),
+see [Static Assets](assets.md). Asset URLs inside CSS (`backgroundImage:
+"url('./hero.jpg')"`) are not supported — use the React-attribute form.
+
 ## The tradeoff
 
 StyleX forces us to use Babel for transpilation instead of esbuild (which is
