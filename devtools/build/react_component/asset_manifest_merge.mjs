@@ -62,6 +62,16 @@ function main() {
     const mf = JSON.parse(readFileSync(resolve(execroot, mfPath), "utf-8"));
     for (const [, hashed] of Object.entries(mf)) {
       const urlPath = args.urlPrefix + hashed;
+      // Re-insertion must be idempotent: same URL → same target filename.
+      // Anything else means a misconfiguration upstream (hash-length mismatch
+      // across leaves, wrong tree wired to a manifest, etc.) and the silent
+      // overwrite would mask it. Fail loudly instead.
+      if (Object.hasOwn(urls, urlPath) && urls[urlPath] !== hashed) {
+        throw new Error(
+          `asset_manifest_merge: URL ${urlPath} would be remapped from ${urls[urlPath]} to ${hashed}. ` +
+            `This usually means a hash-length or tree-wiring misconfiguration upstream.`,
+        );
+      }
       urls[urlPath] = hashed;
       if (!seen.has(hashed)) {
         copyFileSync(resolve(execroot, treeDir, hashed), join(absOutDir, hashed));

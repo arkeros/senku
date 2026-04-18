@@ -114,7 +114,17 @@ if (assetsManifestArg && assetsDirArg) {
   const assetsDir = resolve(runfiles, assetsDirArg);
   const assetsManifest = JSON.parse(readFileSync(assetsManifestPath, "utf-8"));
   for (const [urlPath, fileName] of Object.entries(assetsManifest.urls || {})) {
-    servedFiles[urlPath] = resolve(assetsDir, fileName);
+    // Defense-in-depth: the manifest is internally produced by asset_pipeline,
+    // not attacker input, but mirror the component-JS handler's containment
+    // check so a future misconfiguration — or an accidental absolute path in
+    // the manifest — can't escape the assets dir.
+    const filePath = resolve(assetsDir, fileName);
+    if (filePath !== assetsDir && !filePath.startsWith(assetsDir + sep)) {
+      throw new Error(
+        `devserver: asset manifest entry ${JSON.stringify(fileName)} resolves outside ${assetsDir}`,
+      );
+    }
+    servedFiles[urlPath] = filePath;
     assetCount++;
   }
 }
