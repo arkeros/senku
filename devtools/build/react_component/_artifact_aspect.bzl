@@ -40,6 +40,16 @@ StylexMetadataCollection = provider(
     fields = {"files": "depset of File"},
 )
 
+AssetsCollection = provider(
+    doc = "Hashed asset tree artifacts collected from the 'assets' output group across deps.",
+    fields = {"files": "depset of File"},
+)
+
+AssetManifestCollection = provider(
+    doc = "Per-leaf manifest files collected from the 'asset_manifest' output group across deps.",
+    fields = {"files": "depset of File"},
+)
+
 def _make_collect_impl(group, provider_obj):
     """Build an aspect implementation for the given OutputGroup name."""
 
@@ -64,5 +74,19 @@ _stylex_metadata_impl = _make_collect_impl("stylex_metadata", StylexMetadataColl
 
 stylex_metadata_aspect = aspect(
     implementation = _stylex_metadata_impl,
+    attr_aspects = ["deps"],
+)
+
+_assets_impl = _make_collect_impl("assets", AssetsCollection)
+
+assets_aspect = aspect(
+    implementation = _assets_impl,
+    attr_aspects = ["deps"],
+)
+
+_asset_manifest_impl = _make_collect_impl("asset_manifest", AssetManifestCollection)
+
+asset_manifest_aspect = aspect(
+    implementation = _asset_manifest_impl,
     attr_aspects = ["deps"],
 )

@@ -54,6 +54,14 @@ js_test(
     entry_point = "asset_codegen_test.mjs",
 )
 
+# App-level asset aggregator: merges per-leaf hash_assets manifests into
+# a single devserver manifest and copies every hashed file into one flat
+# directory siblings to the manifest.
+js_binary(
+    name = "asset_manifest_merge_bin",
+    entry_point = "asset_manifest_merge.mjs",
+)
+
 exports_files(["index.html.tpl"])
 
 bzl_library(
@@ -126,6 +134,12 @@ bzl_library(
         ":asset_codegen",
         "@aspect_rules_ts//ts:defs",
     ],
+)
+
+bzl_library(
+    name = "asset_pipeline",
+    srcs = ["asset_pipeline.bzl"],
+    deps = [":_artifact_aspect"],
 )
 
 bzl_library(

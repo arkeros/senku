@@ -4,6 +4,7 @@ load("@aspect_rules_esbuild//esbuild:defs.bzl", "esbuild")
 load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
 load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("//devtools/build/js:devserver.bzl", "devserver")
+load(":asset_pipeline.bzl", "asset_pipeline")
 load(":labels.bzl", "ts_dep")
 load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
@@ -130,6 +131,14 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
         jit_open_props = jit_open_props,
     )
 
+    # Aggregate hashed static assets across all route components:
+    #   :{name}_assets_flat  — flat TreeArtifact with all hashed files
+    #   :{name}_assets.json  — devserver manifest (URL → filename)
+    asset_pipeline(
+        name = name + "_assets",
+        components = all_route_components,
+    )
+
     # HTML template
     tpl_name = html_template or "//devtools/build/react_component:index.html.tpl"
 
@@ -148,7 +157,9 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
     # esbuild and devserver need _ts targets (which carry JsInfo)
     all_ts_targets = [ts_dep(c) for c in all_route_components]
 
-    # Production bundle
+    # Production bundle. Asset files ride as data so they end up in the
+    # bundle's runfiles; URLs are baked into JS by asset_codegen, so
+    # esbuild doesn't need to see the binaries directly.
     esbuild(
         name = name + "_bundle",
         entry_point = name + "_main.js",
@@ -160,6 +171,7 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
             "//:node_modules/react-router",
             "//:node_modules/@stylexjs/stylex",
         ],
+        data = [":" + name + "_assets"],
         **kwargs
     )
 
@@ -172,5 +184,7 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
         browser_deps = browser_deps,
         html_template = tpl_name,
         css = ":" + name + "_styles",
+        assets_manifest = ":" + name + "_assets.json",
+        assets_dir = ":" + name + "_assets",
         **kwargs
     )

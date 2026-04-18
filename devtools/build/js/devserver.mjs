@@ -22,11 +22,28 @@ const MIME = {
   ".js": "application/javascript",
   ".mjs": "application/javascript",
   ".map": "application/json",
+  ".json": "application/json",
+  // Images and fonts served from /assets/ — without these the browser
+  // gets application/octet-stream and refuses to render/load.
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".ico": "image/x-icon",
+  ".avif": "image/avif",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".otf": "font/otf",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
 };
 
 // Parse args
 const args = process.argv.slice(2);
-let jsDirArg, cssFile, htmlFile, port = 3000;
+let jsDirArg, cssFile, htmlFile, assetsManifestArg, assetsDirArg, port = 3000;
 const manifestFiles = [];
 
 for (let i = 0; i < args.length; i++) {
@@ -35,6 +52,8 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--html") htmlFile = args[++i];
   else if (args[i] === "--port") port = parseInt(args[++i], 10);
   else if (args[i] === "--manifest") manifestFiles.push(args[++i]);
+  else if (args[i] === "--assets-manifest") assetsManifestArg = args[++i];
+  else if (args[i] === "--assets-dir") assetsDirArg = args[++i];
 }
 
 if (!jsDirArg || !cssFile || !htmlFile) {
@@ -97,6 +116,20 @@ for (const mf of manifestFiles) {
       servedFiles[urlPath] = bundlePath;
     }
     bundleCount++;
+  }
+}
+
+// Asset pipeline manifest (optional): maps `/assets/<hashed>` URLs to
+// filenames inside the flat assets directory. The pipeline produces both
+// together (manifest + sibling dir), so we resolve URLs against the dir.
+let assetCount = 0;
+if (assetsManifestArg && assetsDirArg) {
+  const assetsManifestPath = resolve(runfiles, assetsManifestArg);
+  const assetsDir = resolve(runfiles, assetsDirArg);
+  const assetsManifest = JSON.parse(readFileSync(assetsManifestPath, "utf-8"));
+  for (const [urlPath, fileName] of Object.entries(assetsManifest.urls || {})) {
+    servedFiles[urlPath] = resolve(assetsDir, fileName);
+    assetCount++;
   }
 }
 
@@ -174,4 +207,7 @@ createServer((req, res) => {
   console.log(`Dev server: http://localhost:${port}`);
   console.log(`  ${esmCount} ESM deps (served directly), ${bundleCount} CJS deps (bundled)`);
   console.log(`  ${Object.keys(importMap).length} import map entries`);
+  if (assetCount > 0) {
+    console.log(`  ${assetCount} static assets under /assets/`);
+  }
 });
