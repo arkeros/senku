@@ -62,24 +62,38 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     """
 
     # Flatten route tree: collect ordered component list and build
-    # index-based route config for the manifest rule.
+    # index-based route config for the manifest rule. Dedupe by label so a
+    # component referenced in multiple routes (e.g. a shared error_component)
+    # appears once — Bazel rejects duplicate labels in label_list attrs.
     ordered_components = []
+    idx_by_component = {}
+
+    def _intern(c):
+        idx = idx_by_component.get(c)
+        if idx == None:
+            idx = len(ordered_components)
+            idx_by_component[c] = idx
+            ordered_components.append(c)
+        return idx
 
     def _collect(r):
         fields = {}
         if "component" in r:
-            fields["component_idx"] = len(ordered_components)
-            ordered_components.append(r["component"])
+            fields["component_idx"] = _intern(r["component"])
         if "error_component" in r:
-            fields["error_component_idx"] = len(ordered_components)
-            ordered_components.append(r["error_component"])
+            fields["error_component_idx"] = _intern(r["error_component"])
         return fields
 
     flat_routes = walk_route_tree(routes, _collect)
 
-    all_route_components = [layout] + ordered_components
-    if error_component:
-        all_route_components = all_route_components + [error_component]
+    # Dedupe across buckets too (layout / app-level error_component may
+    # overlap with route components) before fan-out to downstream rules.
+    seen = {}
+    all_route_components = []
+    for c in [layout] + ordered_components + ([error_component] if error_component else []):
+        if c not in seen:
+            seen[c] = True
+            all_route_components.append(c)
 
     # Generate route manifest — looks up .js entries from each target's DefaultInfo
     manifest_name = name + "_manifest"

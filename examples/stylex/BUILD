@@ -73,6 +73,7 @@ react_app(
             children = [
                 route(
                     component = "//examples/stylex/pages/concerts:ConcertsHome",
+                    error_component = ":RouteError",
                     path = "/",
                 ),
                 route(
