@@ -4,12 +4,14 @@ load("@aspect_rules_js//js:defs.bzl", "js_test")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load(":_artifact_outputs.bzl", "artifact_outputs")
+load(":_hash_assets.bzl", "hash_assets")
+load(":asset_codegen.bzl", "asset_codegen")
 load(":labels.bzl", "is_node_module", "ts_dep")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
 _DEFAULT_TSCONFIG = "//:tsconfig"
 
-def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export_test = True, **kwargs):
+def react_component(name, srcs, deps = [], assets = [], tsconfig = _DEFAULT_TSCONFIG, _export_test = True, **kwargs):
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.
 
     Wraps ts_project with the StyleX Babel transpiler and a thin rule that
@@ -19,16 +21,25 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
     react_app_manifest looks up by naming convention — no routing-specific
     provider required.
 
+    When `assets` is non-empty, the macro content-hashes each file, emits a
+    `<name>.assets.ts` typed-consts module colocated with the source, and
+    includes it in the ts_project srcs. Import the generated URLs with
+    `import { logoUrl } from "./<Component>.assets"`.
+
     Produces the following targets:
-      - :{name}              — public target (DefaultInfo + OutputGroupInfo.stylex_metadata)
+      - :{name}              — public target (DefaultInfo + OutputGroupInfo.stylex_metadata / assets)
       - :{name}_ts           — ts_project (internal, JS + .d.ts outputs)
       - :{name}_typecheck    — tsc type-check (from ts_project)
       - :{name}_export_test  — verifies named export matches target name
+      - :{name}_assets       — hash_assets (when `assets` is non-empty)
+      - :{name}_assets_ts    — asset_codegen (when `assets` is non-empty)
 
     Args:
         name: target name (must match the exported component name and the JS entry)
         srcs: .ts/.tsx source files
         deps: other react_component targets or node_modules labels
+        assets: static asset files (svg, png, woff2, etc.) to content-hash and
+            expose as typed URL consts in `<name>.assets.ts`
         tsconfig: tsconfig.json label (optional)
         **kwargs: passed through to ts_project (e.g. visibility, tags)
     """
@@ -37,9 +48,27 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
     component_deps = [d for d in deps if not is_node_module(d)]
     ts_deps = [ts_dep(d) for d in deps]
 
+    # Forwarded attrs that also make sense on the asset sub-targets
+    _forward_kwargs = {k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")}
+
+    all_srcs = list(srcs)
+    if assets:
+        hash_assets(
+            name = name + "_assets",
+            srcs = assets,
+            **_forward_kwargs
+        )
+        asset_codegen(
+            name = name + "_assets_ts",
+            hashed = ":" + name + "_assets",
+            out = name + ".assets.ts",
+            **_forward_kwargs
+        )
+        all_srcs.append(name + ".assets.ts")
+
     ts_project(
         name = name + "_ts",
-        srcs = srcs,
+        srcs = all_srcs,
         declaration = True,
         source_map = True,
         transpiler = lambda **transpiler_kwargs: stylex_transpile(
@@ -63,8 +92,8 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
         name = name,
         js_outs = [name + "_ts"],
         metadata = [name + "_ts_transpile_stylex_metadata"],
-        deps = component_deps,
-        **{k: v for k, v in kwargs.items() if k == "visibility" or k == "tags"}
+        deps = component_deps + ([":" + name + "_assets"] if assets else []),
+        **{k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")}
     )
 
     if not _export_test:
