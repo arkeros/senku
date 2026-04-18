@@ -3,7 +3,7 @@
 load("@aspect_rules_js//js:defs.bzl", "js_test")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
-load(":_stylex_outputs.bzl", "stylex_outputs")
+load(":_artifact_outputs.bzl", "artifact_outputs")
 load(":labels.bzl", "is_node_module", "ts_dep")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
@@ -13,13 +13,14 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.
 
     Wraps ts_project with the StyleX Babel transpiler and a thin rule that
-    propagates StylexInfo transitively. The public target's DefaultInfo
+    exposes build-time metadata via named OutputGroups (collected transitively
+    by aspects in _artifact_aspect.bzl). The public target's DefaultInfo
     surfaces the ts_project outputs (including `{name}.js`), which
     react_app_manifest looks up by naming convention — no routing-specific
     provider required.
 
     Produces the following targets:
-      - :{name}              — public target (DefaultInfo from ts_project + StylexInfo)
+      - :{name}              — public target (DefaultInfo + OutputGroupInfo.stylex_metadata)
       - :{name}_ts           — ts_project (internal, JS + .d.ts outputs)
       - :{name}_typecheck    — tsc type-check (from ts_project)
       - :{name}_export_test  — verifies named export matches target name
@@ -54,10 +55,11 @@ def react_component(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, _export
         **kwargs
     )
 
-    # Thin wrapper that re-exposes ts_project outputs and propagates
-    # StylexInfo transitively. Downstream consumers (react_app_manifest,
-    # stylex_css) read files from DefaultInfo by naming convention.
-    stylex_outputs(
+    # Thin wrapper that re-exposes ts_project outputs and the stylex_metadata
+    # output group. Downstream consumers (react_app_manifest) read files from
+    # DefaultInfo by naming convention; stylex_css reaches the metadata
+    # through the stylex_metadata_aspect traversing `deps`.
+    artifact_outputs(
         name = name,
         js_outs = [name + "_ts"],
         metadata = [name + "_ts_transpile_stylex_metadata"],

@@ -1,7 +1,7 @@
-"StyleX design-token module: ts_project + StyleX Babel transpile, emits StylexInfo"
+"StyleX design-token module: ts_project + StyleX Babel transpile, exposes stylex_metadata OutputGroup"
 
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
-load(":_stylex_outputs.bzl", "stylex_outputs")
+load(":_artifact_outputs.bzl", "artifact_outputs")
 load(":labels.bzl", "is_node_module", "ts_dep")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
@@ -11,18 +11,19 @@ def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs
     """Build a StyleX design-token module (e.g. `tokens.stylex.ts`).
 
     Produces a type-checked TS compilation plus StyleX Babel transpile, and
-    exposes StylexInfo so downstream react_component/stylex_css targets can
-    collect atomic CSS transitively.
+    exposes its `.stylex.json` metadata via OutputGroupInfo so downstream
+    react_component / stylex_css targets can collect atomic CSS transitively
+    through the stylex_metadata_aspect.
 
     Produces:
-      - :{name}           — public target, provides StylexInfo
+      - :{name}           — public target, DefaultInfo + OutputGroupInfo.stylex_metadata
       - :{name}_ts        — ts_project (internal, JS + .d.ts outputs)
       - :{name}_typecheck — tsc type-check (from ts_project)
 
     Args:
         name: target name
         srcs: .stylex.ts files
-        deps: other stylex_library or react_component targets (transitive StylexInfo)
+        deps: other stylex_library or react_component targets (traversed by aspect)
         tsconfig: tsconfig.json label
         **kwargs: passed through to ts_project (e.g. visibility, tags)
     """
@@ -45,7 +46,7 @@ def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs
         **kwargs
     )
 
-    stylex_outputs(
+    artifact_outputs(
         name = name,
         js_outs = [name + "_ts"],
         metadata = [name + "_ts_transpile_stylex_metadata"],

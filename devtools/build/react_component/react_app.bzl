@@ -36,7 +36,7 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
     Produces:
       - :{name}_devserver — dev server with unbundled ESM
       - :{name}_bundle — production esbuild bundle
-      - :{name}_styles — collected StyleX CSS (transitive via StylexInfo)
+      - :{name}_styles — collected StyleX CSS (transitive via stylex_metadata_aspect)
       - :{name}_html — production index.html
 
     Args:
@@ -123,7 +123,7 @@ def react_app(name, layout, routes, browser_deps, jit_open_props = False, html_t
         ],
     )
 
-    # Collect StyleX CSS from all route components (transitive via StylexInfo)
+    # Collect StyleX CSS from all route components (transitive via stylex_metadata_aspect)
     stylex_css(
         name = name + "_styles",
         components = all_route_components,
