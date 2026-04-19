@@ -9,7 +9,7 @@ const styles = stylex.create({
 });
 
 // Representative integers that land in every CLDR plural category we care
-// about — 1/2/5/11/21 exercise en's one/other, es's one/other, fr's
+// about — 0/1/2/5/11/21 exercise en's one/other, es's one/other, fr's
 // one(covers 0+1)/other, and ru's one/few/many in a single pass. Adjust
 // when a new locale adds new categories.
 const SAMPLE_COUNTS = [0, 1, 2, 5, 11, 21] as const;
