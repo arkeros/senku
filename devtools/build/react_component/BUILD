@@ -77,6 +77,20 @@ js_test(
     entry_point = "asset_manifest_merge_test.mjs",
 )
 
+# i18n merge: reads a manifest of per-component catalog fragments and emits
+# one merged JSON per locale. Enforces three invariants as build errors:
+# no in-locale collisions, no missing translations, no stray keys.
+js_binary(
+    name = "i18n_merge_bin",
+    entry_point = "i18n_merge.mjs",
+)
+
+js_test(
+    name = "i18n_merge_test",
+    data = ["i18n_merge.mjs"],
+    entry_point = "i18n_merge_test.mjs",
+)
+
 exports_files(["index.html.tpl"])
 
 bzl_library(
