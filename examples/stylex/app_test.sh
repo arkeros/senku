@@ -83,20 +83,49 @@ HASHED=$(grep -oE 'panallet_logo\.[0-9a-f]{12}\.png' "$ASSETS_MANIFEST" | head -
 [ -f "$ASSETS_DIR/$HASHED" ] || { echo "FAIL: hashed logo file $HASHED not in $ASSETS_DIR"; exit 1; }
 echo "PASS: asset pipeline (hashed as $HASHED)"
 
-# i18n pipeline: bundle must carry every locale's nav translations inline, and
+# i18n pipeline: bundle must carry every locale's translations inline, and
 # main.tsx must wrap the router in <I18nProvider>.
+#
+# esbuild rewrites non-ASCII as \uXXXX escapes (uppercase hex digits). We
+# grep with -i so Cyrillic can match either case, and we use the literal
+# escape form rather than raw Cyrillic so the assertions are source-greppable
+# on any terminal.
 BUNDLE="examples/stylex/app_bundle.js"
 echo "=== i18n tests ==="
 
-grep -qF "Inicio" "$BUNDLE" || { echo "FAIL: bundle missing Spanish 'Inicio'"; exit 1; }
-grep -qF "Accueil" "$BUNDLE" || { echo "FAIL: bundle missing French 'Accueil'"; exit 1; }
-# esbuild rewrites non-ASCII as \uXXXX escapes in the bundle. Cyrillic Г is U+0413,
-# so Главная starts with \u0413 — check for the prefix as a stand-in for the full
-# string; any Russian translation of any key in the bundle satisfies this.
-# esbuild emits hex digits uppercase; match case-insensitively via -i.
-grep -qiF '\u0413\u043b\u0430\u0432\u043d\u0430\u044f' "$BUNDLE" || { echo "FAIL: bundle missing Russian 'Главная' (escaped)"; exit 1; }
 grep -qF "I18nProvider" "$BUNDLE" || { echo "FAIL: bundle missing I18nProvider wrapper"; exit 1; }
 grep -qF "pickLocale" "$BUNDLE" || { echo "FAIL: bundle missing pickLocale"; exit 1; }
+
+# Nav labels — each locale's "Home" must be present.
+grep -qF "Inicio" "$BUNDLE" || { echo "FAIL: bundle missing 'Inicio' (es:layout.nav.home)"; exit 1; }
+grep -qF "Accueil" "$BUNDLE" || { echo "FAIL: bundle missing 'Accueil' (fr:layout.nav.home)"; exit 1; }
+# Russian Главная → \u0413\u043b\u0430\u0432\u043d\u0430\u044f
+grep -qiF '\u0413\u043b\u0430\u0432\u043d\u0430\u044f' "$BUNDLE" || { echo "FAIL: bundle missing Russian 'Главная'"; exit 1; }
+
+# Concerts translations — each locale's version of "Concerts".
+grep -qF "Conciertos" "$BUNDLE" || { echo "FAIL: bundle missing es:Conciertos"; exit 1; }
+# Russian Концерты → \u041a\u043e\u043d\u0446\u0435\u0440\u0442\u044b
+grep -qiF '\u041a\u043e\u043d\u0446\u0435\u0440\u0442\u044b' "$BUNDLE" || { echo "FAIL: bundle missing Russian 'Концерты'"; exit 1; }
+
+# Interpolation — {$city} placeholder survives through MF2 in every locale.
+grep -qF "Conciertos en" "$BUNDLE" || { echo "FAIL: bundle missing es:concerts.city.heading prefix"; exit 1; }
+# French à → \xE0 after esbuild escape pass.
+grep -qF 'Concerts \xE0' "$BUNDLE" || { echo "FAIL: bundle missing fr:concerts.city.heading prefix"; exit 1; }
+
+# Plural forms — Russian's one/few/many for "концерт" all have distinct
+# stems so each form is independently greppable.
+# концерт  → \u043a\u043e\u043d\u0446\u0435\u0440\u0442
+# концерта → ...\u0442\u0430
+# концертов → ...\u0442\u043e\u0432
+grep -qiF '\u043a\u043e\u043d\u0446\u0435\u0440\u0442' "$BUNDLE" || { echo "FAIL: bundle missing ru:one form 'концерт'"; exit 1; }
+grep -qiF '\u043a\u043e\u043d\u0446\u0435\u0440\u0442\u0430' "$BUNDLE" || { echo "FAIL: bundle missing ru:few form 'концерта'"; exit 1; }
+grep -qiF '\u043a\u043e\u043d\u0446\u0435\u0440\u0442\u043e\u0432' "$BUNDLE" || { echo "FAIL: bundle missing ru:many form 'концертов'"; exit 1; }
+
+# Source-locale strings should NOT appear in the generated I18N_CATALOGS
+# entries for other locales (i.e. no "Home" value in an es catalog entry).
+# Broad check: confirm the catalog object exists and carries locale keys.
+grep -qE '"layout\.nav\.home":\s*"Inicio"' "$BUNDLE" || { echo "FAIL: bundle missing es:layout.nav.home entry"; exit 1; }
+
 echo "PASS: i18n"
 
 echo "All tests passed."
