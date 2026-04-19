@@ -15,6 +15,61 @@ load("//devtools/build/js:browser_dep_group.bzl", "browser_dep_group")
 
 _PUBLIC = ["//visibility:public"]
 
+# npm packages the canonical panallet browser_modules wrap. Verified at
+# macro time against native.existing_rules() so a missing entry produces
+# a clear "add X to package.json" diagnostic instead of the misleading
+# "source file <X> not in this package" error aspect_rules_js emits when
+# a //:node_modules/<X> alias is absent.
+_BASE_REQUIRED_NPM_PACKAGES = [
+    "react",
+    "react-dom",
+    "react-router",
+    "cookie",
+    "set-cookie-parser",
+    "@stylexjs/stylex",
+]
+_I18N_REQUIRED_NPM_PACKAGES = [
+    "messageformat",
+]
+
+def _check_required_packages(i18n):
+    existing = native.existing_rules()
+
+    def _missing_from_node_modules(pkg):
+        return ("node_modules/" + pkg) not in existing
+
+    required = list(_BASE_REQUIRED_NPM_PACKAGES)
+    if i18n:
+        required += _I18N_REQUIRED_NPM_PACKAGES
+
+    missing = [p for p in required if _missing_from_node_modules(p)]
+    if missing:
+        fail("""
+
+panallet_browser_modules: missing npm packages in //:node_modules/.
+
+Add the following to your package.json and run `pnpm install`:
+{pkgs}
+
+Then make sure your root BUILD calls `npm_link_all_packages(name = "node_modules")`
+*before* `panallet_browser_modules(...)`.
+""".format(pkgs = "\n".join(["  - " + p for p in missing])))
+
+    if i18n and "node_modules/@panallet/i18n-runtime" not in existing:
+        fail("""
+
+panallet_browser_modules(i18n = True) requires @panallet/i18n-runtime
+linked into //:node_modules/. Add this to your root BUILD *before* the
+panallet_browser_modules call:
+
+    load("@aspect_rules_js//npm:defs.bzl", "npm_link_package")
+    npm_link_package(
+        name = "node_modules/@panallet/i18n-runtime",
+        src = "@senku//devtools/build/react_component/i18n_runtime:pkg",
+        visibility = ["//visibility:public"],
+    )
+""")
+
 def panallet_browser_modules(i18n = False, visibility = _PUBLIC):
     """Materialize the canonical browser_modules for a panallet app.
 
@@ -31,6 +86,8 @@ def panallet_browser_modules(i18n = False, visibility = _PUBLIC):
             so any package in the consumer repo can reference them in
             `react_app(browser_deps = ...)`.
     """
+
+    _check_required_packages(i18n)
 
     # React + react-dom/client + react/jsx-runtime share internals and must
     # come from one bundling pass, otherwise hooks fail with multiple-React
