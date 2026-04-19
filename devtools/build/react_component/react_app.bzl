@@ -5,6 +5,7 @@ load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
 load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("//devtools/build/js:devserver.bzl", "devserver")
 load(":asset_pipeline.bzl", "asset_pipeline")
+load(":i18n_artifacts.bzl", "i18n_artifacts")
 load(":labels.bzl", "ts_dep")
 load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
@@ -35,7 +36,7 @@ def route(path, component = None, children = None, error_component = None):
         r["error_component"] = error_component
     return r
 
-def react_app(name, layout, routes, browser_deps, error_component = None, jit_open_props = False, html_template = None, runtime_config = None, **kwargs):
+def react_app(name, layout, routes, browser_deps, error_component = None, jit_open_props = False, html_template = None, runtime_config = None, locales = None, source_locale = None, **kwargs):
     """Build a React application with Starlark-defined routes and lazy loading.
 
     Routes are defined in BUILD files and compiled to React Router's
@@ -69,6 +70,15 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
             code depends on `:{name}_env_component` and imports a typed
             `getEnv` helper — undeclared keys fail `tsc`. See
             `runtime_config.bzl`.
+        locales: optional list of locales the app supports (e.g. ["en", "es"]).
+            When set, transitively collects every component's MF2 catalog
+            fragments and emits a typed `{name}_i18n_manifest` component
+            exposing `I18N_CATALOGS` + `Locale`. The merge step enforces that
+            every non-source locale has the same key set as the source; the
+            build fails on missing translations, stray keys, or cross-
+            component collisions. When omitted, no i18n pipeline runs.
+        source_locale: the authoritative locale; defaults to `locales[0]`.
+            Other locales must satisfy this one's key contract exactly.
         **kwargs: passed through to downstream targets (e.g. visibility, tags)
     """
 
@@ -113,6 +123,20 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         if c not in seen:
             seen[c] = True
             all_route_components.append(c)
+
+    # When locales is set, walk the component closure via i18n_catalog_aspect,
+    # merge fragments per locale, and emit :{name}_i18n_manifest for app code
+    # to import. The merge step is where "catalog coverage is a build-time
+    # invariant" actually holds — omit this block and that guarantee evaporates.
+    if locales:
+        _source_locale = source_locale if source_locale else locales[0]
+        i18n_artifacts(
+            name = name,
+            components = all_route_components,
+            source_locale = _source_locale,
+            locales = locales,
+            forward_kwargs = {k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")},
+        )
 
     # Generate route manifest — looks up .js entries from each target's DefaultInfo
     manifest_name = name + "_manifest"

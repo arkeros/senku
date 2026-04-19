@@ -1,12 +1,5 @@
 import { MessageFormat } from "messageformat";
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 export type Catalog = Record<string, string>;
 
@@ -19,37 +12,23 @@ const I18nCtx = createContext<Ctx | null>(null);
 
 export function I18nProvider({
   locale,
-  catalogUrl,
-  initialCatalog,
+  catalog,
   children,
 }: {
   locale: string;
-  catalogUrl: string;
-  initialCatalog?: Catalog;
+  catalog: Catalog;
   children: ReactNode;
 }) {
-  const [catalog, setCatalog] = useState<Catalog | null>(
-    initialCatalog ?? null,
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(catalogUrl)
-      .then((r) => r.json() as Promise<Catalog>)
-      .then((data) => {
-        if (!cancelled) setCatalog(data);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [catalogUrl]);
-
   const value = useMemo<Ctx>(() => {
     const cache = new Map<string, MessageFormat>();
     return {
       locale,
       format: (key, values) => {
-        const src = catalog?.[key] ?? key;
+        // Build-time merge enforces full key coverage, so `catalog[key]` is
+        // guaranteed to exist for every id referenced in the app. The `?? key`
+        // branch is a defensive no-op for developer typos (referencing an id
+        // that doesn't exist).
+        const src = catalog[key] ?? key;
         let mf = cache.get(src);
         if (!mf) {
           // bidiIsolation: "none" keeps interpolated values as plain text.
@@ -63,7 +42,6 @@ export function I18nProvider({
     };
   }, [locale, catalog]);
 
-  if (!catalog) return null;
   return <I18nCtx.Provider value={value}>{children}</I18nCtx.Provider>;
 }
 

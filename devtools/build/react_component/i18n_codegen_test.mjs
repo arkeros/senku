@@ -3,101 +3,78 @@ import assert from "node:assert/strict";
 
 import { generate } from "./i18n_codegen.mjs";
 
-const MANIFEST = {
-  "app_i18n_en.json": "app_i18n_en.abc123.json",
-  "app_i18n_es.json": "app_i18n_es.def456.json",
-  "app_i18n_fr.json": "app_i18n_fr.ghi789.json",
-  "app_i18n_ru.json": "app_i18n_ru.jkl012.json",
-};
-
-test("emits I18N_CATALOGS with hashed URLs per locale", () => {
+test("emits I18N_CATALOGS object with inlined locale entries", () => {
   const out = generate({
-    manifest: MANIFEST,
-    locales: ["en", "es", "fr", "ru"],
-    namePrefix: "app_i18n_",
-    urlPrefix: "/assets/",
+    catalogs: {
+      en: { "layout.home": "Home" },
+      es: { "layout.home": "Inicio" },
+    },
   });
   assert.match(out, /export const I18N_CATALOGS/);
-  assert.match(out, /en:\s*"\/assets\/app_i18n_en\.abc123\.json"/);
-  assert.match(out, /es:\s*"\/assets\/app_i18n_es\.def456\.json"/);
-  assert.match(out, /fr:\s*"\/assets\/app_i18n_fr\.ghi789\.json"/);
-  assert.match(out, /ru:\s*"\/assets\/app_i18n_ru\.jkl012\.json"/);
+  assert.match(out, /en:\s*\{[\s\S]*"layout\.home":\s*"Home"/);
+  assert.match(out, /es:\s*\{[\s\S]*"layout\.home":\s*"Inicio"/);
 });
 
 test("emits Locale type alias as keyof I18N_CATALOGS", () => {
   const out = generate({
-    manifest: MANIFEST,
-    locales: ["en", "es", "fr", "ru"],
-    namePrefix: "app_i18n_",
-    urlPrefix: "/assets/",
+    catalogs: { en: {}, es: {} },
   });
   assert.match(out, /export type Locale\s*=\s*keyof typeof I18N_CATALOGS/);
 });
 
-test("marks the object as const for literal URL types", () => {
-  const out = generate({
-    manifest: MANIFEST,
-    locales: ["en"],
-    namePrefix: "app_i18n_",
-    urlPrefix: "/assets/",
-  });
-  assert.match(out, /\}\s*as const/);
-});
-
-test("url prefix missing trailing slash is normalized", () => {
-  const out = generate({
-    manifest: MANIFEST,
-    locales: ["en"],
-    namePrefix: "app_i18n_",
-    urlPrefix: "/static",
-  });
-  assert.match(out, /"\/static\/app_i18n_en\.abc123\.json"/);
-});
-
-test("locale missing from manifest throws with clear context", () => {
-  assert.throws(
-    () =>
-      generate({
-        manifest: { "app_i18n_en.json": "app_i18n_en.abc.json" },
-        locales: ["en", "es"],
-        namePrefix: "app_i18n_",
-        urlPrefix: "/assets/",
-      }),
-    (err) =>
-      /missing|not found/i.test(err.message) &&
-      err.message.includes("es") &&
-      err.message.includes("app_i18n_es.json"),
-  );
-});
-
-test("output is deterministic (sorted by locale)", () => {
+test("output is deterministic (locales sorted)", () => {
   const a = generate({
-    manifest: MANIFEST,
-    locales: ["ru", "en", "fr", "es"],
-    namePrefix: "app_i18n_",
-    urlPrefix: "/assets/",
+    catalogs: { ru: { k: "r" }, en: { k: "e" }, fr: { k: "f" }, es: { k: "s" } },
   });
   const b = generate({
-    manifest: MANIFEST,
-    locales: ["en", "es", "fr", "ru"],
-    namePrefix: "app_i18n_",
-    urlPrefix: "/assets/",
+    catalogs: { en: { k: "e" }, es: { k: "s" }, fr: { k: "f" }, ru: { k: "r" } },
   });
   assert.equal(a, b);
+  // locales appear alphabetically in the output
+  assert.ok(a.indexOf("en:") < a.indexOf("es:"));
+  assert.ok(a.indexOf("es:") < a.indexOf("fr:"));
+  assert.ok(a.indexOf("fr:") < a.indexOf("ru:"));
 });
 
-test("respects name prefix when picking entries", () => {
+test("output is deterministic (keys within a catalog sorted)", () => {
   const out = generate({
-    manifest: {
-      "my-prefix_en.json": "my-prefix_en.hash.json",
-      "my-prefix_es.json": "my-prefix_es.hash.json",
-      "unrelated.png": "unrelated.deadbeef.png",
+    catalogs: {
+      en: { "z.last": "Z", "a.first": "A", "m.middle": "M" },
     },
-    locales: ["en", "es"],
-    namePrefix: "my-prefix_",
-    urlPrefix: "/assets/",
   });
-  assert.match(out, /en:\s*"\/assets\/my-prefix_en\.hash\.json"/);
-  assert.match(out, /es:\s*"\/assets\/my-prefix_es\.hash\.json"/);
-  assert.doesNotMatch(out, /unrelated/);
+  assert.ok(out.indexOf('"a.first"') < out.indexOf('"m.middle"'));
+  assert.ok(out.indexOf('"m.middle"') < out.indexOf('"z.last"'));
+});
+
+test("escapes special characters in string values", () => {
+  const out = generate({
+    catalogs: {
+      en: {
+        quotes: 'She said "hi"',
+        newline: "line1\nline2",
+        backslash: "a\\b",
+      },
+    },
+  });
+  // JSON.stringify handles all of these — assertion is the round-trip is safe.
+  assert.match(out, /"quotes":\s*"She said \\"hi\\""/);
+  assert.match(out, /"newline":\s*"line1\\nline2"/);
+  assert.match(out, /"backslash":\s*"a\\\\b"/);
+});
+
+test("empty catalogs produce an empty object entry per locale", () => {
+  const out = generate({
+    catalogs: { en: {}, es: {} },
+  });
+  assert.match(out, /en:\s*\{\s*\}/);
+  assert.match(out, /es:\s*\{\s*\}/);
+});
+
+test("preserves MF2 .match syntax verbatim", () => {
+  const mf2 = ".input {$count :number}\n.match $count\none {{One}}\n* {{Many}}";
+  const out = generate({
+    catalogs: { en: { count: mf2 } },
+  });
+  // Value should be JSON-encoded as a string (newlines escaped).
+  assert.match(out, /"count":\s*"\.input \{\$count :number\}\\n/);
 });

@@ -104,12 +104,26 @@ js_test(
     entry_point = "i18n_codegen_test.mjs",
 )
 
+# i18n bundle orchestrator: single action that runs merge + codegen together.
+# Keeps i18n_merge.mjs and i18n_codegen.mjs independently unit-testable while
+# letting Bazel rules declare both the per-locale merged JSONs and the TS
+# manifest as outputs of one action (instead of chaining two).
+js_binary(
+    name = "i18n_bundle_bin",
+    data = [
+        "i18n_codegen.mjs",
+        "i18n_merge.mjs",
+    ],
+    entry_point = "i18n_bundle.mjs",
+)
+
 exports_files(["index.html.tpl"])
 
 bzl_library(
     name = "react_app",
     srcs = ["react_app.bzl"],
     deps = [
+        ":i18n_artifacts",
         ":labels",
         ":react_app_manifest",
         ":react_component",
@@ -129,6 +143,15 @@ bzl_library(
     deps = [
         ":react_component",
         "@bazel_skylib//rules:write_file",
+    ],
+)
+
+bzl_library(
+    name = "i18n_artifacts",
+    srcs = ["i18n_artifacts.bzl"],
+    deps = [
+        ":_artifact_aspect",
+        ":react_component",
     ],
 )
 
