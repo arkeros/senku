@@ -10,7 +10,14 @@
  */
 import { transformSync } from "@babel/core";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, relative, resolve } from "node:path";
+
+// Resolve presets/plugins to absolute paths up-front so babel's internal
+// plugin loader doesn't have to walk node_modules itself. With pnpm's
+// virtual-store layout, that walk fails to reach @senku's node_modules
+// when this script runs as a non-root bzlmod tool from a foreign repo.
+const _require = createRequire(import.meta.url);
 
 const args = process.argv.slice(2);
 let srcFile = null;
@@ -49,11 +56,11 @@ const babelOptions = {
   // set rootDir to the bindir for consistent defineVars hashes
   configFile: false,
   presets: [
-    "@babel/preset-typescript",
-    ["@babel/preset-react", { runtime: "automatic" }],
+    _require.resolve("@babel/preset-typescript"),
+    [_require.resolve("@babel/preset-react"), { runtime: "automatic" }],
   ],
   plugins: [
-    ["@stylexjs/babel-plugin", {
+    [_require.resolve("@stylexjs/babel-plugin"), {
       unstable_moduleResolution: {
         type: "custom",
         rootDir: bindir,
