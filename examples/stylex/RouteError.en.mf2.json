@@ -1,0 +1,3 @@
+{
+  "routeError.message": "This page failed to load: {$message}"
+}

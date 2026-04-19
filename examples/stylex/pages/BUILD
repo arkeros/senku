@@ -20,8 +20,15 @@ react_component(
 react_component(
     name = "NotFound",
     srcs = ["NotFound.tsx"],
+    i18n = [
+        "NotFound.en.mf2.json",
+        "NotFound.es.mf2.json",
+        "NotFound.fr.mf2.json",
+        "NotFound.ru.mf2.json",
+    ],
     deps = [
         "//:node_modules/react-router",
+        "//devtools/build/react_component/i18n_runtime",
         "//examples/stylex:tokens",
     ],
 )
