@@ -21,7 +21,7 @@ react_component(
 react_component(
     name = "Layout",
     srcs = ["Layout.tsx"],
-    assets = ["panallet_logo.png"],
+    assets = ["panellet_logo.png"],
     i18n = [
         "Layout.ca.mf2.json",
         "Layout.en.mf2.json",
@@ -31,7 +31,7 @@ react_component(
     ],
     deps = [
         ":tokens",
-        "//:node_modules/@panallet/i18n-runtime",
+        "//:node_modules/@panellet/i18n-runtime",
         "//:node_modules/react-router",
     ],
 )
@@ -48,7 +48,7 @@ react_component(
     ],
     deps = [
         ":tokens",
-        "//:node_modules/@panallet/i18n-runtime",
+        "//:node_modules/@panellet/i18n-runtime",
         "//:node_modules/react-router",
     ],
 )
@@ -65,7 +65,7 @@ react_component(
     ],
     deps = [
         ":tokens",
-        "//:node_modules/@panallet/i18n-runtime",
+        "//:node_modules/@panellet/i18n-runtime",
         "//:node_modules/react-router",
     ],
 )
@@ -79,7 +79,7 @@ react_app(
         "//:browser_modules/set-cookie-parser",
         "//:browser_modules/@stylexjs/stylex",
         "//:browser_modules/messageformat",
-        "//:browser_modules/@panallet/i18n-runtime",
+        "//:browser_modules/@panellet/i18n-runtime",
     ],
     error_component = ":AppError",
     html_template = "index.html.tpl",

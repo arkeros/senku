@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Trans } from "@panallet/i18n-runtime";
+import { Trans } from "@panellet/i18n-runtime";
 import { color, font, size } from "../../tokens.stylex";
 
 const styles = stylex.create({

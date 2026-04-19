@@ -13,7 +13,7 @@ react_component(
         "Home.ru.mf2.json",
     ],
     deps = [
-        "//:node_modules/@panallet/i18n-runtime",
+        "//:node_modules/@panellet/i18n-runtime",
         "//examples/stylex:Button",
         "//examples/stylex:app_env_component",
     ],
@@ -30,7 +30,7 @@ react_component(
         "About.ru.mf2.json",
     ],
     deps = [
-        "//:node_modules/@panallet/i18n-runtime",
+        "//:node_modules/@panellet/i18n-runtime",
         "//examples/stylex:tokens",
     ],
 )
@@ -46,7 +46,7 @@ react_component(
         "NotFound.ru.mf2.json",
     ],
     deps = [
-        "//:node_modules/@panallet/i18n-runtime",
+        "//:node_modules/@panellet/i18n-runtime",
         "//:node_modules/react-router",
         "//examples/stylex:tokens",
     ],

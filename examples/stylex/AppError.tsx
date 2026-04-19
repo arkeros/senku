@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { useRouteError } from "react-router";
-import { Trans } from "@panallet/i18n-runtime";
+import { Trans } from "@panellet/i18n-runtime";
 import { color, size } from "./tokens.stylex";
 
 const styles = stylex.create({

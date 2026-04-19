@@ -24,7 +24,7 @@ js_binary(
 exports_files(["devserver.mjs"])
 
 # Browser_dep instantiations live in each consumer's repo (typically called
-# in one shot via `panallet_browser_modules()` from `//devtools/build/panallet:install.bzl`).
+# in one shot via `panellet_browser_modules()` from `//devtools/build/panellet:install.bzl`).
 # That keeps the npm packages they wrap pinned by the consumer rather than @senku.
 
 bzl_library(

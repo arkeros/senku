@@ -269,7 +269,7 @@ test("malformed MF2 syntax fails the merge with file/key/locale context", () => 
 });
 
 test("well-formed MF2 with .input + .match + plural passes validation", () => {
-  // Must not throw — round-trip of the real shape we ship in panallet.
+  // Must not throw — round-trip of the real shape we ship in panellet.
   const out = mergeCatalogs({
     sourceLocale: "en",
     locales: ["en"],

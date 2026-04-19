@@ -78,8 +78,8 @@ ASSETS_DIR="examples/stylex/app_assets_flat"
 echo "=== Asset pipeline tests ==="
 
 grep -q '"type": "assets"' "$ASSETS_MANIFEST" || { echo "FAIL: manifest missing type field"; exit 1; }
-grep -qE '"/assets/panallet_logo\.[0-9a-f]{12}\.png"' "$ASSETS_MANIFEST" || { echo "FAIL: manifest missing hashed logo URL"; exit 1; }
-HASHED=$(grep -oE 'panallet_logo\.[0-9a-f]{12}\.png' "$ASSETS_MANIFEST" | head -1)
+grep -qE '"/assets/panellet_logo\.[0-9a-f]{12}\.png"' "$ASSETS_MANIFEST" || { echo "FAIL: manifest missing hashed logo URL"; exit 1; }
+HASHED=$(grep -oE 'panellet_logo\.[0-9a-f]{12}\.png' "$ASSETS_MANIFEST" | head -1)
 [ -f "$ASSETS_DIR/$HASHED" ] || { echo "FAIL: hashed logo file $HASHED not in $ASSETS_DIR"; exit 1; }
 echo "PASS: asset pipeline (hashed as $HASHED)"
 

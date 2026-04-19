@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Trans,
   useI18n,
-} from "@panallet/i18n-runtime";
+} from "@panellet/i18n-runtime";
 import { Button } from "../Button";
 import { getEnv } from "../app_env";
 

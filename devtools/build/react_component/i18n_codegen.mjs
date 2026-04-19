@@ -13,7 +13,7 @@
  *   export type Locale = keyof typeof I18N_CATALOGS;
  *
  * Inlining keeps all catalogs in the main bundle so locale selection is
- * synchronous — no fetch, no loading state. For panallet's 4-locale scope
+ * synchronous — no fetch, no loading state. For panellet's 4-locale scope
  * this adds only a few KB; larger apps can add fetch-based loading later
  * without changing the runtime surface.
  *

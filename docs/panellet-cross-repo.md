@@ -1,6 +1,6 @@
-# Consuming Panallet from Another Workspace
+# Consuming Panellet from Another Workspace
 
-Panallet is designed to be used as a `bazel_dep` from a downstream bzlmod
+Panellet is designed to be used as a `bazel_dep` from a downstream bzlmod
 module — your workspace doesn't have to be inside `@senku`. This doc covers
 the setup, the design rules that keep cross-repo use tractable, and the
 small handful of patterns to know.
@@ -29,9 +29,9 @@ Senku itself depends on `aspect_rules_js`, `aspect_rules_ts`,
 `aspect_rules_esbuild`, `rules_python_gazelle_plugin`,
 `bazel_skylib_gazelle_plugin`, etc. Bzlmod resolves these transitively.
 
-### 2. Add the npm packages your panallet app uses
+### 2. Add the npm packages your panellet app uses
 
-Panallet's macros emit bare `//:node_modules/<pkg>` references that
+Panellet's macros emit bare `//:node_modules/<pkg>` references that
 resolve in your repo's BUILD context — so each consumer pins its own
 versions of the framework's npm deps. Add these to your `package.json`:
 
@@ -63,29 +63,29 @@ versions of the framework's npm deps. Add these to your `package.json`:
 
 Then `pnpm install` to lock.
 
-### 3. Wire panallet's first-party packages into your root BUILD
+### 3. Wire panellet's first-party packages into your root BUILD
 
 In your repo root `BUILD`:
 
 ```python
 load("@aspect_rules_js//npm:defs.bzl", "npm_link_package")
 load("@npm//:defs.bzl", "npm_link_all_packages")
-load("@senku//devtools/build/panallet:install.bzl", "panallet_browser_modules")
+load("@senku//devtools/build/panellet:install.bzl", "panellet_browser_modules")
 
 npm_link_all_packages(name = "node_modules")
 
-# Link panallet's i18n runtime as a first-party npm package. Only needed
+# Link panellet's i18n runtime as a first-party npm package. Only needed
 # when you use locales=... on react_app.
 npm_link_package(
-    name = "node_modules/@panallet/i18n-runtime",
+    name = "node_modules/@panellet/i18n-runtime",
     src = "@senku//devtools/build/react_component/i18n_runtime:pkg",
     visibility = ["//visibility:public"],
 )
 
-# Materialize the canonical browser_modules for panallet apps as
+# Materialize the canonical browser_modules for panellet apps as
 # //:browser_modules/<npm-specifier> targets — esm.sh-style local serving
 # pinned to *your* pnpm-lock versions.
-panallet_browser_modules(i18n = True)  # i18n=False if you skip locales
+panellet_browser_modules(i18n = True)  # i18n=False if you skip locales
 ```
 
 ### 4. Write your app
@@ -116,7 +116,7 @@ react_component(
     i18n = ["Home.en.mf2.json", "Home.es.mf2.json"],  # optional
     deps = [
         ":tokens",
-        "//:node_modules/@panallet/i18n-runtime",      # if using Trans/useI18n
+        "//:node_modules/@panellet/i18n-runtime",      # if using Trans/useI18n
     ],
 )
 
@@ -131,7 +131,7 @@ react_app(
         "//:browser_modules/set-cookie-parser",
         "//:browser_modules/@stylexjs/stylex",
         "//:browser_modules/messageformat",            # if using i18n
-        "//:browser_modules/@panallet/i18n-runtime",   # if using i18n
+        "//:browser_modules/@panellet/i18n-runtime",   # if using i18n
     ],
     locales = ["en", "es"],          # optional
     source_locale = "en",            # required when locales is set
@@ -142,7 +142,7 @@ react_app(
 In `Home.tsx`:
 
 ```tsx
-import { Trans, useI18n } from "@panallet/i18n-runtime";
+import { Trans, useI18n } from "@panellet/i18n-runtime";
 
 export function Home() {
   const { format } = useI18n();
@@ -152,7 +152,7 @@ export function Home() {
 
 ## Design rules
 
-When you read or extend panallet's macros, three patterns govern how
+When you read or extend panellet's macros, three patterns govern how
 labels and references behave cross-repo:
 
 ### Rule 1 — Wrap framework-owned references in `Label()`
@@ -188,13 +188,13 @@ deps = [
 
 ### Rule 2 — Distribute first-party runtimes as npm packages
 
-Anything panallet exposes for consumer code to *import* (currently:
-`@panallet/i18n-runtime`) ships as a real npm package via `npm_package`,
+Anything panellet exposes for consumer code to *import* (currently:
+`@panellet/i18n-runtime`) ships as a real npm package via `npm_package`,
 not as a `react_component` consumed via relative path. Standard module
 resolution then handles it everywhere — TypeScript, esbuild, the
 devserver, the IDE language service.
 
-If panallet later adds shared runtimes (form helpers, route hooks, etc.),
+If panellet later adds shared runtimes (form helpers, route hooks, etc.),
 the same pattern applies: `package.json` + `npm_package` in the runtime's
 BUILD, `npm_link_package` from the consumer's root.
 
@@ -203,7 +203,7 @@ BUILD, `npm_link_package` from the consumer's root.
 Tools that operate on *consumer-owned* data (`browser_dep` wrapping the
 consumer's npm packages, for example) should be **invoked** in the
 consumer's BUILD, even though the macros live in `@senku`. That's what
-`panallet_browser_modules()` does — calls `browser_dep` from the
+`panellet_browser_modules()` does — calls `browser_dep` from the
 caller's package, where `cwd`, runfiles, and node_modules all
 self-consistently point at the consumer's tree.
 
@@ -220,21 +220,21 @@ that are fragile and surface in unexpected places.
 (`"@babel/preset-typescript"`, `"@stylexjs/babel-plugin"`). Babel's
 internal loader walks node_modules from babel-core's location, which
 under pnpm's virtual store doesn't reach @senku's top-level packages
-when run cross-repo (e.g., when astrograde builds `@panallet/i18n-runtime`
+when run cross-repo (e.g., when astrograde builds `@panellet/i18n-runtime`
 through `npm_link_package`).
 
 Fix: pre-resolve via `createRequire(import.meta.url).resolve(...)` and
 hand babel absolute paths. This sidesteps Babel's resolver entirely.
 
-If you add a panallet tool that loads plugins by name from a third-party
+If you add a panellet tool that loads plugins by name from a third-party
 library, apply the same pattern.
 
 ### TypeScript config inheritance
 
 `react_component`'s default `tsconfig` is `Label("//:tsconfig")`, which
-resolves to `@senku//:tsconfig` — a panallet-tuned config (jsx,
+resolves to `@senku//:tsconfig` — a panellet-tuned config (jsx,
 moduleResolution: "bundler", target: "es2022"). You don't need a
-matching `//:tsconfig` in your own repo for panallet to type-check
+matching `//:tsconfig` in your own repo for panellet to type-check
 correctly.
 
 If you need different settings for a particular component, pass the
@@ -250,7 +250,7 @@ react_component(
 
 ### Naming convention for browser modules
 
-Targets created by `panallet_browser_modules()` mirror npm specifiers
+Targets created by `panellet_browser_modules()` mirror npm specifiers
 exactly:
 
 | npm specifier              | Bazel label                                    |
@@ -259,7 +259,7 @@ exactly:
 | `react-router`             | `//:browser_modules/react-router`              |
 | `set-cookie-parser`        | `//:browser_modules/set-cookie-parser`         |
 | `@stylexjs/stylex`         | `//:browser_modules/@stylexjs/stylex`          |
-| `@panallet/i18n-runtime`   | `//:browser_modules/@panallet/i18n-runtime`    |
+| `@panellet/i18n-runtime`   | `//:browser_modules/@panellet/i18n-runtime`    |
 
 The `_react` group is the only deviation — it's a multi-package CJS
 bundle (`react` + `react-dom/client` + `react/jsx-runtime`) that has to
@@ -267,12 +267,12 @@ ship together so they share React internals.
 
 ### Customizing the umbrella names
 
-`panallet_browser_modules` mirrors `npm_link_all_packages`'s parameter
+`panellet_browser_modules` mirrors `npm_link_all_packages`'s parameter
 shape — both umbrella names are overridable:
 
 ```python
 npm_link_all_packages(name = "vendor")            # //:vendor/<pkg>
-panallet_browser_modules(
+panellet_browser_modules(
     name = "browser_vendor",                      # //:browser_vendor/<pkg>
     node_modules = "vendor",                      # match npm_link_all_packages
 )
@@ -280,7 +280,7 @@ panallet_browser_modules(
 
 The defaults (`name = "browser_modules"`, `node_modules = "node_modules"`)
 match what most repos use, so the common case is just
-`panallet_browser_modules(i18n = True)`. The check that fails on missing
+`panellet_browser_modules(i18n = True)`. The check that fails on missing
 packages uses the `node_modules` argument too — its error message points
 at the right umbrella name regardless of customization.
 
