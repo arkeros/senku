@@ -1,7 +1,17 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_test")
+load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 
 package(default_visibility = ["//visibility:public"])
+
+# The esbuild rule requires its `config` file to live in the caller's
+# package or to be pre-copied into bazel-bin. Wrap the config in
+# copy_to_bin here so react_app.bzl can pass `config = Label(":esbuild_react_dedup.config")`
+# from any package without cross-package-source friction.
+copy_to_bin(
+    name = "esbuild_react_dedup.config",
+    srcs = ["esbuild_react_dedup.config.mjs"],
+)
 
 # Transpile script: runs @babel/core to produce .js + .js.map + .stylex.json
 js_binary(
@@ -139,7 +149,13 @@ js_binary(
     entry_point = "i18n_bundle.mjs",
 )
 
-exports_files(["index.html.tpl"])
+exports_files(
+    [
+        "esbuild_react_dedup.config.mjs",
+        "index.html.tpl",
+    ],
+    visibility = ["//visibility:public"],
+)
 
 bzl_library(
     name = "react_app",

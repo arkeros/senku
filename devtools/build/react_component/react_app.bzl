@@ -259,10 +259,25 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     # Target es2020 so BigInt literals (e.g. messageformat's `100n`) and
     # optional chaining compile as-is. Our tsconfig targets ES2022, and
     # every browser we support has shipped these features since 2020.
+    #
+    # The esbuild `config` aliases `react` etc. to the consumer's
+    # //:node_modules/react. See the config file for rationale — without
+    # this, cross-repo npm_package linkages (e.g. @panellet/i18n-runtime
+    # from @senku) bundle a second react copy from their own virtual
+    # store path, breaking React's hook dispatcher at runtime.
     esbuild(
         name = name + "_bundle",
         entry_point = name + "_main.js",
         target = "es2020",
+        # Ship production-mode JS. `define` rewrites the classic
+        # `process.env.NODE_ENV` guards (react-dom, scheduler, etc. still
+        # use them) so minify can dead-code the dev-only branches. The
+        # `production` export condition that swaps react.development.js for
+        # its production twin lives in the esbuild config (next to the
+        # react alias — two sides of the same "one canonical react" story).
+        define = {"process.env.NODE_ENV": '"production"'},
+        minify = True,
+        config = Label("//devtools/build/react_component:esbuild_react_dedup.config"),
         deps = [
             ":" + name + "_main_ts",
         ] + all_ts_targets + [
