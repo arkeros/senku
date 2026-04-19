@@ -265,6 +265,27 @@ The `_react` group is the only deviation — it's a multi-package CJS
 bundle (`react` + `react-dom/client` + `react/jsx-runtime`) that has to
 ship together so they share React internals.
 
+### Customizing the umbrella names
+
+`panallet_browser_modules` mirrors `npm_link_all_packages`'s parameter
+shape — both umbrella names are overridable:
+
+```python
+npm_link_all_packages(name = "vendor")            # //:vendor/<pkg>
+panallet_browser_modules(
+    name = "browser_vendor",                      # //:browser_vendor/<pkg>
+    node_modules = "vendor",                      # match npm_link_all_packages
+)
+```
+
+The defaults (`name = "browser_modules"`, `node_modules = "node_modules"`)
+match what most repos use, so the common case is just
+`panallet_browser_modules(i18n = True)`. The check that fails on missing
+packages uses the `node_modules` argument too — its error message points
+at the right umbrella name regardless of customization.
+
+### Adding extra browser modules
+
 If you want a browser_dep for a package not in the canonical set, call
 `browser_dep` directly:
 
