@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "react-router";
-import { Trans } from "../../../../devtools/build/react_component/i18n_runtime";
+import { Trans } from "@panallet/i18n-runtime";
 
 const styles = stylex.create({
   heading: { fontSize: 24, fontWeight: 700, marginBottom: 16 },

@@ -3,7 +3,7 @@ import { Link, Outlet } from "react-router";
 import {
   Trans,
   useI18n,
-} from "../../devtools/build/react_component/i18n_runtime";
+} from "@panallet/i18n-runtime";
 import { panalletLogoUrl } from "./Layout.assets";
 import { color, font, size } from "./tokens.stylex";
 
