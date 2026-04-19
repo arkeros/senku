@@ -7,7 +7,8 @@ The naming intentionally mirrors `//:node_modules/<pkg>` and the URL shape
 of esm.sh: target name == npm specifier, no escaping or transformation.
 
 Add extra packages by calling `browser_dep` / `browser_dep_group` directly
-with `name = "browser_modules/<your-pkg>"`.
+with `name = "browser_modules/<your-pkg>"` (or whatever prefix you passed
+as `name` to `panallet_browser_modules`).
 """
 
 load("//devtools/build/js:browser_dep.bzl", "browser_dep")
@@ -32,11 +33,11 @@ _I18N_REQUIRED_NPM_PACKAGES = [
     "messageformat",
 ]
 
-def _check_required_packages(i18n):
+def _check_required_packages(i18n, node_modules):
     existing = native.existing_rules()
 
     def _missing_from_node_modules(pkg):
-        return ("node_modules/" + pkg) not in existing
+        return (node_modules + "/" + pkg) not in existing
 
     required = list(_BASE_REQUIRED_NPM_PACKAGES)
     if i18n:
@@ -46,108 +47,127 @@ def _check_required_packages(i18n):
     if missing:
         fail("""
 
-panallet_browser_modules: missing npm packages in //:node_modules/.
+panallet_browser_modules: missing npm packages in //:{nm}/.
 
 Add the following to your package.json and run `pnpm install`:
 {pkgs}
 
-Then make sure your root BUILD calls `npm_link_all_packages(name = "node_modules")`
+Then make sure your root BUILD calls `npm_link_all_packages(name = "{nm}")`
 *before* `panallet_browser_modules(...)`.
-""".format(pkgs = "\n".join(["  - " + p for p in missing])))
+""".format(
+            nm = node_modules,
+            pkgs = "\n".join(["  - " + p for p in missing]),
+        ))
 
-    if i18n and "node_modules/@panallet/i18n-runtime" not in existing:
+    if i18n and (node_modules + "/@panallet/i18n-runtime") not in existing:
         fail("""
 
 panallet_browser_modules(i18n = True) requires @panallet/i18n-runtime
-linked into //:node_modules/. Add this to your root BUILD *before* the
+linked into //:{nm}/. Add this to your root BUILD *before* the
 panallet_browser_modules call:
 
     load("@aspect_rules_js//npm:defs.bzl", "npm_link_package")
     npm_link_package(
-        name = "node_modules/@panallet/i18n-runtime",
+        name = "{nm}/@panallet/i18n-runtime",
         src = "@senku//devtools/build/react_component/i18n_runtime:pkg",
         visibility = ["//visibility:public"],
     )
-""")
+""".format(nm = node_modules))
 
-def panallet_browser_modules(i18n = False, visibility = _PUBLIC):
+def panallet_browser_modules(
+        name = "browser_modules",
+        node_modules = "node_modules",
+        i18n = False,
+        visibility = _PUBLIC):
     """Materialize the canonical browser_modules for a panallet app.
 
-    Creates targets in the calling package using the `browser_modules/<pkg>`
-    naming convention. Bare `//:node_modules/<pkg>` references inside the
-    macro resolve to the caller's pnpm-lock — each repo pins its own React,
+    Creates targets in the calling package using the `<name>/<pkg>` naming
+    convention. Bare `//:<node_modules>/<pkg>` references inside the macro
+    resolve to the caller's pnpm-lock — each repo pins its own React,
     stylex, etc. — so this is safe to call from any consumer.
 
     Args:
+        name: prefix for the generated browser_modules targets. Defaults to
+            "browser_modules" (mirrors npm_link_all_packages's default
+            "node_modules"). The targets land at `//<pkg>:<name>/<specifier>`,
+            e.g. `//:browser_modules/react`. Override if you call
+            npm_link_all_packages with a non-default `name` and want to
+            keep the prefixes paired.
+        node_modules: name of the `npm_link_all_packages` umbrella target
+            in the calling package. Defaults to "node_modules"; matches
+            `npm_link_all_packages(name = ...)`. Used both to construct
+            //:<node_modules>/<pkg> deps and to existence-check them.
         i18n: also link `messageformat` and `@panallet/i18n-runtime` (the
-            latter must already be linked into `//:node_modules/` via
+            latter must already be linked into `//:<node_modules>/` via
             `npm_link_package` from `@senku//devtools/build/react_component/i18n_runtime:pkg`).
         visibility: visibility for the generated targets — defaults to public
             so any package in the consumer repo can reference them in
             `react_app(browser_deps = ...)`.
     """
 
-    _check_required_packages(i18n)
+    _check_required_packages(i18n, node_modules)
+
+    nm = "//:" + node_modules
 
     # React + react-dom/client + react/jsx-runtime share internals and must
     # come from one bundling pass, otherwise hooks fail with multiple-React
     # warnings. Output filenames inside the group: `react.js`,
     # `react-dom_client.js`, `react_jsx-runtime.js`.
     browser_dep_group(
-        name = "browser_modules/_react",
+        name = name + "/_react",
         packages = [
             "react",
             "react-dom/client",
             "react/jsx-runtime",
         ],
         deps = [
-            "//:node_modules/react",
-            "//:node_modules/react-dom",
+            nm + "/react",
+            nm + "/react-dom",
         ],
         visibility = visibility,
     )
 
     browser_dep(
-        name = "browser_modules/react-router",
+        name = name + "/react-router",
         package = "react-router",
         deps = [
-            "//:node_modules/react",
-            "//:node_modules/react-dom",
-            "//:node_modules/react-router",
+            nm + "/react",
+            nm + "/react-dom",
+            nm + "/react-router",
         ],
         visibility = visibility,
     )
 
     browser_dep(
-        name = "browser_modules/cookie",
+        name = name + "/cookie",
         package = "cookie",
-        deps = ["//:node_modules/cookie"],
+        deps = [nm + "/cookie"],
         visibility = visibility,
     )
 
     browser_dep(
-        name = "browser_modules/set-cookie-parser",
+        name = name + "/set-cookie-parser",
         package = "set-cookie-parser",
-        deps = ["//:node_modules/set-cookie-parser"],
+        deps = [nm + "/set-cookie-parser"],
         visibility = visibility,
     )
 
     browser_dep(
-        name = "browser_modules/@stylexjs/stylex",
+        name = name + "/@stylexjs/stylex",
         package = "@stylexjs/stylex",
-        deps = ["//:node_modules/@stylexjs/stylex"],
+        deps = [nm + "/@stylexjs/stylex"],
         visibility = visibility,
     )
 
     if i18n:
         browser_dep(
-            name = "browser_modules/messageformat",
+            name = name + "/messageformat",
             package = "messageformat",
-            deps = ["//:node_modules/messageformat"],
+            deps = [nm + "/messageformat"],
             visibility = visibility,
         )
         browser_dep(
-            name = "browser_modules/@panallet/i18n-runtime",
+            name = name + "/@panallet/i18n-runtime",
             package = "@panallet/i18n-runtime",
             bundle = True,
             external = [
@@ -156,9 +176,9 @@ def panallet_browser_modules(i18n = False, visibility = _PUBLIC):
                 "react/jsx-runtime",
             ],
             deps = [
-                "//:node_modules/@panallet/i18n-runtime",
-                "//:node_modules/messageformat",
-                "//:node_modules/react",
+                nm + "/@panallet/i18n-runtime",
+                nm + "/messageformat",
+                nm + "/react",
             ],
             visibility = visibility,
         )
