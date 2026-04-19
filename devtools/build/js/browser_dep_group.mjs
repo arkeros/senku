@@ -31,7 +31,7 @@ if (!outdir || !manifestFile || packages.length === 0) {
 const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
 const cwd = process.cwd();
 // browser_dep_group targets are instantiated in the consumer's BUILD via
-// panallet_browser_modules, so cwd is the consumer's workspace.
+// panellet_browser_modules, so cwd is the consumer's workspace.
 const require = createRequire(join(cwd, "package.json"));
 
 const absOutdir = resolve(execroot, outdir);

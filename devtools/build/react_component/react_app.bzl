@@ -168,10 +168,10 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
             "--i18n-manifest-import",
             "./" + name + "_i18n_manifest",
             # Stable npm package name — works in-monorepo and cross-repo because
-            # @panallet/i18n-runtime is linked into //:node_modules/ via a
+            # @panellet/i18n-runtime is linked into //:node_modules/ via a
             # first-party npm_link_package in each consumer's root BUILD.
             "--i18n-runtime-import",
-            "@panallet/i18n-runtime",
+            "@panellet/i18n-runtime",
             "--i18n-source-locale",
             _source_locale,
         ])
@@ -206,9 +206,9 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     if i18n_enabled:
         _main_deps.extend([
             ":" + name + "_i18n_manifest",
-            # Resolves to the consumer's //:node_modules/@panallet/i18n-runtime,
+            # Resolves to the consumer's //:node_modules/@panellet/i18n-runtime,
             # which they wire up via npm_link_package in their root BUILD.
-            "//:node_modules/@panallet/i18n-runtime",
+            "//:node_modules/@panellet/i18n-runtime",
         ])
     react_component(
         name = name + "_main",

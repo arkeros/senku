@@ -1,5 +1,5 @@
 {
-  "name": "@panallet/i18n-runtime",
+  "name": "@panellet/i18n-runtime",
   "version": "0.0.0",
   "type": "module",
   "main": "index.js",

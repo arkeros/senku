@@ -1,5 +1,5 @@
 /**
- * ESM dev server for React + StyleX components (Panallet framework).
+ * ESM dev server for React + StyleX components (Panellet framework).
  *
  * Serves Babel-compiled component JS as native ES modules. npm deps are
  * handled based on their manifest (produced by esm_bundle at build time):

@@ -13,7 +13,7 @@ react_component(
         "ConcertsHome.ru.mf2.json",
     ],
     deps = [
-        "//:node_modules/@panallet/i18n-runtime",
+        "//:node_modules/@panellet/i18n-runtime",
         "//:node_modules/react-router",
     ],
 )
@@ -29,7 +29,7 @@ react_component(
         "City.ru.mf2.json",
     ],
     deps = [
-        "//:node_modules/@panallet/i18n-runtime",
+        "//:node_modules/@panellet/i18n-runtime",
         "//:node_modules/react-router",
         "//examples/stylex:tokens",
     ],
@@ -46,7 +46,7 @@ react_component(
         "Trending.ru.mf2.json",
     ],
     deps = [
-        "//:node_modules/@panallet/i18n-runtime",
+        "//:node_modules/@panellet/i18n-runtime",
         "//examples/stylex:tokens",
     ],
 )

@@ -1,8 +1,8 @@
 // Smoke test pinning messageformat@4's MF2 behavior. This runtime is the
 // linchpin of the i18n design — if the library's MF2 parser or plural
-// resolution regresses, every panallet string renders wrong in prod. The
+// resolution regresses, every panellet string renders wrong in prod. The
 // test exists to catch upgrades that change behavior, independent of any
-// panallet integration.
+// panellet integration.
 
 import assert from "node:assert";
 import { test } from "node:test";

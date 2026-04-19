@@ -3,8 +3,8 @@ import { Link, Outlet } from "react-router";
 import {
   Trans,
   useI18n,
-} from "@panallet/i18n-runtime";
-import { panalletLogoUrl } from "./Layout.assets";
+} from "@panellet/i18n-runtime";
+import { panelletLogoUrl } from "./Layout.assets";
 import { color, font, size } from "./tokens.stylex";
 
 const styles = stylex.create({
@@ -39,7 +39,7 @@ export function Layout() {
     <div {...stylex.props(styles.layout)}>
       <nav {...stylex.props(styles.nav)}>
         <img
-          src={panalletLogoUrl}
+          src={panelletLogoUrl}
           alt={format("layout.logo.alt")}
           {...stylex.props(styles.logo)}
         />

@@ -1,11 +1,11 @@
 # Why StyleX
 
-Panallet uses StyleX for component styling. This document explains the choice
+Panellet uses StyleX for component styling. This document explains the choice
 and how it compares to alternatives.
 
 ## The requirement
 
-Panallet is a Bazel-native React framework. The styling solution must:
+Panellet is a Bazel-native React framework. The styling solution must:
 
 1. **Work at build time** — no runtime CSS generation
 2. **Integrate with the build graph** — styles should be collectible per-component and composable transitively via Bazel providers
@@ -76,7 +76,7 @@ Compile-time atomic CSS via Babel plugin.
 
 ## CSS serving strategy
 
-Panallet produces a single unified CSS file via `stylex_css`. This aligns with
+Panellet produces a single unified CSS file via `stylex_css`. This aligns with
 the recommendation from Naman Goel (StyleX's creator at Meta) in
 [Serving Atomic CSS Well](https://nmn.sh/blog/2025-09-16-serving-atomic-styles):
 

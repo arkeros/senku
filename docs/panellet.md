@@ -1,11 +1,11 @@
-# Panallet — React + StyleX Framework for Bazel
+# Panellet — React + StyleX Framework for Bazel
 
-Panallet is a Bazel-native framework for building React applications with StyleX.
+Panellet is a Bazel-native framework for building React applications with StyleX.
 Routes are defined in Starlark, components are compiled with Babel, and the dev
 server serves native ES modules with import maps.
 
-> Consuming panallet from another bzlmod workspace? See
-> [panallet-cross-repo.md](./panallet-cross-repo.md) for setup, the
+> Consuming panellet from another bzlmod workspace? See
+> [panellet-cross-repo.md](./panellet-cross-repo.md) for setup, the
 > framework-vs-user-pinning rules, and the gotchas.
 
 ## Architecture
