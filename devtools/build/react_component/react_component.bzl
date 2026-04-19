@@ -11,7 +11,7 @@ load(":stylex_transpile.bzl", "stylex_transpile")
 
 _DEFAULT_TSCONFIG = "//:tsconfig"
 
-def react_component(name, srcs, deps = [], assets = [], tsconfig = _DEFAULT_TSCONFIG, _export_test = True, **kwargs):
+def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _DEFAULT_TSCONFIG, _export_test = True, **kwargs):
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.
 
     Wraps ts_project with the StyleX Babel transpiler and a thin rule that
@@ -40,6 +40,10 @@ def react_component(name, srcs, deps = [], assets = [], tsconfig = _DEFAULT_TSCO
         deps: other react_component targets or node_modules labels
         assets: static asset files (svg, png, woff2, etc.) to content-hash and
             expose as typed URL consts in `<name>.assets.ts`
+        i18n: MF2 catalog fragments, one per locale. Filenames must follow
+            `<anything>.<locale>.mf2.json`. Exposed via the `i18n_catalog`
+            OutputGroup; react_app's `i18n_catalog_aspect` aggregates them
+            across deps and merges per locale.
         tsconfig: tsconfig.json label (optional)
         **kwargs: passed through to ts_project (e.g. visibility, tags)
     """
@@ -92,6 +96,7 @@ def react_component(name, srcs, deps = [], assets = [], tsconfig = _DEFAULT_TSCO
         name = name,
         js_outs = [name + "_ts"],
         metadata = [name + "_ts_transpile_stylex_metadata"],
+        i18n = i18n,
         deps = component_deps + ([":" + name + "_assets"] if assets else []),
         **{k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")}
     )

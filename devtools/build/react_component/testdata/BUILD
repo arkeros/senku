@@ -68,3 +68,22 @@ require_output_group_test(
     group = "assets",
     target = ":icons_hashed",
 )
+
+# i18n fixture: a component with per-locale MF2 catalog fragments. Locks in
+# that react_component's `i18n` attr flows into the `i18n_catalog`
+# OutputGroup that the aspect collects.
+react_component(
+    name = "I18nLeaf",
+    testonly = True,
+    srcs = ["I18nLeaf.tsx"],
+    i18n = [
+        "I18nLeaf.en.mf2.json",
+        "I18nLeaf.es.mf2.json",
+    ],
+)
+
+require_output_group_test(
+    name = "i18n_leaf_exposes_i18n_catalog_test",
+    group = "i18n_catalog",
+    target = ":I18nLeaf",
+)
