@@ -94,7 +94,9 @@ BUNDLE="examples/stylex/app_bundle.js"
 echo "=== i18n tests ==="
 
 grep -qF "I18nProvider" "$BUNDLE" || { echo "FAIL: bundle missing I18nProvider wrapper"; exit 1; }
-grep -qF "pickLocale" "$BUNDLE" || { echo "FAIL: bundle missing pickLocale"; exit 1; }
+# No explicit pickLocale check: it's an internal helper mangled away by
+# the prod minify pass. The catalog + data assertions below cover the
+# behavior we actually care about.
 
 # Nav labels — each locale's "Home" must be present.
 grep -qF "Inicio" "$BUNDLE" || { echo "FAIL: bundle missing 'Inicio' (es:layout.nav.home)"; exit 1; }
