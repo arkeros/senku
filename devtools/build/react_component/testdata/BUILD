@@ -81,6 +81,9 @@ react_component(
         "I18nLeaf.en.mf2.json",
         "I18nLeaf.es.mf2.json",
     ],
+    deps = [
+        "//:node_modules/@panellet/i18n-runtime",
+    ],
 )
 
 require_output_group_test(
@@ -97,6 +100,9 @@ react_component(
     i18n = [
         "I18nLeafDep.en.mf2.json",
         "I18nLeafDep.es.mf2.json",
+    ],
+    deps = [
+        "//:node_modules/@panellet/i18n-runtime",
     ],
 )
 
