@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Link } from "react-router";
+import { Trans } from "../../../../devtools/build/react_component/i18n_runtime";
 
 const styles = stylex.create({
   heading: { fontSize: 24, fontWeight: 700, marginBottom: 16 },
@@ -10,11 +11,19 @@ const styles = stylex.create({
 export function ConcertsHome() {
   return (
     <div>
-      <h1 {...stylex.props(styles.heading)}>Concerts</h1>
+      <h1 {...stylex.props(styles.heading)}>
+        <Trans id="concerts.home.heading" />
+      </h1>
       <div {...stylex.props(styles.list)}>
-        <Link to="trending" {...stylex.props(styles.link)}>Trending</Link>
-        <Link to="barcelona" {...stylex.props(styles.link)}>Barcelona</Link>
-        <Link to="madrid" {...stylex.props(styles.link)}>Madrid</Link>
+        <Link to="trending" {...stylex.props(styles.link)}>
+          <Trans id="concerts.home.link.trending" />
+        </Link>
+        <Link to="barcelona" {...stylex.props(styles.link)}>
+          <Trans id="concerts.home.link.barcelona" />
+        </Link>
+        <Link to="madrid" {...stylex.props(styles.link)}>
+          <Trans id="concerts.home.link.madrid" />
+        </Link>
       </div>
     </div>
   );

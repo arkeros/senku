@@ -1,4 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
+import { Trans } from "../../../../devtools/build/react_component/i18n_runtime";
 import { color, font, size } from "../../tokens.stylex";
 
 const styles = stylex.create({
@@ -9,9 +10,11 @@ const styles = stylex.create({
 export function Trending() {
   return (
     <div>
-      <h1 {...stylex.props(styles.heading)}>Trending Concerts</h1>
+      <h1 {...stylex.props(styles.heading)}>
+        <Trans id="concerts.trending.heading" />
+      </h1>
       <p {...stylex.props(styles.text)}>
-        The hottest concerts right now.
+        <Trans id="concerts.trending.body" />
       </p>
     </div>
   );
