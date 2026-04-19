@@ -68,6 +68,11 @@ def react_static_layer(
         name = tree,
         srcs = [app],
         root_paths = ["."],
+        # Sourcemaps stay as build artifacts (useful for error reporting
+        # pipelines that ingest them out-of-band), but never land in the
+        # image. Shipping .map in prod leaks unminified source and bloats
+        # the layer for no end-user benefit.
+        exclude_srcs_patterns = ["**/*.map"],
         replace_prefixes = {
             app_name + "_index.html": "index.html",
             app_name + "_assets_flat": "assets",
