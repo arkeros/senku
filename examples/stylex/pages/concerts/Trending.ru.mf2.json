@@ -1,4 +1,5 @@
 {
   "concerts.trending.heading": "Популярные концерты",
-  "concerts.trending.body": "Самые популярные концерты прямо сейчас."
+  "concerts.trending.body": "Самые популярные концерты прямо сейчас.",
+  "concerts.trending.count": ".input {$count :number}\n.match $count\none  {{{$count} концерт}}\nfew  {{{$count} концерта}}\nmany {{{$count} концертов}}\n*    {{{$count} концертов}}"
 }

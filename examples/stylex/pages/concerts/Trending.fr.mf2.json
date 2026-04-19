@@ -1,4 +1,5 @@
 {
   "concerts.trending.heading": "Concerts en tendance",
-  "concerts.trending.body": "Les concerts les plus en vogue en ce moment."
+  "concerts.trending.body": "Les concerts les plus en vogue en ce moment.",
+  "concerts.trending.count": ".input {$count :number}\n.match $count\none {{{$count} concert}}\n*   {{{$count} concerts}}"
 }
