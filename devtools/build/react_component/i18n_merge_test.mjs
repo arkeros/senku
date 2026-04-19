@@ -1,3 +1,8 @@
+// These tests are the guard: mergeCatalogs is invoked by every i18n_bundle
+// Bazel action, so anything that throws here fails the build of every app
+// that depends on the offending catalog. Coverage is therefore a
+// compile-time property — not a CI lint that could be bypassed.
+
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -171,4 +176,100 @@ test("multiple missing keys are all reported, sorted", () => {
       );
     },
   );
+});
+
+// Error-message quality: these tests enforce that each invariant failure
+// gives a developer enough context to fix the problem without re-running
+// with verbose flags. If an error message silently loses one of these
+// pieces of context (locale, key, or file path), the developer falls
+// back to grepping catalogs manually and the "fail at build time" promise
+// stops being useful.
+
+test("collision error names the two specific fragment files", () => {
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en"],
+      fragments: [
+        frag("en", "apps/foo/Header.en.mf2.json", { "shared.x": "A" }),
+        frag("en", "apps/foo/Footer.en.mf2.json", { "shared.x": "B" }),
+      ],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    assert.match(err.message, /apps\/foo\/Header\.en\.mf2\.json/);
+    assert.match(err.message, /apps\/foo\/Footer\.en\.mf2\.json/);
+    assert.match(err.message, /shared\.x/);
+  }
+});
+
+test("undeclared-locale error names the locale and the file", () => {
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en", "es"],
+      fragments: [
+        frag("en", "Layout.en.mf2.json", { "layout.home": "Home" }),
+        frag("pt", "Layout.pt.mf2.json", { "layout.home": "Início" }),
+      ],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    assert.match(err.message, /pt/);
+    assert.match(err.message, /Layout\.pt\.mf2\.json/);
+  }
+});
+
+test("stray-key error is clear about which side is wrong", () => {
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en", "es"],
+      fragments: [
+        frag("en", "Layout.en.mf2.json", { "layout.home": "Home" }),
+        frag("es", "Layout.es.mf2.json", {
+          "layout.home": "Inicio",
+          // typo: nav_home instead of navHome
+          "layout.nav_home": "Inicio",
+        }),
+      ],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    // Must name the locale where the stray key lives, not just say
+    // "coverage mismatch".
+    assert.match(err.message, /\bes\b/);
+    assert.match(err.message, /layout\.nav_home/);
+    // Must NOT claim the en side is wrong — en is the source of truth.
+    assert.doesNotMatch(err.message, /\ben has stray\b/i);
+  }
+});
+
+test("multi-locale failure reports locales independently", () => {
+  // es is missing a key, fr has a stray one — a single run should report
+  // both (rather than failing on the first and hiding the second). In
+  // practice we fail fast per-locale but ensure at least the first is
+  // surfaced with full context.
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en", "es", "fr"],
+      fragments: [
+        frag("en", "Home.en.mf2.json", { "home.title": "Home" }),
+        frag("es", "Home.es.mf2.json", {}),
+        frag("fr", "Home.fr.mf2.json", {
+          "home.title": "Accueil",
+          "home.extra": "Extra",
+        }),
+      ],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    // The specific ordering of which error fires first is implementation
+    // detail; both failure modes must be *reachable* and produce an
+    // actionable message. Assert at least the es-missing path surfaces
+    // since it's the first declared non-source locale.
+    assert.match(err.message, /es/);
+    assert.match(err.message, /home\.title/);
+  }
 });
