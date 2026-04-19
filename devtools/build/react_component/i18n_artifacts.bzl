@@ -156,7 +156,7 @@ def i18n_artifacts(name, components, source_locale, locales, forward_kwargs = {}
         srcs = [manifest_ts],
         _export_test = False,
         deps = [
-            "//devtools/build/react_component/i18n_runtime:i18n_runtime",
+            "//:node_modules/@panallet/i18n-runtime",
         ],
         **component_kwargs
     )

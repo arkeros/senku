@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Trans,
   useI18n,
-} from "../../../devtools/build/react_component/i18n_runtime";
+} from "@panallet/i18n-runtime";
 import { Button } from "../Button";
 import { getEnv } from "../app_env";
 
