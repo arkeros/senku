@@ -81,6 +81,12 @@ browser_dep(
     deps = ["//:node_modules/@stylexjs/stylex"],
 )
 
+browser_dep(
+    name = "messageformat",
+    package = "messageformat",
+    deps = ["//:node_modules/messageformat"],
+)
+
 bzl_library(
     name = "browser_dep",
     srcs = ["browser_dep.bzl"],

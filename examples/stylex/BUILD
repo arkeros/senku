@@ -22,6 +22,12 @@ react_component(
     name = "Layout",
     srcs = ["Layout.tsx"],
     assets = ["panallet_logo.png"],
+    i18n = [
+        "Layout.en.mf2.json",
+        "Layout.es.mf2.json",
+        "Layout.fr.mf2.json",
+        "Layout.ru.mf2.json",
+    ],
     deps = [
         ":tokens",
         "//:node_modules/react-router",
@@ -54,11 +60,18 @@ react_app(
         "//devtools/build/js:cookie",
         "//devtools/build/js:set_cookie_parser",
         "//devtools/build/js:stylex",
+        "//devtools/build/js:messageformat",
     ],
     error_component = ":AppError",
     html_template = "index.html.tpl",
     jit_open_props = True,
     layout = ":Layout",
+    locales = [
+        "en",
+        "es",
+        "fr",
+        "ru",
+    ],
     routes = [
         route(
             component = "//examples/stylex/pages:Home",
@@ -95,6 +108,7 @@ react_app(
     runtime_config = {
         "API_URL": "http://localhost:8080",
     },
+    source_locale = "en",
 )
 
 build_test(
