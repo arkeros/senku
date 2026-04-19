@@ -1,4 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
+import {
+  Trans,
+  useI18n,
+} from "../../../devtools/build/react_component/i18n_runtime";
 import { Button } from "../Button";
 import { getEnv } from "../app_env";
 
@@ -22,13 +26,16 @@ const styles = stylex.create({
 });
 
 export function Home() {
+  const { format } = useI18n();
   return (
     <div>
-      <h1 {...stylex.props(styles.heading)}>Home</h1>
-      <p {...stylex.props(styles.apiUrl)}>API: {getEnv("API_URL")}</p>
+      <h1 {...stylex.props(styles.heading)}><Trans id="home.heading" /></h1>
+      <p {...stylex.props(styles.apiUrl)}>
+        <Trans id="home.apiLabel" values={{ url: getEnv("API_URL") }} />
+      </p>
       <div {...stylex.props(styles.container)}>
-        <Button label="Primary" />
-        <Button label="Secondary" variant="secondary" />
+        <Button label={format("home.button.primary")} />
+        <Button label={format("home.button.secondary")} variant="secondary" />
       </div>
     </div>
   );

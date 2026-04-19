@@ -1,0 +1,4 @@
+{
+  "about.heading": "À propos",
+  "about.body": "Cet exemple illustre des composants React stylés avec StyleX et des routes définies en Starlark, compilées avec Bazel."
+}
