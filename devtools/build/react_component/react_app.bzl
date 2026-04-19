@@ -128,8 +128,9 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     # merge fragments per locale, and emit :{name}_i18n_manifest for app code
     # to import. The merge step is where "catalog coverage is a build-time
     # invariant" actually holds — omit this block and that guarantee evaporates.
-    if locales:
-        _source_locale = source_locale if source_locale else locales[0]
+    i18n_enabled = bool(locales)
+    _source_locale = source_locale if source_locale else (locales[0] if locales else None)
+    if i18n_enabled:
         i18n_artifacts(
             name = name,
             components = all_route_components,
@@ -148,20 +149,38 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         route_config = json.encode(flat_routes),
     )
 
-    # Generate router.tsx and main.tsx from manifest
+    # Generate router.tsx and main.tsx from manifest. When i18n is enabled,
+    # the generated main.tsx wraps <RouterProvider> in <I18nProvider> using
+    # the per-app catalog manifest. Layout components stay clean — the wrap
+    # lives here so that no user component has to import the manifest that's
+    # built from its own fragments.
     codegen_name = name + "_codegen"
+    codegen_args = [
+        "--manifest",
+        "$(location {}.json)".format(manifest_name),
+        "--out-router",
+        "$(location {}_router.tsx)".format(name),
+        "--out-main",
+        "$(location {}_main.tsx)".format(name),
+    ]
+    if i18n_enabled:
+        pkg = native.package_name()
+        depth = len(pkg.split("/")) if pkg else 0
+        runtime_import = "../" * depth + "devtools/build/react_component/i18n_runtime"
+        codegen_args.extend([
+            "--i18n-manifest-import",
+            "./" + name + "_i18n_manifest",
+            "--i18n-runtime-import",
+            runtime_import,
+            "--i18n-source-locale",
+            _source_locale,
+        ])
+
     js_run_binary(
         name = codegen_name,
         srcs = [manifest_name + ".json"],
         outs = [name + "_router.tsx", name + "_main.tsx"],
-        args = [
-            "--manifest",
-            "$(location {}.json)".format(manifest_name),
-            "--out-router",
-            "$(location {}_router.tsx)".format(name),
-            "--out-main",
-            "$(location {}_main.tsx)".format(name),
-        ],
+        args = codegen_args,
         tool = "//devtools/build/react_component:react_app_codegen_bin",
     )
 
@@ -178,16 +197,22 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     )
 
     # Compile generated main (entry point)
+    _main_deps = [
+        ":" + name + "_router",
+        "//:node_modules/react-dom",
+        "//:node_modules/@types/react-dom",
+        "//:node_modules/react-router",
+    ]
+    if i18n_enabled:
+        _main_deps.extend([
+            ":" + name + "_i18n_manifest",
+            "//devtools/build/react_component/i18n_runtime",
+        ])
     react_component(
         name = name + "_main",
         srcs = [name + "_main.tsx"],
         _export_test = False,
-        deps = [
-            ":" + name + "_router",
-            "//:node_modules/react-dom",
-            "//:node_modules/@types/react-dom",
-            "//:node_modules/react-router",
-        ],
+        deps = _main_deps,
     )
 
     # Collect StyleX CSS from all route components (transitive via stylex_metadata_aspect)
@@ -228,9 +253,14 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     # Production bundle. Asset files ride as data so they end up in the
     # bundle's runfiles; URLs are baked into JS by asset_codegen, so
     # esbuild doesn't need to see the binaries directly.
+    #
+    # Target es2020 so BigInt literals (e.g. messageformat's `100n`) and
+    # optional chaining compile as-is. Our tsconfig targets ES2022, and
+    # every browser we support has shipped these features since 2020.
     esbuild(
         name = name + "_bundle",
         entry_point = name + "_main.js",
+        target = "es2020",
         deps = [
             ":" + name + "_main_ts",
         ] + all_ts_targets + [
