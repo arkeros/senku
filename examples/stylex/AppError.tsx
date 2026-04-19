@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { useRouteError } from "react-router";
+import { Trans } from "../../devtools/build/react_component/i18n_runtime";
 import { color, size } from "./tokens.stylex";
 
 const styles = stylex.create({
@@ -17,7 +18,7 @@ export function AppError() {
   const message = error instanceof Error ? error.message : String(error);
   return (
     <div {...stylex.props(styles.wrap)}>
-      <h1>Something went wrong</h1>
+      <h1><Trans id="appError.title" /></h1>
       <pre {...stylex.props(styles.message)}>{message}</pre>
     </div>
   );

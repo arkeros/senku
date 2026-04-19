@@ -38,18 +38,32 @@ react_component(
 react_component(
     name = "AppError",
     srcs = ["AppError.tsx"],
+    i18n = [
+        "AppError.en.mf2.json",
+        "AppError.es.mf2.json",
+        "AppError.fr.mf2.json",
+        "AppError.ru.mf2.json",
+    ],
     deps = [
         ":tokens",
         "//:node_modules/react-router",
+        "//devtools/build/react_component/i18n_runtime",
     ],
 )
 
 react_component(
     name = "RouteError",
     srcs = ["RouteError.tsx"],
+    i18n = [
+        "RouteError.en.mf2.json",
+        "RouteError.es.mf2.json",
+        "RouteError.fr.mf2.json",
+        "RouteError.ru.mf2.json",
+    ],
     deps = [
         ":tokens",
         "//:node_modules/react-router",
+        "//devtools/build/react_component/i18n_runtime",
     ],
 )
 
