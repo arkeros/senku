@@ -31,6 +31,7 @@ react_component(
     deps = [
         ":tokens",
         "//:node_modules/react-router",
+        "//devtools/build/react_component/i18n_runtime",
     ],
 )
 
@@ -132,6 +133,7 @@ sh_test(
     data = [
         ":app_assets",
         ":app_assets.json",
+        ":app_bundle",
         ":app_env_dev",
         ":app_env_tpl",
         ":app_html",

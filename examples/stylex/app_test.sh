@@ -83,4 +83,20 @@ HASHED=$(grep -oE 'panallet_logo\.[0-9a-f]{12}\.png' "$ASSETS_MANIFEST" | head -
 [ -f "$ASSETS_DIR/$HASHED" ] || { echo "FAIL: hashed logo file $HASHED not in $ASSETS_DIR"; exit 1; }
 echo "PASS: asset pipeline (hashed as $HASHED)"
 
+# i18n pipeline: bundle must carry every locale's nav translations inline, and
+# main.tsx must wrap the router in <I18nProvider>.
+BUNDLE="examples/stylex/app_bundle.js"
+echo "=== i18n tests ==="
+
+grep -qF "Inicio" "$BUNDLE" || { echo "FAIL: bundle missing Spanish 'Inicio'"; exit 1; }
+grep -qF "Accueil" "$BUNDLE" || { echo "FAIL: bundle missing French 'Accueil'"; exit 1; }
+# esbuild rewrites non-ASCII as \uXXXX escapes in the bundle. Cyrillic Г is U+0413,
+# so Главная starts with \u0413 — check for the prefix as a stand-in for the full
+# string; any Russian translation of any key in the bundle satisfies this.
+# esbuild emits hex digits uppercase; match case-insensitively via -i.
+grep -qiF '\u0413\u043b\u0430\u0432\u043d\u0430\u044f' "$BUNDLE" || { echo "FAIL: bundle missing Russian 'Главная' (escaped)"; exit 1; }
+grep -qF "I18nProvider" "$BUNDLE" || { echo "FAIL: bundle missing I18nProvider wrapper"; exit 1; }
+grep -qF "pickLocale" "$BUNDLE" || { echo "FAIL: bundle missing pickLocale"; exit 1; }
+echo "PASS: i18n"
+
 echo "All tests passed."
