@@ -181,7 +181,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         srcs = [manifest_name + ".json"],
         outs = [name + "_router.tsx", name + "_main.tsx"],
         args = codegen_args,
-        tool = "//devtools/build/react_component:react_app_codegen_bin",
+        tool = Label("//devtools/build/react_component:react_app_codegen_bin"),
     )
 
     # Compile generated router. Deps on route components are needed for
@@ -231,7 +231,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     )
 
     # HTML template
-    tpl_name = html_template or "//devtools/build/react_component:index.html.tpl"
+    tpl_name = html_template or Label("//devtools/build/react_component:index.html.tpl")
 
     # When runtime_config is set, the `/env.js` bootstrap must load before the
     # main bundle so `window.__ENV__` is set before any module script runs.
