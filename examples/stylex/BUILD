@@ -31,8 +31,8 @@ react_component(
     ],
     deps = [
         ":tokens",
+        "//:node_modules/@panallet/i18n-runtime",
         "//:node_modules/react-router",
-        "//devtools/build/react_component/i18n_runtime",
     ],
 )
 
@@ -48,8 +48,8 @@ react_component(
     ],
     deps = [
         ":tokens",
+        "//:node_modules/@panallet/i18n-runtime",
         "//:node_modules/react-router",
-        "//devtools/build/react_component/i18n_runtime",
     ],
 )
 
@@ -65,20 +65,21 @@ react_component(
     ],
     deps = [
         ":tokens",
+        "//:node_modules/@panallet/i18n-runtime",
         "//:node_modules/react-router",
-        "//devtools/build/react_component/i18n_runtime",
     ],
 )
 
 react_app(
     name = "app",
     browser_deps = [
-        "//devtools/build/js:react",
-        "//devtools/build/js:react_router",
-        "//devtools/build/js:cookie",
-        "//devtools/build/js:set_cookie_parser",
-        "//devtools/build/js:stylex",
-        "//devtools/build/js:messageformat",
+        "//:browser_modules/_react",
+        "//:browser_modules/react-router",
+        "//:browser_modules/cookie",
+        "//:browser_modules/set-cookie-parser",
+        "//:browser_modules/@stylexjs/stylex",
+        "//:browser_modules/messageformat",
+        "//:browser_modules/@panallet/i18n-runtime",
     ],
     error_component = ":AppError",
     html_template = "index.html.tpl",
