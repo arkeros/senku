@@ -30,6 +30,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 
+import { MessageFormat } from "messageformat";
+
 export function mergeCatalogs({ sourceLocale, locales, fragments }) {
   if (!locales.includes(sourceLocale)) {
     throw new Error(
@@ -48,6 +50,19 @@ export function mergeCatalogs({ sourceLocale, locales, fragments }) {
       );
     }
     for (const [key, value] of Object.entries(data)) {
+      // Parse each message against its target locale. A syntactically
+      // broken MF2 string (unbalanced braces, .match without .input,
+      // unknown function, etc.) otherwise ships into the bundle and only
+      // explodes at runtime — here it becomes a build failure instead.
+      // bidiIsolation is mirrored from the runtime so validation and
+      // execution agree on option semantics.
+      try {
+        new MessageFormat(locale, value, { bidiIsolation: "none" });
+      } catch (err) {
+        throw new Error(
+          `Malformed MF2 in ${path}, key "${key}", locale "${locale}": ${err?.message ?? err}`,
+        );
+      }
       perLocale[locale].push({ key, value, path });
     }
   }

@@ -245,6 +245,67 @@ test("stray-key error is clear about which side is wrong", () => {
   }
 });
 
+test("malformed MF2 syntax fails the merge with file/key/locale context", () => {
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en"],
+      fragments: [
+        frag("en", "Trending.en.mf2.json", {
+          // .match without a preceding .input declaration — messageformat's
+          // parser rejects this as "empty-token" or similar at parse time.
+          "concerts.trending.count":
+            ".match {$count :number}\none {{{$count} concert}}\n*   {{{$count} concerts}}",
+        }),
+      ],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    assert.match(err.message, /Malformed MF2/);
+    assert.match(err.message, /Trending\.en\.mf2\.json/);
+    assert.match(err.message, /concerts\.trending\.count/);
+    assert.match(err.message, /\ben\b/);
+  }
+});
+
+test("well-formed MF2 with .input + .match + plural passes validation", () => {
+  // Must not throw — round-trip of the real shape we ship in panallet.
+  const out = mergeCatalogs({
+    sourceLocale: "en",
+    locales: ["en"],
+    fragments: [
+      frag("en", "Trending.en.mf2.json", {
+        "concerts.trending.count":
+          ".input {$count :number}\n.match $count\none {{{$count} concert}}\n*   {{{$count} concerts}}",
+      }),
+    ],
+  });
+  assert.ok(out.en["concerts.trending.count"]);
+});
+
+test("malformed MF2 in a non-source locale fails just the same", () => {
+  // Guards against the validator only running on the source locale —
+  // translators' catalogs are where syntax bugs are most likely to land.
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en", "es"],
+      fragments: [
+        frag("en", "Layout.en.mf2.json", { "layout.title": "Home" }),
+        frag("es", "Layout.es.mf2.json", {
+          // Unbalanced `{{` brace — MF2 rejects at parse.
+          "layout.title": "Inicio {{incomplete",
+        }),
+      ],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    assert.match(err.message, /Malformed MF2/);
+    assert.match(err.message, /Layout\.es\.mf2\.json/);
+    assert.match(err.message, /\bes\b/);
+  }
+});
+
 test("multi-locale failure reports locales independently", () => {
   // es is missing a key, fr has a stray one — a single run should report
   // both (rather than failing on the first and hiding the second). In
