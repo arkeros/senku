@@ -94,7 +94,6 @@ react_app(
     ],
     runtime_config = {
         "API_URL": "http://localhost:8080",
-        "LOCALE": "en",
     },
 )
 
