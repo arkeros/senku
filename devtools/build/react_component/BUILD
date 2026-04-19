@@ -77,11 +77,26 @@ js_test(
     entry_point = "asset_manifest_merge_test.mjs",
 )
 
+# i18n extract refs: scans component sources for <Trans id="..." /> and
+# format("...") call sites, rejects dynamic <Trans> ids, emits a JSON
+# manifest of referenced keys that i18n_merge cross-checks against the
+# source-locale merged catalog.
+js_binary(
+    name = "i18n_extract_refs_bin",
+    entry_point = "i18n_extract_refs.mjs",
+)
+
+js_test(
+    name = "i18n_extract_refs_test",
+    data = ["i18n_extract_refs.mjs"],
+    entry_point = "i18n_extract_refs_test.mjs",
+)
+
 # i18n merge: reads a manifest of per-component catalog fragments and emits
-# one merged JSON per locale. Enforces four invariants as build errors:
-# no in-locale collisions, no missing translations, no stray keys, and no
-# malformed MF2 syntax in any value (validated via messageformat at merge
-# time so runtime never has to).
+# one merged JSON per locale. Enforces five invariants as build errors:
+# no in-locale collisions, no missing translations, no stray keys, no
+# malformed MF2 syntax, and no referenced-but-undefined ids (every
+# <Trans id="..." /> resolves to a catalog key).
 js_binary(
     name = "i18n_merge_bin",
     data = ["//:node_modules/messageformat"],
@@ -167,6 +182,7 @@ bzl_library(
     srcs = ["react_component.bzl"],
     deps = [
         ":_artifact_outputs",
+        ":i18n_extract_refs",
         ":labels",
         ":stylex_transpile",
         "@aspect_rules_js//js:defs",
@@ -249,6 +265,11 @@ bzl_library(
 bzl_library(
     name = "asset_codegen",
     srcs = ["asset_codegen.bzl"],
+)
+
+bzl_library(
+    name = "i18n_extract_refs",
+    srcs = ["i18n_extract_refs.bzl"],
 )
 
 bzl_library(

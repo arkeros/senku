@@ -283,6 +283,105 @@ test("well-formed MF2 with .input + .match + plural passes validation", () => {
   assert.ok(out.en["concerts.trending.count"]);
 });
 
+test("referenced ids that exist in source catalog pass", () => {
+  const out = mergeCatalogs({
+    sourceLocale: "en",
+    locales: ["en"],
+    fragments: [
+      frag("en", "Layout.en.mf2.json", {
+        "layout.home": "Home",
+        "layout.about": "About",
+      }),
+    ],
+    references: [
+      { file: "Layout.tsx", key: "layout.home" },
+      { file: "Layout.tsx", key: "layout.about" },
+    ],
+  });
+  assert.ok(out.en);
+});
+
+test("referenced id missing from source catalog fails with file context", () => {
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en"],
+      fragments: [
+        frag("en", "Layout.en.mf2.json", { "layout.home": "Home" }),
+      ],
+      references: [
+        { file: "Layout.tsx", key: "layout.home" },
+        { file: "Layout.tsx", key: "layout.nonexistent" },
+      ],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    assert.match(err.message, /reference check/);
+    assert.match(err.message, /Layout\.tsx/);
+    assert.match(err.message, /layout\.nonexistent/);
+    // Keys that DO resolve must not appear in the error message — it
+    // would just add noise.
+    assert.doesNotMatch(err.message, /layout\.home(?!\.)/);
+  }
+});
+
+test("multiple unresolved refs are grouped by file in the error", () => {
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en"],
+      fragments: [frag("en", "Layout.en.mf2.json", {})],
+      references: [
+        { file: "Home.tsx", key: "home.heading" },
+        { file: "Home.tsx", key: "home.body" },
+        { file: "About.tsx", key: "about.heading" },
+      ],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    assert.match(err.message, /Home\.tsx/);
+    assert.match(err.message, /About\.tsx/);
+    // Files sorted alphabetically so About < Home
+    assert.ok(err.message.indexOf("About.tsx") < err.message.indexOf("Home.tsx"));
+    // Keys for one file appear together
+    const homeLine = err.message.split("\n").find((l) => l.includes("Home.tsx"));
+    assert.ok(homeLine.includes("home.heading"));
+    assert.ok(homeLine.includes("home.body"));
+  }
+});
+
+test("empty references list is accepted (components with no srcs scanned)", () => {
+  const out = mergeCatalogs({
+    sourceLocale: "en",
+    locales: ["en"],
+    fragments: [frag("en", "Layout.en.mf2.json", { "layout.home": "Home" })],
+    references: [],
+  });
+  assert.ok(out.en);
+});
+
+test("reference check runs after coverage check — coverage failure reported first", () => {
+  // Ordering matters for error quality: if a locale is missing translations,
+  // that's the developer's primary problem, not a downstream ref check.
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en", "es"],
+      fragments: [
+        frag("en", "Layout.en.mf2.json", { "layout.home": "Home" }),
+        frag("es", "Layout.es.mf2.json", {}),
+      ],
+      references: [{ file: "App.tsx", key: "nonexistent" }],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    // Coverage error is the one surfaced; the ref error only fires once
+    // coverage holds.
+    assert.match(err.message, /missing translations/);
+    assert.doesNotMatch(err.message, /reference check/);
+  }
+});
+
 test("malformed MF2 in a non-source locale fails just the same", () => {
   // Guards against the validator only running on the source locale —
   // translators' catalogs are where syntax bugs are most likely to land.

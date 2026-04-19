@@ -1,6 +1,12 @@
 """Per-app i18n pipeline: merge per-component catalog fragments + emit typed TS manifest."""
 
-load(":_artifact_aspect.bzl", "I18nCatalogCollection", "i18n_catalog_aspect")
+load(
+    ":_artifact_aspect.bzl",
+    "I18nCatalogCollection",
+    "I18nRefsCollection",
+    "i18n_catalog_aspect",
+    "i18n_refs_aspect",
+)
 load(":react_component.bzl", "react_component")
 
 def _parse_locale_from_basename(basename):
@@ -21,6 +27,17 @@ def _i18n_bundle_impl(ctx):
         if I18nCatalogCollection in c
     ]).to_list()
 
+    # Ref manifests come from components that declared i18n catalogs; every
+    # such component's sources were scanned for <Trans id="..." /> call
+    # sites, so the union here is "every id referenced by the app's
+    # component closure" — exactly the set the merger validates against
+    # the source-locale merged catalog.
+    refs_files = depset(transitive = [
+        c[I18nRefsCollection].files
+        for c in ctx.attr.components
+        if I18nRefsCollection in c
+    ]).to_list()
+
     # Compose the merge-manifest the orchestrator tool consumes. Pairing
     # locale + path here avoids reparsing filenames JS-side and keeps locale
     # detection in one place.
@@ -34,6 +51,7 @@ def _i18n_bundle_impl(ctx):
             )
             for f in fragments
         ],
+        refs_files = [f.path for f in refs_files],
     )
     merge_manifest = ctx.actions.declare_file(ctx.label.name + "_merge_manifest.json")
     ctx.actions.write(merge_manifest, json.encode(manifest_struct))
@@ -55,7 +73,7 @@ def _i18n_bundle_impl(ctx):
     args.add("--manifest-ts", manifest_ts.path)
 
     ctx.actions.run(
-        inputs = fragments + [merge_manifest],
+        inputs = fragments + refs_files + [merge_manifest],
         outputs = merged_jsons + [manifest_ts],
         executable = ctx.executable._tool,
         arguments = [args],
@@ -76,8 +94,8 @@ _i18n_bundle = rule(
     implementation = _i18n_bundle_impl,
     attrs = {
         "components": attr.label_list(
-            aspects = [i18n_catalog_aspect],
-            doc = "react_component targets whose transitive i18n fragments are aggregated.",
+            aspects = [i18n_catalog_aspect, i18n_refs_aspect],
+            doc = "react_component targets whose transitive i18n fragments + ref manifests are aggregated.",
         ),
         "source_locale": attr.string(mandatory = True),
         "locales": attr.string_list(mandatory = True),
