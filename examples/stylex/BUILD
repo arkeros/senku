@@ -23,6 +23,7 @@ react_component(
     srcs = ["Layout.tsx"],
     assets = ["panallet_logo.png"],
     i18n = [
+        "Layout.ca.mf2.json",
         "Layout.en.mf2.json",
         "Layout.es.mf2.json",
         "Layout.fr.mf2.json",
@@ -39,6 +40,7 @@ react_component(
     name = "AppError",
     srcs = ["AppError.tsx"],
     i18n = [
+        "AppError.ca.mf2.json",
         "AppError.en.mf2.json",
         "AppError.es.mf2.json",
         "AppError.fr.mf2.json",
@@ -55,6 +57,7 @@ react_component(
     name = "RouteError",
     srcs = ["RouteError.tsx"],
     i18n = [
+        "RouteError.ca.mf2.json",
         "RouteError.en.mf2.json",
         "RouteError.es.mf2.json",
         "RouteError.fr.mf2.json",
@@ -82,6 +85,7 @@ react_app(
     jit_open_props = True,
     layout = ":Layout",
     locales = [
+        "ca",
         "en",
         "es",
         "fr",

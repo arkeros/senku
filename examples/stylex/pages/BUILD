@@ -6,6 +6,7 @@ react_component(
     name = "Home",
     srcs = ["Home.tsx"],
     i18n = [
+        "Home.ca.mf2.json",
         "Home.en.mf2.json",
         "Home.es.mf2.json",
         "Home.fr.mf2.json",
@@ -22,6 +23,7 @@ react_component(
     name = "About",
     srcs = ["About.tsx"],
     i18n = [
+        "About.ca.mf2.json",
         "About.en.mf2.json",
         "About.es.mf2.json",
         "About.fr.mf2.json",
@@ -37,6 +39,7 @@ react_component(
     name = "NotFound",
     srcs = ["NotFound.tsx"],
     i18n = [
+        "NotFound.ca.mf2.json",
         "NotFound.en.mf2.json",
         "NotFound.es.mf2.json",
         "NotFound.fr.mf2.json",
