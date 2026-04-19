@@ -10,7 +10,7 @@ load(":i18n_extract_refs.bzl", "i18n_extract_refs")
 load(":labels.bzl", "is_node_module", "ts_dep")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
-_DEFAULT_TSCONFIG = "//:tsconfig"
+_DEFAULT_TSCONFIG = Label("//:tsconfig")
 
 def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _DEFAULT_TSCONFIG, _export_test = True, **kwargs):
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.

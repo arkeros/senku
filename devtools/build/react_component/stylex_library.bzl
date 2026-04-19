@@ -5,7 +5,7 @@ load(":_artifact_outputs.bzl", "artifact_outputs")
 load(":labels.bzl", "is_node_module", "ts_dep")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
-_DEFAULT_TSCONFIG = "//:tsconfig"
+_DEFAULT_TSCONFIG = Label("//:tsconfig")
 
 def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs):
     """Build a StyleX design-token module (e.g. `tokens.stylex.ts`).

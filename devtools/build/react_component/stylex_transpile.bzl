@@ -78,7 +78,7 @@ def stylex_transpile(name, srcs, out_dir = None, resolve_json = False, stylex_de
             srcs = tool_srcs,
             outs = [js_out, map_out, metadata_out],
             args = args,
-            tool = "//devtools/build/react_component:stylex_transpile_bin",
+            tool = Label("//devtools/build/react_component:stylex_transpile_bin"),
             **kwargs
         )
 

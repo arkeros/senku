@@ -32,7 +32,7 @@ def browser_dep_group(name, packages, deps, **kwargs):
             "--manifest",
             "$(location {}.json)".format(name),
         ] + pkg_args,
-        tool = "//devtools/build/js:browser_dep_group_bin",
+        tool = Label("//devtools/build/js:browser_dep_group_bin"),
         **kwargs
     )
 
