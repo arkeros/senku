@@ -60,3 +60,24 @@ export function Trans({
 }) {
   return <>{useI18n().format(id, values)}</>;
 }
+
+/**
+ * Browser-side locale selection. Priority:
+ *   1. `?lang=<code>` query param (ad-hoc testing; QA can flip languages
+ *      without touching browser settings).
+ *   2. The primary subtag of `navigator.language` (e.g. "en-US" → "en").
+ *   3. The provided fallback.
+ *
+ * Returning a value from `supported` means the caller can pass the result
+ * straight to I18N_CATALOGS indexing without a runtime guard.
+ */
+export function pickLocale<L extends string>(
+  supported: readonly L[],
+  fallback: L,
+): L {
+  if (typeof window === "undefined") return fallback;
+  const override = new URLSearchParams(window.location.search).get("lang");
+  if (override && supported.includes(override as L)) return override as L;
+  const tag = navigator.language.split("-")[0];
+  return supported.includes(tag as L) ? (tag as L) : fallback;
+}
