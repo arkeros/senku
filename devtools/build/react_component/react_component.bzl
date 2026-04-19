@@ -6,6 +6,7 @@ load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load(":_artifact_outputs.bzl", "artifact_outputs")
 load(":_hash_assets.bzl", "hash_assets")
 load(":asset_codegen.bzl", "asset_codegen")
+load(":i18n_extract_refs.bzl", "i18n_extract_refs")
 load(":labels.bzl", "is_node_module", "ts_dep")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
@@ -92,11 +93,28 @@ def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _D
     # output group. Downstream consumers (react_app_manifest) read files from
     # DefaultInfo by naming convention; stylex_css reaches the metadata
     # through the stylex_metadata_aspect traversing `deps`.
+    # When the component ships catalogs, extract referenced ids from its
+    # sources so i18n_merge can later prove every <Trans id="..." /> in this
+    # component resolves to a catalog key. Limited to components with i18n
+    # fragments — otherwise this runs for every react_component in the repo.
+    i18n_refs_labels = []
+    if i18n:
+        refs_name = name + "_i18n_refs"
+        refs_out = name + "_i18n_refs.json"
+        i18n_extract_refs(
+            name = refs_name,
+            srcs = [s for s in srcs if s.endswith(".tsx") or s.endswith(".ts") or s.endswith(".mts")],
+            out = refs_out,
+            **{k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")}
+        )
+        i18n_refs_labels = [":" + refs_name]
+
     artifact_outputs(
         name = name,
         js_outs = [name + "_ts"],
         metadata = [name + "_ts_transpile_stylex_metadata"],
         i18n = i18n,
+        i18n_refs = i18n_refs_labels,
         deps = component_deps + ([":" + name + "_assets"] if assets else []),
         **{k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")}
     )

@@ -32,7 +32,7 @@ import { resolve, dirname } from "node:path";
 
 import { MessageFormat } from "messageformat";
 
-export function mergeCatalogs({ sourceLocale, locales, fragments }) {
+export function mergeCatalogs({ sourceLocale, locales, fragments, references = [] }) {
   if (!locales.includes(sourceLocale)) {
     throw new Error(
       `source_locale "${sourceLocale}" must be in locales (${locales.join(", ")})`,
@@ -107,6 +107,24 @@ export function mergeCatalogs({ sourceLocale, locales, fragments }) {
         `Locale "${locale}" has stray key(s) not in source locale "${sourceLocale}": ${stray.join(", ")}`,
       );
     }
+  }
+
+  // Every id that a component referenced via <Trans id="..." /> or
+  // format("...") must resolve to a catalog key. Group unresolved refs by
+  // file so the error message reads like a real diagnostic ("Foo.tsx: key
+  // X, key Y") rather than a flat list of pairs.
+  const unresolved = references.filter((r) => !sourceKeys.has(r.key));
+  if (unresolved.length > 0) {
+    const byFile = {};
+    for (const { file, key } of unresolved) {
+      (byFile[file] ??= new Set()).add(key);
+    }
+    const lines = Object.keys(byFile)
+      .sort()
+      .map((f) => `  ${f}: ${[...byFile[f]].sort().join(", ")}`);
+    throw new Error(
+      `i18n reference check failed — ${unresolved.length} id(s) used in source but missing from the "${sourceLocale}" catalog:\n${lines.join("\n")}`,
+    );
   }
 
   return merged;

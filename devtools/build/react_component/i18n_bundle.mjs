@@ -56,10 +56,21 @@ const fragments = manifest.fragments.map((f) => ({
   data: JSON.parse(readFileSync(resolve(execroot, f.path), "utf-8")),
 }));
 
+// Per-component ref manifests are produced by i18n_extract_refs for every
+// react_component with i18n catalogs. Flattening here lets the merger
+// treat "referenced ids" as a single aggregate set without knowing which
+// component it came from — though the file context travels with each ref
+// so error messages can still point at the offending source line.
+const references = (manifest.refs_files ?? []).flatMap((p) => {
+  const parsed = JSON.parse(readFileSync(resolve(execroot, p), "utf-8"));
+  return parsed.refs ?? [];
+});
+
 const merged = mergeCatalogs({
   sourceLocale: manifest.source_locale,
   locales: manifest.locales,
   fragments,
+  references,
 });
 
 // Per-locale JSONs: kept as declared outputs so a developer can inspect what
