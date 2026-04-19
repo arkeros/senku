@@ -1,0 +1,6 @@
+{
+  "home.heading": "Accueil",
+  "home.apiLabel": "API : {$url}",
+  "home.button.primary": "Principal",
+  "home.button.secondary": "Secondaire"
+}
