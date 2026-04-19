@@ -243,7 +243,15 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         out = name + "_index.html",
         substitutions = {
             "{{HEAD}}": '<link rel="stylesheet" href="/{}_styles.css" />'.format(name),
-            "{{SCRIPTS}}": '{}<script src="/{}_bundle.js"></script>'.format(env_script_tag, name),
+            # `type="module"` is required because the esbuild output uses ESM
+            # with code-splitting (`splitting = True`): the entry `{name}_main.js`
+            # statically imports the shared vendor chunk and dynamically imports
+            # each lazy route chunk. Classic `<script>` can't resolve those.
+            #
+            # The `/{name}_bundle/` prefix corresponds to the TreeArtifact
+            # directory esbuild produces; react_static_layer ships its
+            # contents as a nested path at /var/www/html/{name}_bundle/.
+            "{{SCRIPTS}}": '{}<script type="module" src="/{}_bundle/{}_main.js"></script>'.format(env_script_tag, name, name),
         },
         template = tpl_name,
         **kwargs
@@ -265,10 +273,22 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     # this, cross-repo npm_package linkages (e.g. @panellet/i18n-runtime
     # from @senku) bundle a second react copy from their own virtual
     # store path, breaking React's hook dispatcher at runtime.
+    #
+    # `splitting = True` switches the output to ESM + a directory of chunks:
+    #   {name}_main.js       — the entry; the HTML loads this as `type="module"`
+    #   chunk-<hash>.js      — shared deps (react, react-dom, messageformat, …)
+    #                          auto-extracted because every lazy route chunk
+    #                          imports them. Cached across deploys until those
+    #                          packages change.
+    #   <Route>-<hash>.js    — each react-router `lazy()` route; fetched on nav,
+    #                          cached until that route's source changes.
+    # Preserves tree-shaking end-to-end (one esbuild pass sees all imports).
     esbuild(
         name = name + "_bundle",
         entry_point = name + "_main.js",
         target = "es2020",
+        splitting = True,
+        output_dir = True,
         # Ship production-mode JS. `define` rewrites the classic
         # `process.env.NODE_ENV` guards (react-dom, scheduler, etc. still
         # use them) so minify can dead-code the dev-only branches. The
