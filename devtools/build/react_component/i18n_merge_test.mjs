@@ -301,6 +301,37 @@ test("referenced ids that exist in source catalog pass", () => {
   assert.ok(out.en);
 });
 
+test("set equality across multiple fragments and files passes cleanly", () => {
+  // The two directional subset checks only collectively guarantee "catalog
+  // keys == referenced keys" when they both hold over the *union* across
+  // fragments and source files. This test pins the equality happy path for
+  // a realistic shape: two fragment files contribute keys, two source
+  // files contribute refs, and every key on each side matches.
+  const out = mergeCatalogs({
+    sourceLocale: "en",
+    locales: ["en"],
+    fragments: [
+      frag("en", "Layout.en.mf2.json", {
+        "layout.home": "Home",
+        "layout.about": "About",
+      }),
+      frag("en", "Home.en.mf2.json", { "home.heading": "Welcome" }),
+    ],
+    references: [
+      { file: "Layout.tsx", key: "layout.home" },
+      { file: "Layout.tsx", key: "layout.about" },
+      { file: "Home.tsx", key: "home.heading" },
+    ],
+  });
+  assert.deepEqual(out, {
+    en: {
+      "layout.home": "Home",
+      "layout.about": "About",
+      "home.heading": "Welcome",
+    },
+  });
+});
+
 test("referenced id missing from source catalog fails with file context", () => {
   try {
     mergeCatalogs({
@@ -350,14 +381,108 @@ test("multiple unresolved refs are grouped by file in the error", () => {
   }
 });
 
-test("empty references list is accepted (components with no srcs scanned)", () => {
+test("omitted references skips cross-check entirely", () => {
+  // The standalone CLI (i18n_merge.mjs) invokes mergeCatalogs without
+  // having scanned any component sources, so `references` is undefined. In
+  // that mode both ref-invariant directions (unresolved ids + unused keys)
+  // have to be skipped — the caller hasn't produced the data to check
+  // against.
   const out = mergeCatalogs({
     sourceLocale: "en",
     locales: ["en"],
     fragments: [frag("en", "Layout.en.mf2.json", { "layout.home": "Home" })],
+    // no `references` key at all
+  });
+  assert.ok(out.en["layout.home"]);
+});
+
+test("empty references list with empty source catalog passes", () => {
+  // Explicit `references: []` means "scanning ran, found zero ids" — legal
+  // only when the source catalog is also empty. This is the degenerate
+  // case of an app with no i18n-enabled components.
+  const out = mergeCatalogs({
+    sourceLocale: "en",
+    locales: ["en"],
+    fragments: [],
     references: [],
   });
-  assert.ok(out.en);
+  assert.deepEqual(out, { en: {} });
+});
+
+test("unused source key fails with fragment-file context", () => {
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en"],
+      fragments: [
+        frag("en", "Layout.en.mf2.json", {
+          "layout.home": "Home",
+          "layout.ghost": "Dead",
+        }),
+      ],
+      references: [{ file: "Layout.tsx", key: "layout.home" }],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    assert.match(err.message, /unused/i);
+    assert.match(err.message, /Layout\.en\.mf2\.json/);
+    assert.match(err.message, /layout\.ghost/);
+    // Referenced keys must not appear in the error — would just add noise.
+    assert.doesNotMatch(err.message, /layout\.home(?!\.)/);
+  }
+});
+
+test("multiple unused keys are grouped by fragment file", () => {
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en"],
+      fragments: [
+        frag("en", "Home.en.mf2.json", {
+          "home.heading": "Heading",
+          "home.body": "Body",
+        }),
+        frag("en", "About.en.mf2.json", {
+          "about.heading": "About",
+        }),
+      ],
+      references: [],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    assert.match(err.message, /Home\.en\.mf2\.json/);
+    assert.match(err.message, /About\.en\.mf2\.json/);
+    // Files sorted alphabetically so About < Home — same ordering
+    // convention as the unresolved-refs error for consistency.
+    assert.ok(
+      err.message.indexOf("About.en.mf2.json") <
+        err.message.indexOf("Home.en.mf2.json"),
+    );
+    // Keys belonging to one fragment appear together on its line.
+    const homeLine = err.message
+      .split("\n")
+      .find((l) => l.includes("Home.en.mf2.json"));
+    assert.ok(homeLine.includes("home.heading"));
+    assert.ok(homeLine.includes("home.body"));
+  }
+});
+
+test("unused-key check runs after unresolved-ref check", () => {
+  // Ordering matters for error quality: an unresolved ref is a typo or a
+  // missing translation, which is more urgent than a dead catalog key.
+  // Surfacing the unused-key error first would hide the real bug.
+  try {
+    mergeCatalogs({
+      sourceLocale: "en",
+      locales: ["en"],
+      fragments: [frag("en", "Layout.en.mf2.json", { "layout.ghost": "Dead" })],
+      references: [{ file: "Layout.tsx", key: "layout.nonexistent" }],
+    });
+    assert.fail("expected throw");
+  } catch (err) {
+    assert.match(err.message, /reference check/);
+    assert.doesNotMatch(err.message, /unused/i);
+  }
 });
 
 test("reference check runs after coverage check — coverage failure reported first", () => {

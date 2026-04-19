@@ -1,14 +1,23 @@
 /**
  * Merges per-component i18n catalog fragments into one catalog per locale and
- * enforces three invariants as build errors:
+ * enforces five invariants as build errors:
  *
  *   1. No key is declared by two components within the same locale.
  *   2. Every key in the source-locale catalog exists in every non-source
  *      locale's catalog.
  *   3. No non-source-locale catalog declares a key absent from the source.
+ *   4. Every id referenced in source (<Trans>, format(...)) resolves to a
+ *      key in the source-locale catalog. (Only when `references` is provided.)
+ *   5. Every key in the source-locale catalog is referenced by at least one
+ *      call site. (Only when `references` is provided.)
  *
  * The goal is that a green build guarantees every user-visible string has a
- * translation in every declared locale; catalog drift cannot ship.
+ * translation in every declared locale AND every declared translation is
+ * actually reachable from the UI; catalog drift and dead keys cannot ship.
+ *
+ * Passing `references` is the caller's signal that source scanning ran. When
+ * it's omitted entirely (e.g. the standalone CLI below), invariants 4 and 5
+ * are skipped — there's nothing to check against.
  *
  * CLI usage:
  *   node i18n_merge.mjs \
@@ -32,7 +41,7 @@ import { resolve, dirname } from "node:path";
 
 import { MessageFormat } from "messageformat";
 
-export function mergeCatalogs({ sourceLocale, locales, fragments, references = [] }) {
+export function mergeCatalogs({ sourceLocale, locales, fragments, references }) {
   if (!locales.includes(sourceLocale)) {
     throw new Error(
       `source_locale "${sourceLocale}" must be in locales (${locales.join(", ")})`,
@@ -71,6 +80,11 @@ export function mergeCatalogs({ sourceLocale, locales, fragments, references = [
   // source paths.
   /** @type {Record<string, Record<string, string>>} */
   const merged = {};
+  // Map from source-locale key → fragment path that declared it. Retained
+  // past the merge loop so the unused-key check can point at the specific
+  // .mf2.json to edit.
+  /** @type {Record<string, string>} */
+  let sourceKeyToPath = {};
   for (const locale of locales) {
     /** @type {Record<string, string>} */
     const catalog = {};
@@ -86,6 +100,7 @@ export function mergeCatalogs({ sourceLocale, locales, fragments, references = [
       keyToPath[key] = path;
     }
     merged[locale] = catalog;
+    if (locale === sourceLocale) sourceKeyToPath = keyToPath;
   }
 
   // Enforce coverage against the source locale.
@@ -109,22 +124,47 @@ export function mergeCatalogs({ sourceLocale, locales, fragments, references = [
     }
   }
 
-  // Every id that a component referenced via <Trans id="..." /> or
-  // format("...") must resolve to a catalog key. Group unresolved refs by
-  // file so the error message reads like a real diagnostic ("Foo.tsx: key
-  // X, key Y") rather than a flat list of pairs.
-  const unresolved = references.filter((r) => !sourceKeys.has(r.key));
-  if (unresolved.length > 0) {
-    const byFile = {};
-    for (const { file, key } of unresolved) {
-      (byFile[file] ??= new Set()).add(key);
+  // `references === undefined` is the caller's "I haven't scanned sources"
+  // signal (e.g., the standalone CLI). Skip both ref-invariant checks in
+  // that mode since we'd have nothing to compare against.
+  if (references !== undefined) {
+    // Every id that a component referenced via <Trans id="..." /> or
+    // format("...") must resolve to a catalog key. Group unresolved refs by
+    // file so the error message reads like a real diagnostic ("Foo.tsx: key
+    // X, key Y") rather than a flat list of pairs.
+    const unresolved = references.filter((r) => !sourceKeys.has(r.key));
+    if (unresolved.length > 0) {
+      const byFile = {};
+      for (const { file, key } of unresolved) {
+        (byFile[file] ??= new Set()).add(key);
+      }
+      const lines = Object.keys(byFile)
+        .sort()
+        .map((f) => `  ${f}: ${[...byFile[f]].sort().join(", ")}`);
+      throw new Error(
+        `i18n reference check failed — ${unresolved.length} id(s) used in source but missing from the "${sourceLocale}" catalog:\n${lines.join("\n")}`,
+      );
     }
-    const lines = Object.keys(byFile)
-      .sort()
-      .map((f) => `  ${f}: ${[...byFile[f]].sort().join(", ")}`);
-    throw new Error(
-      `i18n reference check failed — ${unresolved.length} id(s) used in source but missing from the "${sourceLocale}" catalog:\n${lines.join("\n")}`,
-    );
+
+    // Inverse direction: every key declared in the source catalog must be
+    // reachable from at least one call site. A dead key means either a
+    // stale translation that nobody ships, or a typo in the call site that
+    // silently fell back. Either way, it should fail the build. Grouped by
+    // fragment path so the developer knows which .mf2.json to edit.
+    const referencedKeys = new Set(references.map((r) => r.key));
+    const unused = [...sourceKeys].filter((k) => !referencedKeys.has(k));
+    if (unused.length > 0) {
+      const byPath = {};
+      for (const key of unused) {
+        (byPath[sourceKeyToPath[key]] ??= new Set()).add(key);
+      }
+      const lines = Object.keys(byPath)
+        .sort()
+        .map((p) => `  ${p}: ${[...byPath[p]].sort().join(", ")}`);
+      throw new Error(
+        `i18n unused-key check failed — ${unused.length} key(s) declared in "${sourceLocale}" catalog but never referenced in source:\n${lines.join("\n")}`,
+      );
+    }
   }
 
   return merged;
