@@ -289,3 +289,18 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         runtime_config_dev = (":" + name + "_env_dev") if runtime_config != None else None,
         **kwargs
     )
+
+    # Aggregate the deployable prod outputs under the bare `:{name}` label
+    # so `bazel build :{name}` produces everything a static host would serve,
+    # and downstream macros (e.g. react_static_layer) can consume the app
+    # as a single Bazel label instead of a string prefix.
+    native.filegroup(
+        name = name,
+        srcs = [
+            ":" + name + "_html",
+            ":" + name + "_bundle",
+            ":" + name + "_styles",
+            ":" + name + "_assets",
+        ],
+        **kwargs
+    )

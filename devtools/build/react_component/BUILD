@@ -160,6 +160,15 @@ bzl_library(
 )
 
 bzl_library(
+    name = "react_static_layer",
+    srcs = ["react_static_layer.bzl"],
+    deps = [
+        "//oci:frontend_image",
+        "@bazel_lib//lib:copy_to_directory",
+    ],
+)
+
+bzl_library(
     name = "runtime_config",
     srcs = ["runtime_config.bzl"],
     deps = [
