@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { useParams } from "react-router";
+import { Trans } from "@panellet/i18n-runtime";
 import { color, font, size } from "../../tokens.stylex";
 
 const styles = stylex.create({
@@ -9,12 +10,14 @@ const styles = stylex.create({
 
 export function City() {
   const { city } = useParams();
-  const cityName = city ?? "this city";
+  if (!city) return null;
   return (
     <div>
-      <h1 {...stylex.props(styles.heading)}>Concerts in {cityName}</h1>
+      <h1 {...stylex.props(styles.heading)}>
+        <Trans id="concerts.city.heading" values={{ city }} />
+      </h1>
       <p {...stylex.props(styles.text)}>
-        Showing upcoming concerts in {cityName}.
+        <Trans id="concerts.city.body" values={{ city }} />
       </p>
     </div>
   );

@@ -21,9 +21,17 @@ react_component(
 react_component(
     name = "Layout",
     srcs = ["Layout.tsx"],
-    assets = ["panallet_logo.png"],
+    assets = ["panellet_logo.png"],
+    i18n = [
+        "Layout.ca.mf2.json",
+        "Layout.en.mf2.json",
+        "Layout.es.mf2.json",
+        "Layout.fr.mf2.json",
+        "Layout.ru.mf2.json",
+    ],
     deps = [
         ":tokens",
+        "//:node_modules/@panellet/i18n-runtime",
         "//:node_modules/react-router",
     ],
 )
@@ -31,8 +39,16 @@ react_component(
 react_component(
     name = "AppError",
     srcs = ["AppError.tsx"],
+    i18n = [
+        "AppError.ca.mf2.json",
+        "AppError.en.mf2.json",
+        "AppError.es.mf2.json",
+        "AppError.fr.mf2.json",
+        "AppError.ru.mf2.json",
+    ],
     deps = [
         ":tokens",
+        "//:node_modules/@panellet/i18n-runtime",
         "//:node_modules/react-router",
     ],
 )
@@ -40,8 +56,16 @@ react_component(
 react_component(
     name = "RouteError",
     srcs = ["RouteError.tsx"],
+    i18n = [
+        "RouteError.ca.mf2.json",
+        "RouteError.en.mf2.json",
+        "RouteError.es.mf2.json",
+        "RouteError.fr.mf2.json",
+        "RouteError.ru.mf2.json",
+    ],
     deps = [
         ":tokens",
+        "//:node_modules/@panellet/i18n-runtime",
         "//:node_modules/react-router",
     ],
 )
@@ -49,16 +73,25 @@ react_component(
 react_app(
     name = "app",
     browser_deps = [
-        "//devtools/build/js:react",
-        "//devtools/build/js:react_router",
-        "//devtools/build/js:cookie",
-        "//devtools/build/js:set_cookie_parser",
-        "//devtools/build/js:stylex",
+        "//:browser_modules/_react",
+        "//:browser_modules/react-router",
+        "//:browser_modules/cookie",
+        "//:browser_modules/set-cookie-parser",
+        "//:browser_modules/@stylexjs/stylex",
+        "//:browser_modules/messageformat",
+        "//:browser_modules/@panellet/i18n-runtime",
     ],
     error_component = ":AppError",
     html_template = "index.html.tpl",
     jit_open_props = True,
     layout = ":Layout",
+    locales = [
+        "ca",
+        "en",
+        "es",
+        "fr",
+        "ru",
+    ],
     routes = [
         route(
             component = "//examples/stylex/pages:Home",
@@ -95,6 +128,7 @@ react_app(
     runtime_config = {
         "API_URL": "http://localhost:8080",
     },
+    source_locale = "en",
 )
 
 build_test(
@@ -118,6 +152,7 @@ sh_test(
     data = [
         ":app_assets",
         ":app_assets.json",
+        ":app_bundle",
         ":app_env_dev",
         ":app_env_tpl",
         ":app_html",

@@ -41,7 +41,7 @@ def browser_dep(name, package, deps, bundle = False, external = [], **kwargs):
         srcs = deps,
         outs = [name + ".js", name + ".json"],
         args = args,
-        tool = "//devtools/build/js:browser_dep_bin",
+        tool = Label("//devtools/build/js:browser_dep_bin"),
         **kwargs
     )
 

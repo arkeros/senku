@@ -1,4 +1,4 @@
-"Shared iterative walker for the panallet route tree (Starlark forbids recursion)."
+"Shared iterative walker for the panellet route tree (Starlark forbids recursion)."
 
 _MAX_DEPTH = 1000
 

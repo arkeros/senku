@@ -1,7 +1,17 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_test")
+load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 
 package(default_visibility = ["//visibility:public"])
+
+# The esbuild rule requires its `config` file to live in the caller's
+# package or to be pre-copied into bazel-bin. Wrap the config in
+# copy_to_bin here so react_app.bzl can pass `config = Label(":esbuild_react_dedup.config")`
+# from any package without cross-package-source friction.
+copy_to_bin(
+    name = "esbuild_react_dedup.config",
+    srcs = ["esbuild_react_dedup.config.mjs"],
+)
 
 # Transpile script: runs @babel/core to produce .js + .js.map + .stylex.json
 js_binary(
@@ -77,12 +87,81 @@ js_test(
     entry_point = "asset_manifest_merge_test.mjs",
 )
 
-exports_files(["index.html.tpl"])
+# i18n extract refs: scans component sources for <Trans id="..." /> and
+# format("...") call sites, rejects dynamic <Trans> ids, emits a JSON
+# manifest of referenced keys that i18n_merge cross-checks against the
+# source-locale merged catalog.
+js_binary(
+    name = "i18n_extract_refs_bin",
+    entry_point = "i18n_extract_refs.mjs",
+)
+
+js_test(
+    name = "i18n_extract_refs_test",
+    data = ["i18n_extract_refs.mjs"],
+    entry_point = "i18n_extract_refs_test.mjs",
+)
+
+# i18n merge: reads a manifest of per-component catalog fragments and emits
+# one merged JSON per locale. Enforces five invariants as build errors:
+# no in-locale collisions, no missing translations, no stray keys, no
+# malformed MF2 syntax, and no referenced-but-undefined ids (every
+# <Trans id="..." /> resolves to a catalog key).
+js_binary(
+    name = "i18n_merge_bin",
+    data = ["//:node_modules/messageformat"],
+    entry_point = "i18n_merge.mjs",
+)
+
+js_test(
+    name = "i18n_merge_test",
+    data = [
+        "i18n_merge.mjs",
+        "//:node_modules/messageformat",
+    ],
+    entry_point = "i18n_merge_test.mjs",
+)
+
+# i18n codegen: emits the per-app TS manifest mapping each declared locale to
+# its hashed catalog URL, drawn from the asset-pipeline manifest.
+js_binary(
+    name = "i18n_codegen_bin",
+    entry_point = "i18n_codegen.mjs",
+)
+
+js_test(
+    name = "i18n_codegen_test",
+    data = ["i18n_codegen.mjs"],
+    entry_point = "i18n_codegen_test.mjs",
+)
+
+# i18n bundle orchestrator: single action that runs merge + codegen together.
+# Keeps i18n_merge.mjs and i18n_codegen.mjs independently unit-testable while
+# letting Bazel rules declare both the per-locale merged JSONs and the TS
+# manifest as outputs of one action (instead of chaining two).
+js_binary(
+    name = "i18n_bundle_bin",
+    data = [
+        "i18n_codegen.mjs",
+        "i18n_merge.mjs",
+        "//:node_modules/messageformat",
+    ],
+    entry_point = "i18n_bundle.mjs",
+)
+
+exports_files(
+    [
+        "esbuild_react_dedup.config.mjs",
+        "index.html.tpl",
+    ],
+    visibility = ["//visibility:public"],
+)
 
 bzl_library(
     name = "react_app",
     srcs = ["react_app.bzl"],
     deps = [
+        ":i18n_artifacts",
         ":labels",
         ":react_app_manifest",
         ":react_component",
@@ -97,6 +176,15 @@ bzl_library(
 )
 
 bzl_library(
+    name = "react_static_layer",
+    srcs = ["react_static_layer.bzl"],
+    deps = [
+        "//oci:frontend_image",
+        "@bazel_lib//lib:copy_to_directory",
+    ],
+)
+
+bzl_library(
     name = "runtime_config",
     srcs = ["runtime_config.bzl"],
     deps = [
@@ -106,10 +194,20 @@ bzl_library(
 )
 
 bzl_library(
+    name = "i18n_artifacts",
+    srcs = ["i18n_artifacts.bzl"],
+    deps = [
+        ":_artifact_aspect",
+        ":react_component",
+    ],
+)
+
+bzl_library(
     name = "react_component",
     srcs = ["react_component.bzl"],
     deps = [
         ":_artifact_outputs",
+        ":i18n_extract_refs",
         ":labels",
         ":stylex_transpile",
         "@aspect_rules_js//js:defs",
@@ -192,6 +290,11 @@ bzl_library(
 bzl_library(
     name = "asset_codegen",
     srcs = ["asset_codegen.bzl"],
+)
+
+bzl_library(
+    name = "i18n_extract_refs",
+    srcs = ["i18n_extract_refs.bzl"],
 )
 
 bzl_library(

@@ -50,6 +50,16 @@ AssetManifestCollection = provider(
     fields = {"files": "depset of File"},
 )
 
+I18nCatalogCollection = provider(
+    doc = "Per-component MF2 catalog fragments collected from the 'i18n_catalog' output group across deps. Files are named <component>.<locale>.mf2.json; locale is parsed from the filename downstream.",
+    fields = {"files": "depset of File"},
+)
+
+I18nRefsCollection = provider(
+    doc = "Per-component JSON manifests of i18n id references collected from the 'i18n_refs' output group across deps. Consumed by i18n_merge to enforce that every referenced id resolves to a catalog key.",
+    fields = {"files": "depset of File"},
+)
+
 def _make_collect_impl(group, provider_obj):
     """Build an aspect implementation for the given OutputGroup name."""
 
@@ -88,5 +98,19 @@ _asset_manifest_impl = _make_collect_impl("asset_manifest", AssetManifestCollect
 
 asset_manifest_aspect = aspect(
     implementation = _asset_manifest_impl,
+    attr_aspects = ["deps"],
+)
+
+_i18n_catalog_impl = _make_collect_impl("i18n_catalog", I18nCatalogCollection)
+
+i18n_catalog_aspect = aspect(
+    implementation = _i18n_catalog_impl,
+    attr_aspects = ["deps"],
+)
+
+_i18n_refs_impl = _make_collect_impl("i18n_refs", I18nRefsCollection)
+
+i18n_refs_aspect = aspect(
+    implementation = _i18n_refs_impl,
     attr_aspects = ["deps"],
 )

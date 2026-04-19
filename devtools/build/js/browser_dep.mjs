@@ -44,6 +44,10 @@ if (!pkg || !outputJs || !outputManifest) {
 
 const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
 const cwd = process.cwd();
+// Resolve npm packages from cwd. browser_dep targets are always instantiated
+// in the consumer's BUILD (via panellet_browser_modules), so cwd is the
+// consumer's workspace and its node_modules holds every package this tool
+// is asked to prepare.
 const require = createRequire(join(cwd, "package.json"));
 
 /**

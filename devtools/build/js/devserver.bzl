@@ -70,10 +70,12 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, e
     if not entry_js:
         entry_js = entry_point.lstrip(":") + ".js" if entry_point.startswith(":") else entry_point + ".js"
 
-    # Copy cross-package files into this package so js_binary can use them
+    # Copy cross-package files into this package so js_binary can use them.
+    # Wrap in Label() so the source resolves to @senku regardless of the
+    # caller's repo (mirrors go_image.bzl's distroless-base pattern).
     copy_file(
         name = name + "_devserver_script",
-        src = "//devtools/build/js:devserver.mjs",
+        src = Label("//devtools/build/js:devserver.mjs"),
         out = name + "_devserver.mjs",
     )
 

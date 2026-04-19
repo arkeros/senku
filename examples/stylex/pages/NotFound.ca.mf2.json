@@ -1,0 +1,5 @@
+{
+  "notFound.heading": "404",
+  "notFound.body": "Cap ruta coincideix amb {$pathname}.",
+  "notFound.backHome": "Tornar a l'inici"
+}

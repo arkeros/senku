@@ -1,0 +1,4 @@
+{
+  "concerts.city.heading": "Концерты в {$city}",
+  "concerts.city.body": "Показаны предстоящие концерты в {$city}."
+}

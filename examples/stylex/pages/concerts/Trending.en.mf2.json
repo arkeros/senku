@@ -1,0 +1,5 @@
+{
+  "concerts.trending.heading": "Trending Concerts",
+  "concerts.trending.body": "The hottest concerts right now.",
+  "concerts.trending.count": ".input {$count :number}\n.match $count\none {{{$count} concert}}\n*   {{{$count} concerts}}"
+}

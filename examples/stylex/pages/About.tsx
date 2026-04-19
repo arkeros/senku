@@ -1,4 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
+import { Trans } from "@panellet/i18n-runtime";
 import { color, font, size } from "../tokens.stylex";
 
 const styles = stylex.create({
@@ -17,10 +18,9 @@ const styles = stylex.create({
 export function About() {
   return (
     <div>
-      <h1 {...stylex.props(styles.heading)}>About</h1>
+      <h1 {...stylex.props(styles.heading)}><Trans id="about.heading" /></h1>
       <p {...stylex.props(styles.text)}>
-        This example demonstrates React components with StyleX styling and
-        Starlark-defined routes, built with Bazel.
+        <Trans id="about.body" />
       </p>
     </div>
   );

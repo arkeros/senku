@@ -16,7 +16,11 @@ def _artifact_outputs_impl(ctx):
 
     return [
         DefaultInfo(files = depset(ctx.files.js_outs)),
-        OutputGroupInfo(stylex_metadata = depset(own_metadata)),
+        OutputGroupInfo(
+            stylex_metadata = depset(own_metadata),
+            i18n_catalog = depset(ctx.files.i18n),
+            i18n_refs = depset(ctx.files.i18n_refs),
+        ),
     ]
 
 artifact_outputs = rule(
@@ -27,6 +31,16 @@ artifact_outputs = rule(
             allow_files = True,
             default = [],
             doc = ".stylex.json metadata files (empty for non-StyleX rules like asset_library)",
+        ),
+        "i18n": attr.label_list(
+            allow_files = [".mf2.json"],
+            default = [],
+            doc = "Per-locale MF2 catalog fragments. Filenames must match the pattern <anything>.<locale>.mf2.json; the merger parses the locale out at aggregate time.",
+        ),
+        "i18n_refs": attr.label_list(
+            allow_files = [".json"],
+            default = [],
+            doc = "Output of i18n_extract_refs on the component's sources — a JSON index of <Trans id=...> and format(...) call sites that i18n_merge cross-checks against the merged source-locale catalog.",
         ),
         "deps": attr.label_list(doc = "Dependency targets (traversed by collection aspects)"),
     },
