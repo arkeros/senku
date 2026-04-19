@@ -78,16 +78,22 @@ js_test(
 )
 
 # i18n merge: reads a manifest of per-component catalog fragments and emits
-# one merged JSON per locale. Enforces three invariants as build errors:
-# no in-locale collisions, no missing translations, no stray keys.
+# one merged JSON per locale. Enforces four invariants as build errors:
+# no in-locale collisions, no missing translations, no stray keys, and no
+# malformed MF2 syntax in any value (validated via messageformat at merge
+# time so runtime never has to).
 js_binary(
     name = "i18n_merge_bin",
+    data = ["//:node_modules/messageformat"],
     entry_point = "i18n_merge.mjs",
 )
 
 js_test(
     name = "i18n_merge_test",
-    data = ["i18n_merge.mjs"],
+    data = [
+        "i18n_merge.mjs",
+        "//:node_modules/messageformat",
+    ],
     entry_point = "i18n_merge_test.mjs",
 )
 
@@ -113,6 +119,7 @@ js_binary(
     data = [
         "i18n_codegen.mjs",
         "i18n_merge.mjs",
+        "//:node_modules/messageformat",
     ],
     entry_point = "i18n_bundle.mjs",
 )
