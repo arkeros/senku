@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { color, font, radius, shadow, size } from "./tokens.stylex";
+import { color, font, radius, shadow, size } from "../../theme/tokens.stylex";
 
 type ButtonProps = {
   label: string;

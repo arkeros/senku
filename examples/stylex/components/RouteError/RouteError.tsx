@@ -1,25 +1,20 @@
 import * as stylex from "@stylexjs/stylex";
 import { useRouteError } from "react-router";
 import { Trans } from "@panellet/i18n-runtime";
-import { color, size } from "./tokens.stylex";
+import { size } from "../../ui/theme/tokens.stylex";
 
 const styles = stylex.create({
   wrap: {
-    padding: size.m,
-    borderTop: `4px solid ${color.primary}`,
-  },
-  message: {
-    color: color.primary,
+    padding: size.s,
   },
 });
 
-export function AppError() {
+export function RouteError() {
   const error = useRouteError();
   const message = error instanceof Error ? error.message : String(error);
   return (
     <div {...stylex.props(styles.wrap)}>
-      <h1><Trans id="appError.title" /></h1>
-      <pre {...stylex.props(styles.message)}>{message}</pre>
+      <p><Trans id="routeError.message" values={{ message }} /></p>
     </div>
   );
 }

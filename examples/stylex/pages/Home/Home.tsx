@@ -3,8 +3,8 @@ import {
   Trans,
   useI18n,
 } from "@panellet/i18n-runtime";
-import { Button } from "../Button";
-import { getEnv } from "../app_env";
+import { Button } from "../../ui/components/Button/Button";
+import { getEnv } from "../../app_env";
 
 const styles = stylex.create({
   container: {

@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { Link, useLocation } from "react-router";
 import { Trans } from "@panellet/i18n-runtime";
-import { color, font, size } from "../tokens.stylex";
+import { color, font, size } from "../../ui/theme/tokens.stylex";
 
 const styles = stylex.create({
   wrap: {
