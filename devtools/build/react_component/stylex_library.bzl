@@ -5,7 +5,7 @@ load(":_artifact_outputs.bzl", "artifact_outputs")
 load(":labels.bzl", "is_node_module", "ts_dep")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
-_DEFAULT_TSCONFIG = Label("//:tsconfig")
+_DEFAULT_TSCONFIG = "//:tsconfig"
 
 def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs):
     """Build a StyleX design-token module (e.g. `tokens.stylex.ts`).
@@ -24,7 +24,9 @@ def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs
         name: target name
         srcs: .stylex.ts files
         deps: other stylex_library or react_component targets (traversed by aspect)
-        tsconfig: tsconfig.json label
+        tsconfig: tsconfig.json label. Defaults to `//:tsconfig` in the
+            *consuming* repo — each consumer is expected to provide a
+            `ts_config(name = "tsconfig", src = "tsconfig.json")` at its root.
         **kwargs: passed through to ts_project (e.g. visibility, tags)
     """
 
@@ -39,11 +41,7 @@ def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs
             stylex_deps = ts_deps,
             **transpiler_kwargs
         ),
-        # See react_component.bzl for the rationale: generate a
-        # per-target tsconfig with explicit `files` so cross-package
-        # tsconfigs (e.g. external repos) don't trip TS18003.
-        tsconfig = {},
-        extends = tsconfig,
+        tsconfig = tsconfig,
         deps = ts_deps + [
             "//:node_modules/@stylexjs/stylex",
         ],

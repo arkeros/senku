@@ -10,7 +10,7 @@ load(":i18n_extract_refs.bzl", "i18n_extract_refs")
 load(":labels.bzl", "is_node_module", "ts_dep")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
-_DEFAULT_TSCONFIG = Label("//:tsconfig")
+_DEFAULT_TSCONFIG = "//:tsconfig"
 
 def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _DEFAULT_TSCONFIG, _export_test = True, **kwargs):
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.
@@ -45,7 +45,10 @@ def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _D
             `<anything>.<locale>.mf2.json`. Exposed via the `i18n_catalog`
             OutputGroup; react_app's `i18n_catalog_aspect` aggregates them
             across deps and merges per locale.
-        tsconfig: tsconfig.json label (optional)
+        tsconfig: tsconfig.json label (optional). Defaults to `//:tsconfig`
+            in the *consuming* repo — each consumer is expected to provide a
+            `ts_config(name = "tsconfig", src = "tsconfig.json")` at its root.
+            Pass an explicit label to override.
         **kwargs: passed through to ts_project (e.g. visibility, tags)
     """
 
@@ -80,13 +83,7 @@ def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _D
             stylex_deps = ts_deps,
             **transpiler_kwargs
         ),
-        # Generate a per-target tsconfig that `extends` the user's
-        # tsconfig and lists `srcs` explicitly. Otherwise tsc falls back
-        # to the default `**/*` include relative to the tsconfig's bin
-        # location, which fails with TS18003 when the tsconfig lives in
-        # a different package (e.g. external repos consuming senku).
-        tsconfig = {},
-        extends = tsconfig,
+        tsconfig = tsconfig,
         deps = ts_deps + [
             "//:node_modules/@stylexjs/stylex",
             "//:node_modules/@types/react",

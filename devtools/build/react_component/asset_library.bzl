@@ -45,7 +45,9 @@ def asset_library(name, srcs, tsconfig = _DEFAULT_TSCONFIG, url_prefix = "/asset
     Args:
         name: target name (also the TS module name consumers import)
         srcs: asset files to content-hash. Basenames must be unique.
-        tsconfig: tsconfig.json label (defaults to repo root).
+        tsconfig: tsconfig.json label. Defaults to `//:tsconfig` in the
+            *consuming* repo — each consumer is expected to provide a
+            `ts_config(name = "tsconfig", src = "tsconfig.json")` at its root.
         url_prefix: URL path prefix for the generated const values.
         **kwargs: passed through to sub-targets (visibility, tags, testonly).
     """
@@ -74,11 +76,7 @@ def asset_library(name, srcs, tsconfig = _DEFAULT_TSCONFIG, url_prefix = "/asset
         declaration = True,
         source_map = True,
         transpiler = "tsc",
-        # See react_component.bzl for the rationale: generate a
-        # per-target tsconfig with explicit `files` so cross-package
-        # tsconfigs (e.g. external repos) don't trip TS18003.
-        tsconfig = {},
-        extends = tsconfig,
+        tsconfig = tsconfig,
         **_forward
     )
 
