@@ -4,15 +4,14 @@ load("@aspect_rules_js//js:defs.bzl", "js_test")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load(":_artifact_outputs.bzl", "artifact_outputs")
+load(":_compiler_options.bzl", "BASE_COMPILER_OPTIONS")
 load(":_hash_assets.bzl", "hash_assets")
 load(":asset_codegen.bzl", "asset_codegen")
 load(":i18n_extract_refs.bzl", "i18n_extract_refs")
 load(":labels.bzl", "is_node_module", "ts_dep")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
-_DEFAULT_TSCONFIG = "//:tsconfig"
-
-def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _DEFAULT_TSCONFIG, _export_test = True, **kwargs):
+def react_component(name, srcs, deps = [], assets = [], i18n = [], _export_test = True, **kwargs):
     """Build a React component with TypeScript type-checking and StyleX CSS extraction.
 
     Wraps ts_project with the StyleX Babel transpiler and a thin rule that
@@ -45,11 +44,12 @@ def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _D
             `<anything>.<locale>.mf2.json`. Exposed via the `i18n_catalog`
             OutputGroup; react_app's `i18n_catalog_aspect` aggregates them
             across deps and merges per locale.
-        tsconfig: tsconfig.json label (optional). Defaults to `//:tsconfig`
-            in the *consuming* repo — each consumer is expected to provide a
-            `ts_config(name = "tsconfig", src = "tsconfig.json")` at its root.
-            Pass an explicit label to override.
         **kwargs: passed through to ts_project (e.g. visibility, tags)
+
+    The TypeScript `compilerOptions` are baked in (see
+    `_compiler_options.bzl`); consuming repos do not need to provide
+    their own `tsconfig.json`. `ts_project` writes a per-target
+    tsconfig with those options plus an explicit `files` list.
     """
 
     # Separate component deps from node_module deps
@@ -77,14 +77,11 @@ def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _D
     ts_project(
         name = name + "_ts",
         srcs = all_srcs,
-        declaration = True,
-        source_map = True,
-        resolve_json_module = True,
         transpiler = lambda **transpiler_kwargs: stylex_transpile(
             stylex_deps = ts_deps,
             **transpiler_kwargs
         ),
-        tsconfig = tsconfig,
+        tsconfig = {"compilerOptions": BASE_COMPILER_OPTIONS},
         deps = ts_deps + [
             "//:node_modules/@stylexjs/stylex",
             "//:node_modules/@types/react",
