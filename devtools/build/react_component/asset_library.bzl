@@ -74,7 +74,11 @@ def asset_library(name, srcs, tsconfig = _DEFAULT_TSCONFIG, url_prefix = "/asset
         declaration = True,
         source_map = True,
         transpiler = "tsc",
-        tsconfig = tsconfig,
+        # See react_component.bzl for the rationale: generate a
+        # per-target tsconfig with explicit `files` so cross-package
+        # tsconfigs (e.g. external repos) don't trip TS18003.
+        tsconfig = {},
+        extends = tsconfig,
         **_forward
     )
 

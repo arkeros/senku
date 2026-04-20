@@ -39,7 +39,11 @@ def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs
             stylex_deps = ts_deps,
             **transpiler_kwargs
         ),
-        tsconfig = tsconfig,
+        # See react_component.bzl for the rationale: generate a
+        # per-target tsconfig with explicit `files` so cross-package
+        # tsconfigs (e.g. external repos) don't trip TS18003.
+        tsconfig = {},
+        extends = tsconfig,
         deps = ts_deps + [
             "//:node_modules/@stylexjs/stylex",
         ],

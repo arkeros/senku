@@ -70,6 +70,23 @@ require_output_group_test(
     target = ":icons_hashed",
 )
 
+# Cross-package tsconfig fixture: the tsconfig lives in a sibling
+# package (sub_tsconfig/), the srcs live here. This mirrors the
+# external-repo case (e.g. astrograde consuming senku's `//:tsconfig`):
+# tsc's default `**/*` include from the tsconfig dir would otherwise
+# miss the srcs and fail with TS18003.
+react_component(
+    name = "CrossPkg",
+    testonly = True,
+    srcs = ["CrossPkg.tsx"],
+    tsconfig = "//devtools/build/react_component/testdata/sub_tsconfig:tsconfig",
+)
+
+build_test(
+    name = "cross_pkg_tsconfig_build_test",
+    targets = [":CrossPkg"],
+)
+
 # i18n fixture: a component with per-locale MF2 catalog fragments. Locks in
 # that react_component's `i18n` attr flows into the `i18n_catalog`
 # OutputGroup that the aspect collects.
