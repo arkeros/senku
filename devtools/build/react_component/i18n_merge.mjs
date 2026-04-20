@@ -1,6 +1,6 @@
 /**
  * Merges per-component i18n catalog fragments into one catalog per locale and
- * enforces five invariants as build errors:
+ * enforces six invariants as build errors:
  *
  *   1. No key is declared by two components within the same locale.
  *   2. Every key in the source-locale catalog exists in every non-source
@@ -10,10 +10,12 @@
  *      key in the source-locale catalog. (Only when `references` is provided.)
  *   5. Every key in the source-locale catalog is referenced by at least one
  *      call site. (Only when `references` is provided.)
+ *   6. Every message parses as valid MF2; malformed messages fail the build.
  *
  * The goal is that a green build guarantees every user-visible string has a
- * translation in every declared locale AND every declared translation is
- * actually reachable from the UI; catalog drift and dead keys cannot ship.
+ * translation in every declared locale, every declared translation is
+ * actually reachable from the UI, and every catalog entry is valid;
+ * catalog drift, dead keys, and malformed messages cannot ship.
  *
  * Passing `references` is the caller's signal that source scanning ran. When
  * it's omitted entirely (e.g. the standalone CLI below), invariants 4 and 5
