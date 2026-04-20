@@ -236,22 +236,25 @@ library, apply the same pattern.
 
 ### TypeScript config inheritance
 
-`react_component`'s default `tsconfig` is `Label("//:tsconfig")`, which
-resolves to `@senku//:tsconfig` — a panellet-tuned config (jsx,
-moduleResolution: "bundler", target: "es2022"). You don't need a
-matching `//:tsconfig` in your own repo for panellet to type-check
-correctly.
+`react_component`, `stylex_library`, and `asset_library` bake their
+`compilerOptions` into Starlark (`BASE_COMPILER_OPTIONS` in
+`devtools/build/react_component/_compiler_options.bzl`) and hand them
+to `ts_project` as a generated per-target tsconfig. The baked-in
+options are panellet-tuned:
 
-If you need different settings for a particular component, pass the
-`tsconfig` arg explicitly:
+- `target: "ES2022"`, `module: "ES2022"`
+- `moduleResolution: "bundler"`
+- `jsx: "react-jsx"`
+- `strict: true`, `declaration: true`, `sourceMap: true`
+- `skipLibCheck: true`, `resolveJsonModule: true`
 
-```python
-react_component(
-    name = "MyComponent",
-    srcs = ["MyComponent.tsx"],
-    tsconfig = "//path/to/your:tsconfig",
-)
-```
+You don't need a `//:tsconfig` in your own repo for panellet to
+type-check correctly — nothing references one.
+
+Per-target overrides aren't supported: the macros don't take a
+`tsconfig` arg. If a downstream needs a different option, edit
+`_compiler_options.bzl` (or wire a per-macro override there) rather
+than passing tsconfigs from call sites.
 
 ### Naming convention for browser modules
 
