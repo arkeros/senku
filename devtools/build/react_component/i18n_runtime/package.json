@@ -5,7 +5,7 @@
   "main": "index.js",
   "types": "index.d.ts",
   "peerDependencies": {
-    "messageformat": "*",
+    "messageformat": "^4.0.0",
     "react": "*"
   }
 }
