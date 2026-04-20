@@ -82,8 +82,9 @@ for (const [locale, catalog] of Object.entries(merged)) {
   writeFileSync(out, JSON.stringify(catalog, null, 2) + "\n");
 }
 
-// TS manifest: the main bundle artifact — Layout imports I18N_CATALOGS from
-// here and hands the active locale's object straight to <I18nProvider>.
+// TS manifest: the main bundle artifact — the generated main.tsx wrapper
+// from react_app_codegen.mjs imports I18N_CATALOGS from here and passes the
+// active locale's object straight to <I18nProvider>.
 writeFileSync(
   resolve(execroot, args.manifestTs),
   generate({ catalogs: merged }),
