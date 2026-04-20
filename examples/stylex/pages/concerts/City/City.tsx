@@ -10,7 +10,7 @@ const styles = stylex.create({
 
 export function City() {
   const { city } = useParams();
-  if (!city) return null;
+  if (!city) throw new Response("Not Found", { status: 404 });
   return (
     <div>
       <h1 {...stylex.props(styles.heading)}>
