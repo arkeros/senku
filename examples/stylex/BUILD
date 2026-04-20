@@ -22,13 +22,7 @@ react_component(
     name = "Layout",
     srcs = ["Layout.tsx"],
     assets = ["panellet_logo.png"],
-    i18n = [
-        "Layout.ca.mf2.json",
-        "Layout.en.mf2.json",
-        "Layout.es.mf2.json",
-        "Layout.fr.mf2.json",
-        "Layout.ru.mf2.json",
-    ],
+    i18n = glob(["Layout.*.mf2.json"]),
     deps = [
         ":tokens",
         "//:node_modules/@panellet/i18n-runtime",
@@ -39,13 +33,7 @@ react_component(
 react_component(
     name = "AppError",
     srcs = ["AppError.tsx"],
-    i18n = [
-        "AppError.ca.mf2.json",
-        "AppError.en.mf2.json",
-        "AppError.es.mf2.json",
-        "AppError.fr.mf2.json",
-        "AppError.ru.mf2.json",
-    ],
+    i18n = glob(["AppError.*.mf2.json"]),
     deps = [
         ":tokens",
         "//:node_modules/@panellet/i18n-runtime",
@@ -56,13 +44,7 @@ react_component(
 react_component(
     name = "RouteError",
     srcs = ["RouteError.tsx"],
-    i18n = [
-        "RouteError.ca.mf2.json",
-        "RouteError.en.mf2.json",
-        "RouteError.es.mf2.json",
-        "RouteError.fr.mf2.json",
-        "RouteError.ru.mf2.json",
-    ],
+    i18n = glob(["RouteError.*.mf2.json"]),
     deps = [
         ":tokens",
         "//:node_modules/@panellet/i18n-runtime",
