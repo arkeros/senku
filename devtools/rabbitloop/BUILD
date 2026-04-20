@@ -37,6 +37,7 @@ py_library(
     srcs = [
         "__init__.py",
         "claude.py",
+        "detect.py",
         "github.py",
         "main.py",
     ],
@@ -45,4 +46,10 @@ py_library(
         "@pip//absl_py",
         "@pip//requests",
     ],
+)
+
+py_test(
+    name = "detect_test",
+    srcs = ["detect_test.py"],
+    deps = [":rabbitloop_lib"],
 )
