@@ -80,7 +80,13 @@ def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _D
             stylex_deps = ts_deps,
             **transpiler_kwargs
         ),
-        tsconfig = tsconfig,
+        # Generate a per-target tsconfig that `extends` the user's
+        # tsconfig and lists `srcs` explicitly. Otherwise tsc falls back
+        # to the default `**/*` include relative to the tsconfig's bin
+        # location, which fails with TS18003 when the tsconfig lives in
+        # a different package (e.g. external repos consuming senku).
+        tsconfig = {},
+        extends = tsconfig,
         deps = ts_deps + [
             "//:node_modules/@stylexjs/stylex",
             "//:node_modules/@types/react",
