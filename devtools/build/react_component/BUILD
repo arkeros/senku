@@ -283,6 +283,11 @@ bzl_library(
 )
 
 bzl_library(
+    name = "_compiler_options",
+    srcs = ["_compiler_options.bzl"],
+)
+
+bzl_library(
     name = "_hash_assets",
     srcs = ["_hash_assets.bzl"],
 )

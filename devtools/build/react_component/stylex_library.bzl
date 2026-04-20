@@ -2,12 +2,11 @@
 
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load(":_artifact_outputs.bzl", "artifact_outputs")
+load(":_compiler_options.bzl", "BASE_COMPILER_OPTIONS")
 load(":labels.bzl", "is_node_module", "ts_dep")
 load(":stylex_transpile.bzl", "stylex_transpile")
 
-_DEFAULT_TSCONFIG = "//:tsconfig"
-
-def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs):
+def stylex_library(name, srcs, deps = [], **kwargs):
     """Build a StyleX design-token module (e.g. `tokens.stylex.ts`).
 
     Produces a type-checked TS compilation plus StyleX Babel transpile, and
@@ -24,10 +23,11 @@ def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs
         name: target name
         srcs: .stylex.ts files
         deps: other stylex_library or react_component targets (traversed by aspect)
-        tsconfig: tsconfig.json label. Defaults to `//:tsconfig` in the
-            *consuming* repo — each consumer is expected to provide a
-            `ts_config(name = "tsconfig", src = "tsconfig.json")` at its root.
         **kwargs: passed through to ts_project (e.g. visibility, tags)
+
+    The TypeScript `compilerOptions` are baked in (see
+    `_compiler_options.bzl`); consuming repos do not need to provide
+    their own `tsconfig.json`.
     """
 
     ts_deps = [ts_dep(d) for d in deps]
@@ -35,14 +35,11 @@ def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs
     ts_project(
         name = name + "_ts",
         srcs = srcs,
-        declaration = True,
-        source_map = True,
-        resolve_json_module = True,
         transpiler = lambda **transpiler_kwargs: stylex_transpile(
             stylex_deps = ts_deps,
             **transpiler_kwargs
         ),
-        tsconfig = tsconfig,
+        tsconfig = {"compilerOptions": BASE_COMPILER_OPTIONS},
         deps = ts_deps + [
             "//:node_modules/@stylexjs/stylex",
         ],

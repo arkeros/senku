@@ -22,12 +22,11 @@ module. The hashed files + manifest flow up through the `assets` and
 
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load(":_artifact_outputs.bzl", "artifact_outputs")
+load(":_compiler_options.bzl", "BASE_COMPILER_OPTIONS")
 load(":_hash_assets.bzl", "hash_assets")
 load(":asset_codegen.bzl", "asset_codegen")
 
-_DEFAULT_TSCONFIG = "//:tsconfig"
-
-def asset_library(name, srcs, tsconfig = _DEFAULT_TSCONFIG, url_prefix = "/assets/", **kwargs):
+def asset_library(name, srcs, url_prefix = "/assets/", **kwargs):
     """Build a reusable asset bundle exposed as a typed TS module.
 
     Mirrors the react_component / stylex_library shape: `:{name}_ts` is the
@@ -45,11 +44,12 @@ def asset_library(name, srcs, tsconfig = _DEFAULT_TSCONFIG, url_prefix = "/asset
     Args:
         name: target name (also the TS module name consumers import)
         srcs: asset files to content-hash. Basenames must be unique.
-        tsconfig: tsconfig.json label. Defaults to `//:tsconfig` in the
-            *consuming* repo — each consumer is expected to provide a
-            `ts_config(name = "tsconfig", src = "tsconfig.json")` at its root.
         url_prefix: URL path prefix for the generated const values.
         **kwargs: passed through to sub-targets (visibility, tags, testonly).
+
+    The TypeScript `compilerOptions` are baked in (see
+    `_compiler_options.bzl`); consuming repos do not need to provide
+    their own `tsconfig.json`.
     """
     _forward = {k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")}
 
@@ -73,11 +73,8 @@ def asset_library(name, srcs, tsconfig = _DEFAULT_TSCONFIG, url_prefix = "/asset
     ts_project(
         name = name + "_ts",
         srcs = [name + ".ts"],
-        declaration = True,
-        source_map = True,
-        resolve_json_module = True,
         transpiler = "tsc",
-        tsconfig = tsconfig,
+        tsconfig = {"compilerOptions": BASE_COMPILER_OPTIONS},
         **_forward
     )
 
