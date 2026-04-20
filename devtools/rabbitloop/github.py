@@ -7,7 +7,12 @@ from absl import logging
 GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
 
 BOT_AUTHORS = frozenset(
-    {"coderabbitai", "github-actions[bot]", "copilot-pull-request-reviewer"}
+    {
+        "coderabbitai",
+        "github-actions[bot]",
+        "copilot-pull-request-reviewer",
+        "greptile-apps[bot]",
+    }
 )
 
 REVIEW_THREADS_QUERY = """
