@@ -75,6 +75,7 @@ def asset_library(name, srcs, tsconfig = _DEFAULT_TSCONFIG, url_prefix = "/asset
         srcs = [name + ".ts"],
         declaration = True,
         source_map = True,
+        resolve_json_module = True,
         transpiler = "tsc",
         tsconfig = tsconfig,
         **_forward

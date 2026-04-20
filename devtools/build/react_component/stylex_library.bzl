@@ -37,6 +37,7 @@ def stylex_library(name, srcs, deps = [], tsconfig = _DEFAULT_TSCONFIG, **kwargs
         srcs = srcs,
         declaration = True,
         source_map = True,
+        resolve_json_module = True,
         transpiler = lambda **transpiler_kwargs: stylex_transpile(
             stylex_deps = ts_deps,
             **transpiler_kwargs
