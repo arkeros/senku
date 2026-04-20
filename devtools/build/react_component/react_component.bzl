@@ -79,6 +79,7 @@ def react_component(name, srcs, deps = [], assets = [], i18n = [], tsconfig = _D
         srcs = all_srcs,
         declaration = True,
         source_map = True,
+        resolve_json_module = True,
         transpiler = lambda **transpiler_kwargs: stylex_transpile(
             stylex_deps = ts_deps,
             **transpiler_kwargs
