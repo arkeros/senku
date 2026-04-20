@@ -56,6 +56,12 @@ function parseArgs(argv) {
   return args;
 }
 
+const IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+function formatKey(k) {
+  return IDENT_RE.test(k) ? k : JSON.stringify(k);
+}
+
 export function generate({ catalogs }) {
   const sortedLocales = Object.keys(catalogs).sort();
 
@@ -63,10 +69,11 @@ export function generate({ catalogs }) {
   for (const locale of sortedLocales) {
     const cat = catalogs[locale];
     const keys = Object.keys(cat).sort();
+    const localeKey = formatKey(locale);
     if (keys.length === 0) {
-      lines.push(`  ${locale}: {},`);
+      lines.push(`  ${localeKey}: {},`);
     } else {
-      lines.push(`  ${locale}: {`);
+      lines.push(`  ${localeKey}: {`);
       for (const k of keys) {
         lines.push(`    ${JSON.stringify(k)}: ${JSON.stringify(cat[k])},`);
       }
