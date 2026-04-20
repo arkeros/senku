@@ -70,6 +70,16 @@ test("empty catalogs produce an empty object entry per locale", () => {
   assert.match(out, /es:\s*\{\s*\}/);
 });
 
+test("quotes non-identifier locale keys so generated TS stays valid", () => {
+  const out = generate({
+    catalogs: {
+      en: { "layout.home": "Home" },
+      "pt-BR": { "layout.home": "Início" },
+    },
+  });
+  assert.match(out, /"pt-BR":\s*\{[\s\S]*"layout\.home":\s*"Início"/);
+});
+
 test("preserves MF2 .match syntax verbatim", () => {
   const mf2 = ".input {$count :number}\n.match $count\none {{One}}\n* {{Many}}";
   const out = generate({
