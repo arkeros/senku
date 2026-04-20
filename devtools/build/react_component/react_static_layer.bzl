@@ -10,16 +10,16 @@ def react_static_layer(
         **kwargs):
     """Build a tar layer from a react_app's outputs, laid out for nginx.
 
-    react_app's HTML references `/{app}_bundle.js`, `/{app}_styles.css`, and
-    hashed assets under `/assets/`. Nginx serves `/var/www/html` with
-    `try_files $uri $uri/ /index.html`, so the tar entries must sit at
-    those exact absolute paths.
+    react_app's HTML references `/{app}_bundle/{app}_main.js`,
+    `/{app}_styles.css`, and hashed assets under `/assets/`. Nginx serves
+    `/var/www/html` with `try_files $uri $uri/ /index.html`, so the tar
+    entries must sit at those exact absolute paths.
 
     Produces:
       :{name}       — tar layer suitable as `statics_layer` for
                       @senku//oci:frontend_image.bzl. Entries:
                         /var/www/html/index.html       (renamed from {app}_index.html)
-                        /var/www/html/{app}_bundle.js
+                        /var/www/html/{app}_bundle/{app}_main.js
                         /var/www/html/{app}_styles.css
                         /var/www/html/assets/*         (renamed from {app}_assets_flat/)
       :{name}_tree  — underlying TreeArtifact (useful for local inspection).
