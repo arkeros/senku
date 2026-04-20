@@ -224,6 +224,27 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         jit_open_props = jit_open_props,
     )
 
+    # Copy open-props/normalize.min.css into a Bazel output so it lands in
+    # the app filegroup (and therefore the prod tar layer). Shipped as a
+    # sibling stylesheet loaded before StyleX CSS: source order gives it
+    # lower precedence than app styles, and keeping it a separate file
+    # lets the browser cache the normalize bytes across deploys — they
+    # only change on open-props version bumps, not on component edits.
+    #
+    # //:node_modules/open-props has two execpath entries (virtual store +
+    # symlink); either contains the file, so we pick the first that does.
+    normalize_css_target = name + "_normalize_css"
+    native.genrule(
+        name = normalize_css_target,
+        srcs = ["//:node_modules/open-props"],
+        outs = [name + "_normalize.css"],
+        cmd = "for d in $(execpaths //:node_modules/open-props); do " +
+              "if [ -f \"$$d/normalize.min.css\" ]; then " +
+              "cp -L \"$$d/normalize.min.css\" $@; exit 0; fi; done; " +
+              "echo 'normalize.min.css not found in open-props package' >&2; exit 1",
+        **{k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")}
+    )
+
     # Aggregate hashed static assets across all route components:
     #   :{name}_assets_flat  — flat TreeArtifact with all hashed files
     #   :{name}_assets.json  — devserver manifest (URL → filename)
@@ -242,7 +263,13 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         name = name + "_html",
         out = name + "_index.html",
         substitutions = {
-            "{{HEAD}}": '<link rel="stylesheet" href="/{}_styles.css" />'.format(name),
+            # Normalize ships before StyleX so source order keeps app styles
+            # winning on equal specificity. Served from /{name}_normalize.css
+            # via the filegroup below (mirrors {name}_styles.css).
+            "{{HEAD}}": (
+                '<link rel="stylesheet" href="/{}_normalize.css" />'.format(name) +
+                '<link rel="stylesheet" href="/{}_styles.css" />'.format(name)
+            ),
             # `type="module"` is required because the esbuild output uses ESM
             # with code-splitting (`splitting = True`): the entry `{name}_main.js`
             # statically imports the shared vendor chunk and dynamically imports
@@ -318,7 +345,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         components = [":" + name + "_main_ts", ":" + name + "_router_ts"] + all_ts_targets,
         browser_deps = browser_deps,
         html_template = tpl_name,
-        css = ":" + name + "_styles",
+        css = [":" + normalize_css_target, ":" + name + "_styles"],
         assets_manifest = ":" + name + "_assets.json",
         assets_dir = ":" + name + "_assets",
         runtime_config_dev = (":" + name + "_env_dev") if runtime_config != None else None,
@@ -335,6 +362,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
             ":" + name + "_html",
             ":" + name + "_bundle",
             ":" + name + "_styles",
+            ":" + normalize_css_target,
             ":" + name + "_assets",
         ],
         **kwargs

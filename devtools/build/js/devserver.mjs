@@ -29,12 +29,13 @@ function mimeFor(ext) {
 
 // Parse args
 const args = process.argv.slice(2);
-let jsDirArg, cssFile, htmlFile, assetsManifestArg, assetsDirArg, runtimeConfigArg, port = 3000;
+let jsDirArg, htmlFile, assetsManifestArg, assetsDirArg, runtimeConfigArg, port = 3000;
 const manifestFiles = [];
+const cssArgs = [];
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--js-dir") jsDirArg = args[++i];
-  else if (args[i] === "--css") cssFile = args[++i];
+  else if (args[i] === "--css") cssArgs.push(args[++i]);
   else if (args[i] === "--html") htmlFile = args[++i];
   else if (args[i] === "--port") port = parseInt(args[++i], 10);
   else if (args[i] === "--manifest") manifestFiles.push(args[++i]);
@@ -43,8 +44,8 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--runtime-config") runtimeConfigArg = args[++i];
 }
 
-if (!jsDirArg || !cssFile || !htmlFile) {
-  console.error("Usage: devserver.mjs --js-dir <file> --css <file> --html <file> --manifest <file> [--port <n>]");
+if (!jsDirArg || cssArgs.length === 0 || !htmlFile) {
+  console.error("Usage: devserver.mjs --js-dir <file> --css <file> [--css <file> ...] --html <file> --manifest <file> [--port <n>]");
   process.exit(1);
 }
 
@@ -52,7 +53,9 @@ if (!jsDirArg || !cssFile || !htmlFile) {
 const runfiles = process.cwd();
 const entryFile = jsDirArg.split("/").pop(); // e.g. "app_main.js"
 const jsDir = dirname(resolve(runfiles, jsDirArg));
-cssFile = resolve(runfiles, cssFile);
+// Served at `/<basename>` in the order passed on the CLI — source order
+// controls cascade, so upstream callers put normalize/reset first.
+const cssFiles = cssArgs.map((p) => resolve(runfiles, p));
 htmlFile = resolve(runfiles, htmlFile);
 
 // Process manifests: build import map and file serving index
@@ -139,8 +142,11 @@ const originalHtml = readFileSync(htmlFile, "utf-8");
 const mapJson = JSON.stringify({ imports: importMap }, null, 2);
 const mapTag = `<script type="importmap">\n${mapJson}\n</script>`;
 const envTag = envJs ? '<script src="/env.js"></script>\n    ' : "";
+const cssLinks = cssFiles
+  .map((f) => `<link rel="stylesheet" href="/${f.split("/").pop()}" />`)
+  .join("");
 const indexHtml = originalHtml
-  .replace("{{HEAD}}", `<link rel="stylesheet" href="/${cssFile.split("/").pop()}" />`)
+  .replace("{{HEAD}}", cssLinks)
   .replace("{{SCRIPTS}}", `${envTag}${mapTag}\n    <script type="module" src="/${entryFile}"></script>`);
 
 // Reads are intentionally synchronous for simplicity — this is a dev server,
@@ -168,9 +174,10 @@ createServer((req, res) => {
     return;
   }
 
-  if (url === "/" + cssFile.split("/").pop()) {
+  const cssMatch = cssFiles.find((f) => url === "/" + f.split("/").pop());
+  if (cssMatch) {
     res.writeHead(200, { "Content-Type": "text/css" });
-    res.end(readFileSync(cssFile));
+    res.end(readFileSync(cssMatch));
     return;
   }
 

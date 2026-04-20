@@ -19,7 +19,9 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, e
             so list explicit browser_dep/browser_dep_group targets before any that pull in
             transitive ESM discoveries (see devserver.mjs:63-70).
         html_template: label of the index.html.tpl template
-        css: label of the CSS target
+        css: list of CSS target labels. Each is served at `/<basename>` and
+            injected as a `<link>` in the HTML head in the given order, so
+            put reset/normalize stylesheets first and app styles last.
         assets_manifest: optional label pointing at an asset_pipeline devserver
             manifest (type: "assets"). When set, the server registers every
             URL → runfiles path for content-hashed static assets.
@@ -67,6 +69,10 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, e
         runtime_config_args = ["--runtime-config", "$(location {})".format(runtime_config_dev)]
         runtime_config_data = [runtime_config_dev]
 
+    css_args = []
+    for c in css:
+        css_args.extend(["--css", "$(location {})".format(c)])
+
     if not entry_js:
         entry_js = entry_point.lstrip(":") + ".js" if entry_point.startswith(":") else entry_point + ".js"
 
@@ -92,13 +98,10 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, e
         args = [
             "--js-dir",
             "$(location {})".format(entry_js),
-            "--css",
-            "$(location {})".format(css),
             "--html",
             "$(location :{})".format(html_copy),
-        ] + manifest_args + asset_args + runtime_config_args,
-        data = components + dep_data + asset_data + runtime_config_data + [
-            css,
+        ] + css_args + manifest_args + asset_args + runtime_config_args,
+        data = components + dep_data + asset_data + runtime_config_data + css + [
             ":" + html_copy,
             entry_js,
             "//:node_modules/mime",
