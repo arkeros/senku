@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * Emit a TypeScript module with per-locale catalogs inlined as object
- * literals. Used by react_app to produce {app}_i18n_manifest.ts that the
- * Layout imports and hands to <I18nProvider>.
+ * literals. Used by react_app to produce {app}_i18n_manifest.ts that
+ * generated main.tsx imports and passes to <I18nProvider>, which wraps
+ * <RouterProvider>.
  *
  * Output shape:
  *   // generated — do not edit
