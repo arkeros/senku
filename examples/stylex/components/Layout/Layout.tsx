@@ -5,7 +5,7 @@ import {
   useI18n,
 } from "@panellet/i18n-runtime";
 import { panelletLogoUrl } from "./Layout.assets";
-import { color, font, size } from "./tokens.stylex";
+import { color, font, size } from "../../ui/theme/tokens.stylex";
 
 const styles = stylex.create({
   layout: {

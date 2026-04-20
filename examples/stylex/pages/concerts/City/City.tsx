@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useParams } from "react-router";
 import { Trans } from "@panellet/i18n-runtime";
-import { color, font, size } from "../../tokens.stylex";
+import { color, font, size } from "../../../ui/theme/tokens.stylex";
 
 const styles = stylex.create({
   heading: { fontSize: font.size4, fontWeight: font.weight7, marginBottom: size.s },

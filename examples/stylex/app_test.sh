@@ -5,11 +5,11 @@ set -euo pipefail
 ROUTER="examples/stylex/app_router.js"
 echo "=== Router tests ==="
 
-grep -q 'import("./Layout")' "$ROUTER" || { echo "FAIL: missing Layout lazy import"; exit 1; }
-grep -q 'import("./pages/Home")' "$ROUTER" || { echo "FAIL: missing Home lazy import"; exit 1; }
-grep -q 'import("./pages/About")' "$ROUTER" || { echo "FAIL: missing About lazy import"; exit 1; }
-grep -q 'import("./pages/concerts/ConcertsHome")' "$ROUTER" || { echo "FAIL: missing ConcertsHome lazy import"; exit 1; }
-grep -q 'import("./pages/concerts/City")' "$ROUTER" || { echo "FAIL: missing City lazy import"; exit 1; }
+grep -q 'import("./components/Layout/Layout")' "$ROUTER" || { echo "FAIL: missing Layout lazy import"; exit 1; }
+grep -q 'import("./pages/Home/Home")' "$ROUTER" || { echo "FAIL: missing Home lazy import"; exit 1; }
+grep -q 'import("./pages/About/About")' "$ROUTER" || { echo "FAIL: missing About lazy import"; exit 1; }
+grep -q 'import("./pages/concerts/ConcertsHome/ConcertsHome")' "$ROUTER" || { echo "FAIL: missing ConcertsHome lazy import"; exit 1; }
+grep -q 'import("./pages/concerts/City/City")' "$ROUTER" || { echo "FAIL: missing City lazy import"; exit 1; }
 grep -q 'createBrowserRouter' "$ROUTER" || { echo "FAIL: missing createBrowserRouter"; exit 1; }
 grep -q 'path: "concerts"' "$ROUTER" || { echo "FAIL: missing concerts route"; exit 1; }
 grep -q 'path: ":city"' "$ROUTER" || { echo "FAIL: missing :city param route"; exit 1; }
@@ -22,7 +22,7 @@ grep -q 'import { RouteError }' "$ROUTER" || { echo "FAIL: missing RouteError st
 grep -q 'errorElement: .*_jsx(AppError' "$ROUTER" || { echo "FAIL: missing app-level errorElement"; exit 1; }
 grep -q 'errorElement: .*_jsx(RouteError' "$ROUTER" || { echo "FAIL: missing route-level errorElement"; exit 1; }
 grep -q 'path: "\*"' "$ROUTER" || { echo "FAIL: missing 404 catch-all path"; exit 1; }
-grep -q 'import("./pages/NotFound")' "$ROUTER" || { echo "FAIL: missing NotFound lazy import"; exit 1; }
+grep -q 'import("./pages/NotFound/NotFound")' "$ROUTER" || { echo "FAIL: missing NotFound lazy import"; exit 1; }
 echo "PASS: router"
 
 # Test generated main entry point
