@@ -144,9 +144,14 @@ In `Home.tsx`:
 ```tsx
 import { Trans, useI18n } from "@panellet/i18n-runtime";
 
-export function Home() {
+export function Home({ count }: { count: number }) {
   const { format } = useI18n();
-  return <h1><Trans id="home.title" /></h1>;
+  return (
+    <>
+      <h1><Trans id="home.title" /></h1>
+      <p>{format("home.items", { count })}</p>
+    </>
+  );
 }
 ```
 
@@ -255,15 +260,15 @@ exactly:
 
 | npm specifier              | Bazel label                                    |
 |----------------------------|------------------------------------------------|
-| `react` (CJS group)        | `//:browser_modules/_react`                    |
+| `react` (shared-internals group) | `//:browser_modules/_react`              |
 | `react-router`             | `//:browser_modules/react-router`              |
 | `set-cookie-parser`        | `//:browser_modules/set-cookie-parser`         |
 | `@stylexjs/stylex`         | `//:browser_modules/@stylexjs/stylex`          |
 | `@panellet/i18n-runtime`   | `//:browser_modules/@panellet/i18n-runtime`    |
 
-The `_react` group is the only deviation — it's a multi-package CJS
-bundle (`react` + `react-dom/client` + `react/jsx-runtime`) that has to
-ship together so they share React internals.
+The `_react` group is the only deviation — it's a multi-package bundle
+(`react` + `react-dom/client` + `react/jsx-runtime`) that has to ship
+together so they share React internals.
 
 ### Customizing the umbrella names
 
