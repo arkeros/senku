@@ -21,11 +21,14 @@ def _parse_locale_from_basename(basename):
     return stem[dot + 1:]
 
 def _i18n_bundle_impl(ctx):
-    fragments = depset(transitive = [
-        c[I18nCatalogCollection].files
-        for c in ctx.attr.components
-        if I18nCatalogCollection in c
-    ]).to_list()
+    fragments = sorted(
+        depset(transitive = [
+            c[I18nCatalogCollection].files
+            for c in ctx.attr.components
+            if I18nCatalogCollection in c
+        ]).to_list(),
+        key = lambda f: f.path,
+    )
 
     # Ref manifests come from components that declared i18n catalogs; every
     # such component's sources were scanned for <Trans id="..." /> call
