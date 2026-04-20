@@ -5,6 +5,7 @@ load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
 load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("//devtools/build/js:devserver.bzl", "devserver")
 load(":asset_pipeline.bzl", "asset_pipeline")
+load(":i18n_artifacts.bzl", "i18n_artifacts")
 load(":labels.bzl", "ts_dep")
 load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
@@ -35,7 +36,7 @@ def route(path, component = None, children = None, error_component = None):
         r["error_component"] = error_component
     return r
 
-def react_app(name, layout, routes, browser_deps, error_component = None, jit_open_props = False, html_template = None, runtime_config = None, **kwargs):
+def react_app(name, layout, routes, browser_deps, error_component = None, jit_open_props = False, html_template = None, runtime_config = None, locales = None, source_locale = None, **kwargs):
     """Build a React application with Starlark-defined routes and lazy loading.
 
     Routes are defined in BUILD files and compiled to React Router's
@@ -69,6 +70,15 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
             code depends on `:{name}_env_component` and imports a typed
             `getEnv` helper — undeclared keys fail `tsc`. See
             `runtime_config.bzl`.
+        locales: optional list of locales the app supports (e.g. ["en", "es"]).
+            When set, transitively collects every component's MF2 catalog
+            fragments and emits a typed `{name}_i18n_manifest` component
+            exposing `I18N_CATALOGS` + `Locale`. The merge step enforces that
+            every non-source locale has the same key set as the source; the
+            build fails on missing translations, stray keys, or cross-
+            component collisions. When omitted, no i18n pipeline runs.
+        source_locale: the authoritative locale; defaults to `locales[0]`.
+            Other locales must satisfy this one's key contract exactly.
         **kwargs: passed through to downstream targets (e.g. visibility, tags)
     """
 
@@ -114,6 +124,21 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
             seen[c] = True
             all_route_components.append(c)
 
+    # When locales is set, walk the component closure via i18n_catalog_aspect,
+    # merge fragments per locale, and emit :{name}_i18n_manifest for app code
+    # to import. The merge step is where "catalog coverage is a build-time
+    # invariant" actually holds — omit this block and that guarantee evaporates.
+    i18n_enabled = bool(locales)
+    _source_locale = source_locale if source_locale else (locales[0] if locales else None)
+    if i18n_enabled:
+        i18n_artifacts(
+            name = name,
+            components = all_route_components,
+            source_locale = _source_locale,
+            locales = locales,
+            forward_kwargs = {k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")},
+        )
+
     # Generate route manifest — looks up .js entries from each target's DefaultInfo
     manifest_name = name + "_manifest"
     react_app_manifest(
@@ -124,21 +149,39 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         route_config = json.encode(flat_routes),
     )
 
-    # Generate router.tsx and main.tsx from manifest
+    # Generate router.tsx and main.tsx from manifest. When i18n is enabled,
+    # the generated main.tsx wraps <RouterProvider> in <I18nProvider> using
+    # the per-app catalog manifest. Layout components stay clean — the wrap
+    # lives here so that no user component has to import the manifest that's
+    # built from its own fragments.
     codegen_name = name + "_codegen"
+    codegen_args = [
+        "--manifest",
+        "$(location {}.json)".format(manifest_name),
+        "--out-router",
+        "$(location {}_router.tsx)".format(name),
+        "--out-main",
+        "$(location {}_main.tsx)".format(name),
+    ]
+    if i18n_enabled:
+        codegen_args.extend([
+            "--i18n-manifest-import",
+            "./" + name + "_i18n_manifest",
+            # Stable npm package name — works in-monorepo and cross-repo because
+            # @panellet/i18n-runtime is linked into //:node_modules/ via a
+            # first-party npm_link_package in each consumer's root BUILD.
+            "--i18n-runtime-import",
+            "@panellet/i18n-runtime",
+            "--i18n-source-locale",
+            _source_locale,
+        ])
+
     js_run_binary(
         name = codegen_name,
         srcs = [manifest_name + ".json"],
         outs = [name + "_router.tsx", name + "_main.tsx"],
-        args = [
-            "--manifest",
-            "$(location {}.json)".format(manifest_name),
-            "--out-router",
-            "$(location {}_router.tsx)".format(name),
-            "--out-main",
-            "$(location {}_main.tsx)".format(name),
-        ],
-        tool = "//devtools/build/react_component:react_app_codegen_bin",
+        args = codegen_args,
+        tool = Label("//devtools/build/react_component:react_app_codegen_bin"),
     )
 
     # Compile generated router. Deps on route components are needed for
@@ -154,16 +197,24 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     )
 
     # Compile generated main (entry point)
+    _main_deps = [
+        ":" + name + "_router",
+        "//:node_modules/react-dom",
+        "//:node_modules/@types/react-dom",
+        "//:node_modules/react-router",
+    ]
+    if i18n_enabled:
+        _main_deps.extend([
+            ":" + name + "_i18n_manifest",
+            # Resolves to the consumer's //:node_modules/@panellet/i18n-runtime,
+            # which they wire up via npm_link_package in their root BUILD.
+            "//:node_modules/@panellet/i18n-runtime",
+        ])
     react_component(
         name = name + "_main",
         srcs = [name + "_main.tsx"],
         _export_test = False,
-        deps = [
-            ":" + name + "_router",
-            "//:node_modules/react-dom",
-            "//:node_modules/@types/react-dom",
-            "//:node_modules/react-router",
-        ],
+        deps = _main_deps,
     )
 
     # Collect StyleX CSS from all route components (transitive via stylex_metadata_aspect)
@@ -182,7 +233,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     )
 
     # HTML template
-    tpl_name = html_template or "//devtools/build/react_component:index.html.tpl"
+    tpl_name = html_template or Label("//devtools/build/react_component:index.html.tpl")
 
     # When runtime_config is set, the `/env.js` bootstrap must load before the
     # main bundle so `window.__ENV__` is set before any module script runs.
@@ -192,7 +243,15 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         out = name + "_index.html",
         substitutions = {
             "{{HEAD}}": '<link rel="stylesheet" href="/{}_styles.css" />'.format(name),
-            "{{SCRIPTS}}": '{}<script src="/{}_bundle.js"></script>'.format(env_script_tag, name),
+            # `type="module"` is required because the esbuild output uses ESM
+            # with code-splitting (`splitting = True`): the entry `{name}_main.js`
+            # statically imports the shared vendor chunk and dynamically imports
+            # each lazy route chunk. Classic `<script>` can't resolve those.
+            #
+            # The `/{name}_bundle/` prefix corresponds to the TreeArtifact
+            # directory esbuild produces; react_static_layer ships its
+            # contents as a nested path at /var/www/html/{name}_bundle/.
+            "{{SCRIPTS}}": '{}<script type="module" src="/{}_bundle/{}_main.js"></script>'.format(env_script_tag, name, name),
         },
         template = tpl_name,
         **kwargs
@@ -204,9 +263,41 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     # Production bundle. Asset files ride as data so they end up in the
     # bundle's runfiles; URLs are baked into JS by asset_codegen, so
     # esbuild doesn't need to see the binaries directly.
+    #
+    # Target es2020 so BigInt literals (e.g. messageformat's `100n`) and
+    # optional chaining compile as-is. Our tsconfig targets ES2022, and
+    # every browser we support has shipped these features since 2020.
+    #
+    # The esbuild `config` aliases `react` etc. to the consumer's
+    # //:node_modules/react. See the config file for rationale — without
+    # this, cross-repo npm_package linkages (e.g. @panellet/i18n-runtime
+    # from @senku) bundle a second react copy from their own virtual
+    # store path, breaking React's hook dispatcher at runtime.
+    #
+    # `splitting = True` switches the output to ESM + a directory of chunks:
+    #   {name}_main.js       — the entry; the HTML loads this as `type="module"`
+    #   chunk-<hash>.js      — shared deps (react, react-dom, messageformat, …)
+    #                          auto-extracted because every lazy route chunk
+    #                          imports them. Cached across deploys until those
+    #                          packages change.
+    #   <Route>-<hash>.js    — each react-router `lazy()` route; fetched on nav,
+    #                          cached until that route's source changes.
+    # Preserves tree-shaking end-to-end (one esbuild pass sees all imports).
     esbuild(
         name = name + "_bundle",
         entry_point = name + "_main.js",
+        target = "es2020",
+        splitting = True,
+        output_dir = True,
+        # Ship production-mode JS. `define` rewrites the classic
+        # `process.env.NODE_ENV` guards (react-dom, scheduler, etc. still
+        # use them) so minify can dead-code the dev-only branches. The
+        # `production` export condition that swaps react.development.js for
+        # its production twin lives in the esbuild config (next to the
+        # react alias — two sides of the same "one canonical react" story).
+        define = {"process.env.NODE_ENV": '"production"'},
+        minify = True,
+        config = Label("//devtools/build/react_component:esbuild_react_dedup.config"),
         deps = [
             ":" + name + "_main_ts",
         ] + all_ts_targets + [
@@ -231,5 +322,20 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         assets_manifest = ":" + name + "_assets.json",
         assets_dir = ":" + name + "_assets",
         runtime_config_dev = (":" + name + "_env_dev") if runtime_config != None else None,
+        **kwargs
+    )
+
+    # Aggregate the deployable prod outputs under the bare `:{name}` label
+    # so `bazel build :{name}` produces everything a static host would serve,
+    # and downstream macros (e.g. react_static_layer) can consume the app
+    # as a single Bazel label instead of a string prefix.
+    native.filegroup(
+        name = name,
+        srcs = [
+            ":" + name + "_html",
+            ":" + name + "_bundle",
+            ":" + name + "_styles",
+            ":" + name + "_assets",
+        ],
         **kwargs
     )

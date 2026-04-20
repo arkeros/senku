@@ -1,6 +1,6 @@
 # Static Assets
 
-Panallet pipes static files (images, fonts, SVGs) through a content-addressed
+Panellet pipes static files (images, fonts, SVGs) through a content-addressed
 pipeline: each file lands at `/assets/<stem>.<hash12>.<ext>` at build time,
 referenced from components via typed URL constants. No strings. No path chasing.
 No runtime resolution.

@@ -1,5 +1,5 @@
 /**
- * ESM dev server for React + StyleX components (Panallet framework).
+ * ESM dev server for React + StyleX components (Panellet framework).
  *
  * Serves Babel-compiled component JS as native ES modules. npm deps are
  * handled based on their manifest (produced by esm_bundle at build time):
@@ -13,7 +13,7 @@
  *        --manifest <file.json> [--manifest ...] [--port <n>]
  */
 import { createServer } from "node:http";
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, extname, dirname, resolve, sep } from "node:path";
 import mime from "mime";
 
@@ -174,9 +174,15 @@ createServer((req, res) => {
     return;
   }
 
-  // Serve component JS files (try .js extension for extensionless imports).
-  // Resolve the URL against jsDir and confirm the result stays inside it, so a
-  // crafted URL like /../../etc/passwd can't escape the served directory.
+  // Serve component JS files (try .js extension for extensionless imports,
+  // and /index.js for package-style imports that resolve to a directory).
+  //
+  // Resolution first tries paths under jsDir (same-package imports like
+  // `./Layout` from `/app_main.js`), then falls back to runfiles root so
+  // cross-package relative imports like `../../devtools/...` that the
+  // browser normalizes to `/devtools/...` can still find their file. All
+  // candidates are containment-checked against runfiles so a crafted URL
+  // like `/../../etc/passwd` can't escape.
   let relPath;
   try {
     relPath = decodeURIComponent(url.slice(1));
@@ -190,10 +196,20 @@ createServer((req, res) => {
     res.end("Null byte in path");
     return;
   }
-  const candidates = [join(jsDir, relPath), join(jsDir, relPath + ".js")];
+  const candidates = [
+    join(jsDir, relPath),
+    join(jsDir, relPath + ".js"),
+    join(jsDir, relPath, "index.js"),
+    join(runfiles, relPath),
+    join(runfiles, relPath + ".js"),
+    join(runfiles, relPath, "index.js"),
+  ];
   for (const jsPath of candidates) {
-    if (jsPath !== jsDir && !jsPath.startsWith(jsDir + sep)) continue;
-    if (existsSync(jsPath)) {
+    if (jsPath !== runfiles && !jsPath.startsWith(runfiles + sep)) continue;
+    // existsSync returns true for directories too; only regular files are
+    // servable. Without this check, a bare directory URL like `/devtools/...`
+    // (no trailing /index.js) would readFileSync a directory and crash.
+    if (existsSync(jsPath) && statSync(jsPath).isFile()) {
       const ext = extname(jsPath) || ".js";
       res.writeHead(200, { "Content-Type": mimeFor(ext) });
       res.end(readFileSync(jsPath));

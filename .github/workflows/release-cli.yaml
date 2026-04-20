@@ -99,3 +99,56 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check prebuilts pipeline
+        id: prebuilts
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          # `bazel run` downloads the binary even with
+          # --remote_download_outputs=minimal; `bazel cquery --output=files`
+          # would only return a path that may not be materialised.
+          if bazel run --ui_event_filters=-info,-stdout,-stderr //bazel/cmd/knife -- prebuilts list | grep -qx "${{ matrix.tool }}"; then
+            echo "has_pipeline=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "${{ matrix.tool }} is not configured for versions.bzl refresh; skipping"
+            echo "has_pipeline=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Regenerate versions.bzl
+        if: steps.prebuilts.outputs.has_pipeline == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          bazel run //bazel/cmd/knife -- prebuilts update --tool "${{ matrix.tool }}"
+      - name: Show pending diff
+        id: diff
+        if: steps.prebuilts.outputs.has_pipeline == 'true'
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "versions.bzl already up-to-date"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Commit and push versions.bzl
+        if: steps.diff.outputs.has_changes == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(${{ matrix.tool }}): refresh versions.bzl"
+          # Race-safe push: if main advanced while we ran (another matrix
+          # job committing, or an unrelated push), rebase and retry.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            git fetch origin main
+            git rebase origin/main
+            sleep $((attempt * attempt))
+          done
+          echo "Failed to push after 5 attempts" >&2
+          exit 1

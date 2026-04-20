@@ -1,107 +1,71 @@
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@rules_shell//shell:sh_test.bzl", "sh_test")
-load("//devtools/build/react_component:output_group_test.bzl", "require_output_group_test")
 load("//devtools/build/react_component:react_app.bzl", "react_app", "route")
-load("//devtools/build/react_component:react_component.bzl", "react_component")
-load("//devtools/build/react_component:stylex_library.bzl", "stylex_library")
-
-stylex_library(
-    name = "tokens",
-    srcs = ["tokens.stylex.ts"],
-    visibility = ["//examples/stylex:__subpackages__"],
-)
-
-react_component(
-    name = "Button",
-    srcs = ["Button.tsx"],
-    visibility = ["//examples/stylex/pages:__subpackages__"],
-    deps = [":tokens"],
-)
-
-react_component(
-    name = "Layout",
-    srcs = ["Layout.tsx"],
-    assets = ["panallet_logo.png"],
-    deps = [
-        ":tokens",
-        "//:node_modules/react-router",
-    ],
-)
-
-react_component(
-    name = "AppError",
-    srcs = ["AppError.tsx"],
-    deps = [
-        ":tokens",
-        "//:node_modules/react-router",
-    ],
-)
-
-react_component(
-    name = "RouteError",
-    srcs = ["RouteError.tsx"],
-    deps = [
-        ":tokens",
-        "//:node_modules/react-router",
-    ],
-)
 
 react_app(
     name = "app",
     browser_deps = [
-        "//devtools/build/js:react",
-        "//devtools/build/js:react_router",
-        "//devtools/build/js:cookie",
-        "//devtools/build/js:set_cookie_parser",
-        "//devtools/build/js:stylex",
+        "//:browser_modules/_react",
+        "//:browser_modules/react-router",
+        "//:browser_modules/cookie",
+        "//:browser_modules/set-cookie-parser",
+        "//:browser_modules/@stylexjs/stylex",
+        "//:browser_modules/messageformat",
+        "//:browser_modules/@panellet/i18n-runtime",
     ],
-    error_component = ":AppError",
+    error_component = "//examples/stylex/components/AppError",
     html_template = "index.html.tpl",
     jit_open_props = True,
-    layout = ":Layout",
+    layout = "//examples/stylex/components/Layout",
+    locales = [
+        "ca",
+        "en",
+        "es",
+        "fr",
+        "ru",
+    ],
     routes = [
         route(
-            component = "//examples/stylex/pages:Home",
+            component = "//examples/stylex/pages/Home",
             path = "/",
         ),
         route(
-            component = "//examples/stylex/pages:About",
-            error_component = ":RouteError",
+            component = "//examples/stylex/pages/About",
+            error_component = "//examples/stylex/components/RouteError",
             path = "about",
         ),
         route(
             children = [
                 route(
-                    component = "//examples/stylex/pages/concerts:ConcertsHome",
-                    error_component = ":RouteError",
+                    component = "//examples/stylex/pages/concerts/ConcertsHome",
+                    error_component = "//examples/stylex/components/RouteError",
                     path = "/",
                 ),
                 route(
-                    component = "//examples/stylex/pages/concerts:City",
+                    component = "//examples/stylex/pages/concerts/City",
                     path = ":city",
                 ),
                 route(
-                    component = "//examples/stylex/pages/concerts:Trending",
+                    component = "//examples/stylex/pages/concerts/Trending",
                     path = "trending",
                 ),
             ],
             path = "concerts",
         ),
         route(
-            component = "//examples/stylex/pages:NotFound",
+            component = "//examples/stylex/pages/NotFound",
             path = "*",
         ),
     ],
     runtime_config = {
         "API_URL": "http://localhost:8080",
     },
+    source_locale = "en",
 )
 
 build_test(
     name = "stylex_test",
     targets = [
-        ":Button",
-        ":Layout",
         ":app_bundle",
         ":app_styles",
         ":app_html",
@@ -118,6 +82,7 @@ sh_test(
     data = [
         ":app_assets",
         ":app_assets.json",
+        ":app_bundle",
         ":app_env_dev",
         ":app_env_tpl",
         ":app_html",
@@ -125,18 +90,4 @@ sh_test(
         ":app_router_ts",
         ":app_styles",
     ],
-)
-
-# Locks in that react_component exposes StyleX metadata via OutputGroupInfo —
-# the generic path that asset collection and other build-time metadata share.
-require_output_group_test(
-    name = "button_stylex_output_group_test",
-    group = "stylex_metadata",
-    target = ":Button",
-)
-
-require_output_group_test(
-    name = "tokens_stylex_output_group_test",
-    group = "stylex_metadata",
-    target = ":tokens",
 )

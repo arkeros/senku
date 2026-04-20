@@ -197,8 +197,14 @@ func (s *Workload) Validate(env Environment) error {
 	if s.Spec.Resources.Requests == nil {
 		s.Spec.Resources.Requests = corev1.ResourceList{}
 	}
+	// Default to Cloud Run's minimum viable allocation (1 vCPU / 512Mi).
+	// Above the gen2 memory floor and above the cpu-with-concurrency floor,
+	// so a workload with no resources block still renders.
 	if _, ok := s.Spec.Resources.Limits[corev1.ResourceCPU]; !ok {
-		return fmt.Errorf("spec.resources.limits.cpu is required")
+		s.Spec.Resources.Limits[corev1.ResourceCPU] = resource.MustParse("1")
+	}
+	if _, ok := s.Spec.Resources.Limits[corev1.ResourceMemory]; !ok {
+		s.Spec.Resources.Limits[corev1.ResourceMemory] = resource.MustParse("512Mi")
 	}
 	if _, ok := s.Spec.Resources.Requests[corev1.ResourceCPU]; !ok {
 		s.Spec.Resources.Requests[corev1.ResourceCPU] = s.Spec.Resources.Limits[corev1.ResourceCPU]
@@ -212,19 +218,18 @@ func (s *Workload) Validate(env Environment) error {
 	if reqCPU := s.Spec.Resources.Requests[corev1.ResourceCPU]; reqCPU.Cmp(s.Spec.Resources.Limits[corev1.ResourceCPU]) > 0 {
 		return fmt.Errorf("spec.resources.requests.cpu must be <= spec.resources.limits.cpu")
 	}
-	if memLimit, ok := s.Spec.Resources.Limits[corev1.ResourceMemory]; ok {
-		if err := validateResourceQuantity("spec.resources.limits.memory", memLimit); err != nil {
-			return err
-		}
-		if _, ok := s.Spec.Resources.Requests[corev1.ResourceMemory]; !ok {
-			s.Spec.Resources.Requests[corev1.ResourceMemory] = memLimit
-		}
-		if err := validateResourceQuantity("spec.resources.requests.memory", s.Spec.Resources.Requests[corev1.ResourceMemory]); err != nil {
-			return err
-		}
-		if reqMem := s.Spec.Resources.Requests[corev1.ResourceMemory]; reqMem.Cmp(memLimit) > 0 {
-			return fmt.Errorf("spec.resources.requests.memory must be <= spec.resources.limits.memory")
-		}
+	memLimit := s.Spec.Resources.Limits[corev1.ResourceMemory]
+	if err := validateResourceQuantity("spec.resources.limits.memory", memLimit); err != nil {
+		return err
+	}
+	if _, ok := s.Spec.Resources.Requests[corev1.ResourceMemory]; !ok {
+		s.Spec.Resources.Requests[corev1.ResourceMemory] = memLimit
+	}
+	if err := validateResourceQuantity("spec.resources.requests.memory", s.Spec.Resources.Requests[corev1.ResourceMemory]); err != nil {
+		return err
+	}
+	if reqMem := s.Spec.Resources.Requests[corev1.ResourceMemory]; reqMem.Cmp(memLimit) > 0 {
+		return fmt.Errorf("spec.resources.requests.memory must be <= spec.resources.limits.memory")
 	}
 	if err := validateSecretFiles(s.Spec.SecretFiles); err != nil {
 		return err
