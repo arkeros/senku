@@ -213,7 +213,7 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-containerregistry/cmd/krane v0.0.0-20260416183851-f80cb9a75083 // indirect
+	github.com/google/go-containerregistry/cmd/krane v0.0.0-20260420192954-ccc3b92d82df // indirect
 	github.com/google/go-github/v85 v85.0.0
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/licensecheck v0.3.1 // indirect
