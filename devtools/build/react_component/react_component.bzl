@@ -94,12 +94,17 @@ def react_component(name, srcs, deps = [], assets = [], i18n = [], _export_test 
     # output group. Downstream consumers (react_app_manifest) read files from
     # DefaultInfo by naming convention; stylex_css reaches the metadata
     # through the stylex_metadata_aspect traversing `deps`.
-    # When the component ships catalogs, extract referenced ids from its
-    # sources so i18n_merge can later prove every <Trans id="..." /> in this
-    # component resolves to a catalog key. Limited to components with i18n
-    # fragments — otherwise this runs for every react_component in the repo.
+    # Extract referenced ids from sources whenever the component either ships
+    # catalogs or pulls in `@panellet/i18n-runtime` — every <Trans> /
+    # `format(...)` call site must participate in coverage so i18n_merge can
+    # reject dynamic ids and detect missing/unused keys, even when the
+    # catalog lives upstream in a dep.
+    uses_i18n_runtime = any([
+        "@panellet/i18n-runtime" in str(d)
+        for d in deps
+    ])
     i18n_refs_labels = []
-    if i18n:
+    if i18n or uses_i18n_runtime:
         refs_name = name + "_i18n_refs"
         refs_out = name + "_i18n_refs.json"
         i18n_extract_refs(
