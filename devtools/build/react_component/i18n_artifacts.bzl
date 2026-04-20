@@ -35,11 +35,14 @@ def _i18n_bundle_impl(ctx):
     # sites, so the union here is "every id referenced by the app's
     # component closure" — exactly the set the merger validates against
     # the source-locale merged catalog.
-    refs_files = depset(transitive = [
-        c[I18nRefsCollection].files
-        for c in ctx.attr.components
-        if I18nRefsCollection in c
-    ]).to_list()
+    refs_files = sorted(
+        depset(transitive = [
+            c[I18nRefsCollection].files
+            for c in ctx.attr.components
+            if I18nRefsCollection in c
+        ]).to_list(),
+        key = lambda f: f.path,
+    )
 
     # Compose the merge-manifest the orchestrator tool consumes. Pairing
     # locale + path here avoids reparsing filenames JS-side and keeps locale
