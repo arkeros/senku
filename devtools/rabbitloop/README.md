@@ -29,17 +29,19 @@ No local state tracking — GitHub's resolved/unresolved thread state is the sin
 
 ## Usage
 
+When run from a repo checkout with `gh` authenticated, `--repo`, `--pr`, and `--owner` are auto-detected (via `gh repo view`, `gh pr view` on the current branch, and `gh api user`). Pass them explicitly to override.
+
 ```bash
-# Dry run — see what would be fixed without invoking Claude
-bazel run //devtools/rabbitloop -- --repo arkeros/senku --pr 42 --once --dry-run
+# Dry run on the current branch's PR — no Claude invocation
+bazel run //devtools/rabbitloop -- --once --dry_run
 
-# Single pass — fix all approved comments and exit
-bazel run //devtools/rabbitloop -- --repo arkeros/senku --pr 42 --once
+# Single pass on the current branch's PR
+bazel run //devtools/rabbitloop -- --once
 
-# Continuous loop — poll every 2 minutes
-bazel run //devtools/rabbitloop -- --repo arkeros/senku --pr 42
+# Continuous loop on the current branch's PR, poll every 2 minutes
+bazel run //devtools/rabbitloop
 
-# Custom interval and owner
+# Target a specific PR with a custom interval and owner
 bazel run //devtools/rabbitloop -- --repo arkeros/senku --pr 42 --interval 60 --owner arkeros
 ```
 
@@ -47,12 +49,12 @@ bazel run //devtools/rabbitloop -- --repo arkeros/senku --pr 42 --interval 60 --
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--repo` | required | GitHub repository (`OWNER/REPO`) |
-| `--pr` | required | Pull request number |
-| `--owner` | repo owner | GitHub user whose 👍 triggers fixes |
+| `--repo` | `gh repo view` | GitHub repository (`OWNER/REPO`) |
+| `--pr` | `gh pr view` (current branch) | Pull request number |
+| `--owner` | `gh api user` (authenticated user) | GitHub user whose 👍 triggers fixes |
 | `--interval` | 120 | Polling interval in seconds |
 | `--once` | false | Run a single iteration then exit |
-| `--dry-run` | false | Log what would be done without invoking Claude or resolving threads |
+| `--dry_run` | false | Log what would be done without invoking Claude or resolving threads |
 
 ## Prerequisites
 
@@ -64,3 +66,4 @@ bazel run //devtools/rabbitloop -- --repo arkeros/senku --pr 42 --interval 60 --
 - [CodeRabbit](https://coderabbit.ai/) (`coderabbitai`)
 - GitHub Actions (`github-actions[bot]`)
 - [GitHub Copilot](https://docs.github.com/en/copilot) (`copilot-pull-request-reviewer`)
+- [Greptile](https://greptile.com/) (`greptile-apps[bot]`)

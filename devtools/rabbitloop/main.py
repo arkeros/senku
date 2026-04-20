@@ -6,21 +6,27 @@ from absl import logging
 
 from devtools.rabbitloop.github import GitHubClient
 from devtools.rabbitloop.claude import fix
+from devtools.rabbitloop import detect
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("repo", None, "GitHub repository in OWNER/REPO format.")
-flags.DEFINE_integer("pr", None, "Pull request number.")
+flags.DEFINE_string(
+    "repo", None,
+    "GitHub repository in OWNER/REPO format (default: detected via 'gh repo view').",
+)
+flags.DEFINE_integer(
+    "pr", None,
+    "Pull request number (default: detected from current branch via 'gh pr view').",
+)
 flags.DEFINE_string(
     "owner", None,
-    "GitHub username whose thumbs-up triggers fixes (default: repo owner).",
+    "GitHub username whose thumbs-up triggers fixes "
+    "(default: authenticated user via 'gh api user').",
 )
 flags.DEFINE_integer("interval", 120, "Polling interval in seconds.")
 flags.DEFINE_bool("once", False, "Run a single iteration then exit.")
 flags.DEFINE_bool("dry_run", False,
                   "Print what would be done without invoking Claude or resolving.")
-
-flags.mark_flags_as_required(["repo", "pr"])
 
 
 def run_once(
@@ -43,16 +49,34 @@ def run_once(
 def main(argv):
     del argv  # Unused.
 
-    repo_parts = FLAGS.repo.split("/", 1)
+    repo = FLAGS.repo or detect.detect_repo()
+    if not repo:
+        raise app.UsageError(
+            "--repo is required and could not be auto-detected. "
+            "Pass --repo OWNER/REPO or run from a repo checkout with 'gh' authenticated."
+        )
+    repo_parts = repo.split("/", 1)
     if len(repo_parts) != 2 or not repo_parts[0] or not repo_parts[1] or "/" in repo_parts[1]:
         raise app.UsageError("--repo must be in OWNER/REPO format")
-    repo_owner, _ = repo_parts
-    owner = FLAGS.owner or repo_owner
+
+    pr = FLAGS.pr if FLAGS.pr is not None else detect.detect_pr()
+    if pr is None:
+        raise app.UsageError(
+            "--pr is required and could not be auto-detected. "
+            "Pass --pr <number> or run from a branch with an open PR."
+        )
+
+    owner = FLAGS.owner or detect.detect_owner()
+    if not owner:
+        raise app.UsageError(
+            "--owner is required and could not be auto-detected. "
+            "Pass --owner <login> or ensure 'gh' is authenticated."
+        )
 
     logging.info(
         "rabbitloop starting: repo=%s pr=#%d owner=%s interval=%ds",
-        FLAGS.repo,
-        FLAGS.pr,
+        repo,
+        pr,
         owner,
         FLAGS.interval,
     )
@@ -61,7 +85,7 @@ def main(argv):
 
     while True:
         made_progress = run_once(
-            client, FLAGS.repo, FLAGS.pr, owner, dry_run=FLAGS.dry_run
+            client, repo, pr, owner, dry_run=FLAGS.dry_run
         )
         if FLAGS.once:
             break
