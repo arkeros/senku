@@ -122,8 +122,8 @@ js_test(
     entry_point = "i18n_merge_test.mjs",
 )
 
-# i18n codegen: emits the per-app TS manifest mapping each declared locale to
-# its hashed catalog URL, drawn from the asset-pipeline manifest.
+# i18n codegen: emits the per-app TS manifest inlining each declared locale's
+# merged catalog as TS literals.
 js_binary(
     name = "i18n_codegen_bin",
     entry_point = "i18n_codegen.mjs",
