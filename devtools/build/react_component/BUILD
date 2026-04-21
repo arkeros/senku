@@ -151,6 +151,7 @@ js_binary(
 
 exports_files(
     [
+        "default.conf.tpl",
         "esbuild_react_dedup.config.mjs",
         "index.html.tpl",
     ],
@@ -181,6 +182,7 @@ bzl_library(
     deps = [
         "//oci:frontend_image",
         "@bazel_lib//lib:copy_to_directory",
+        "@bazel_lib//lib:expand_template",
     ],
 )
 

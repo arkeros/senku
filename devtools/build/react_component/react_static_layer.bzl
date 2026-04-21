@@ -1,6 +1,7 @@
 """Build a tar layer from a react_app's outputs, ready for nginx at /var/www/html."""
 
 load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
+load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("@tar.bzl", "mutate", "tar")
 load("//oci:frontend_image.bzl", "NGINX_UID", "NGINX_USERNAME", "NGINX_WEB_ROOT")
 
@@ -8,29 +9,38 @@ def react_static_layer(
         name,
         app,
         **kwargs):
-    """Build a tar layer from a react_app's outputs, laid out for nginx.
+    """Build the tar layers for shipping a react_app under nginx.
 
     react_app's HTML references `/{app}_bundle/{app}_main.js`,
     `/{app}_styles.css`, and hashed assets under `/assets/`. Nginx serves
-    `/var/www/html` with `try_files $uri $uri/ /index.html`, so the tar
-    entries must sit at those exact absolute paths.
+    `/var/www/html` with `try_files $uri $uri/ /index.html`, so the
+    webroot tar's entries sit at those exact absolute paths.
 
-    Produces:
-      :{name}       — tar layer suitable as `statics_layer` for
-                      @senku//oci:frontend_image.bzl. Entries:
-                        /var/www/html/index.html       (renamed from {app}_index.html)
-                        /var/www/html/{app}_bundle/{app}_main.js
-                        /var/www/html/{app}_styles.css
-                        /var/www/html/assets/*         (renamed from {app}_assets_flat/)
-      :{name}_tree  — underlying TreeArtifact (useful for local inspection).
+    Also produces a per-app `default.conf` that replaces the base nginx
+    image's generic one — it knows which URL prefixes this app
+    content-addresses (the esbuild bundle dir's chunks) and can mark
+    them immutable while leaving the unhashed entry revalidatable.
+
+    Emits two tars (py_image_layer pattern: one layer per logical group,
+    each with its own cache-invalidation boundary):
+
+      :{name}_statics — /var/www/html/*       (webroot content)
+      :{name}_conf    — /etc/nginx/conf.d/default.conf
+
+    Pass both to `frontend_image`'s `statics_layer` as a list:
+
+        frontend_images_all_arch(
+            name = "image",
+            statics_layer = [":app_layer_statics", ":app_layer_conf"],
+        )
 
     Args:
-        name: target name.
+        name: prefix for emitted tar targets.
         app: label of a react_app in the same package (e.g. `":app"`).
             react_app emits a filegroup at `:{app_name}` aggregating the
             deployable outputs; this macro consumes that filegroup and
             derives rename rules from the app's name.
-        **kwargs: forwarded to the layer tar (visibility, tags, testonly).
+        **kwargs: forwarded to each tar (visibility, tags, testonly).
     """
     app_label = native.package_relative_label(app)
     if app_label.package != native.package_name():
@@ -63,9 +73,33 @@ def react_static_layer(
              "for now, or extend react_static_layer to cover it.") % app_name,
         )
 
-    tree = name + "_tree"
+    # Per-app nginx config. Carves out this app's esbuild bundle dir as
+    # an immutable-cache prefix, with the unhashed JS entry explicitly
+    # overridden back to `no-cache` so deploys are picked up. Everything
+    # else (HTML, StyleX CSS, normalize) revalidates via ETag.
+    #
+    # Named `_default_conf` because it ships at /etc/nginx/conf.d/default.conf
+    # — replacing the base nginx image's default.conf with this per-app one.
+    # Output at `<target>/default.conf` so the final basename matches what
+    # nginx expects; the tar's `strip_prefix` then drops the `<target>/`
+    # wrapper, landing the file at /etc/nginx/conf.d/default.conf.
+    conf_name = name + "_default_conf"
+    expand_template(
+        name = conf_name,
+        out = conf_name + "/default.conf",
+        substitutions = {
+            "{{APP_NAME}}": app_name,
+        },
+        template = Label("//devtools/build/react_component:default.conf.tpl"),
+    )
+
+    # Statics tree — the web content. Unchanged shape from the original
+    # single-tar version: files land at basenames like `index.html` and
+    # `assets/…`, then the tar's `package_dir` mounts them under
+    # /var/www/html.
+    statics_tree = name + "_statics_tree"
     copy_to_directory(
-        name = tree,
+        name = statics_tree,
         srcs = [app],
         root_paths = ["."],
         # Sourcemaps stay as build artifacts (useful for error reporting
@@ -79,16 +113,31 @@ def react_static_layer(
         },
     )
 
-    # Strip both the package path and the TreeArtifact's wrapper directory
-    # so each file sits directly under NGINX_WEB_ROOT.
+    # Two tar layers, mirroring py_image_layer's "one layer per logical
+    # group" pattern: the webroot and the nginx conf live in separate
+    # tars, composed by the consumer passing both to `statics_layer` as
+    # a list. Keeps caching boundaries clean — a config tweak doesn't
+    # invalidate the statics layer and vice versa.
     tar(
-        name = name,
-        srcs = [":" + tree],
+        name = name + "_statics",
+        srcs = [":" + statics_tree],
         mutate = mutate(
             owner = str(NGINX_UID),
             ownername = NGINX_USERNAME,
             package_dir = NGINX_WEB_ROOT,
-            strip_prefix = native.package_name() + "/" + tree,
+            strip_prefix = native.package_name() + "/" + statics_tree,
+        ),
+        **kwargs
+    )
+
+    tar(
+        name = name + "_conf",
+        srcs = [":" + conf_name],
+        mutate = mutate(
+            owner = str(NGINX_UID),
+            ownername = NGINX_USERNAME,
+            package_dir = "/etc/nginx/conf.d",
+            strip_prefix = native.package_name() + "/" + conf_name,
         ),
         **kwargs
     )
