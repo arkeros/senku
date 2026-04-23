@@ -1,156 +1,145 @@
 provider "google" {
   project = var.project_id
-  region  = var.region
 }
 
 locals {
   prefix = var.name
 }
 
-# --- Sample Cloud Run services ------------------------------------------------
-# These are placeholder workloads demonstrating the LB routing shape:
-# `/v1/*` → hello_v1, `/v2/*` → hello_v2, both on the same domain.
-# Replace with real services; the LB wiring below stays structurally the same.
+# --- 404 default --------------------------------------------------------------
+# Empty GCS bucket fronted by a backend bucket. Used as the URL map's
+# `default_service` so unmatched host+path requests return 404 (GCS serves
+# 404 for any key that doesn't exist in the bucket). Avoids the trap where
+# unmatched traffic silently lands on whichever backend was listed first.
 
-module "hello_v1" {
-  source = "../../../../devtools/bifrost/terraform/modules/service_cloudrun"
-
-  name       = "hello-v1"
-  project_id = var.project_id
-  region     = var.region
-
-  image     = "gcr.io/google-samples/hello-app@sha256:3f87c2db2eab75bf8e5a3a48d6be1f73bb2a0c1e7e34e08b3e7b7e3b7e3b7e3b"
-  resources = { cpu = 0.5, memory = 512 }
-
-  scaling = {
-    min = 0
-    max = 3
-  }
-
-  # Public invoker + LB-only ingress is the canonical "behind an external LB"
-  # recipe: no auth on the LB hop, but direct *.run.app calls are blocked.
-  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
-  public  = true
+resource "google_storage_bucket" "default_404" {
+  project                     = var.project_id
+  name                        = "${var.project_id}-${local.prefix}-lb-404"
+  location                    = var.bucket_location
+  uniform_bucket_level_access = true
+  force_destroy               = true
 }
 
-module "hello_v2" {
-  source = "../../../../devtools/bifrost/terraform/modules/service_cloudrun"
-
-  name       = "hello-v2"
-  project_id = var.project_id
-  region     = var.region
-
-  image     = "gcr.io/google-samples/hello-app@sha256:3f87c2db2eab75bf8e5a3a48d6be1f73bb2a0c1e7e34e08b3e7b7e3b7e3b7e3b"
-  resources = { cpu = 0.5, memory = 512 }
-
-  scaling = {
-    min = 0
-    max = 3
-  }
-
-  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
-  public  = true
+resource "google_compute_backend_bucket" "default_404" {
+  project     = var.project_id
+  name        = "${local.prefix}-default-404"
+  bucket_name = google_storage_bucket.default_404.name
 }
 
-# --- Serverless NEGs ----------------------------------------------------------
-# One NEG per (service, region). Adding a second region to a service = add a
-# second NEG here and a second `backend` block in the matching backend service.
+# --- Serverless NEG + backend service per registered backend ------------------
+# One (NEG, backend_service) pair per entry in var.backends. Adding a region
+# to a backend = add another NEG in that region and an extra `backend` block
+# in the matching backend_service — no URL-map restructuring.
 
-resource "google_compute_region_network_endpoint_group" "hello_v1" {
+resource "google_compute_region_network_endpoint_group" "backend" {
+  for_each = var.backends
+
   project               = var.project_id
-  name                  = "${local.prefix}-hello-v1"
-  region                = var.region
+  name                  = "${local.prefix}-${each.key}"
+  region                = each.value.region
   network_endpoint_type = "SERVERLESS"
 
   cloud_run {
-    service = module.hello_v1.service_name
+    service = each.value.service_name
   }
 }
 
-resource "google_compute_region_network_endpoint_group" "hello_v2" {
-  project               = var.project_id
-  name                  = "${local.prefix}-hello-v2"
-  region                = var.region
-  network_endpoint_type = "SERVERLESS"
+resource "google_compute_backend_service" "backend" {
+  for_each = var.backends
 
-  cloud_run {
-    service = module.hello_v2.service_name
-  }
-}
-
-# --- Backend services ---------------------------------------------------------
-# One backend service per logical route. Keeping the split per-service (not
-# per-route) lets us add NEGs in new regions without restructuring the URL map.
-
-resource "google_compute_backend_service" "hello_v1" {
   project = var.project_id
-  name    = "${local.prefix}-hello-v1"
+  name    = "${local.prefix}-${each.key}"
 
   load_balancing_scheme = "EXTERNAL_MANAGED"
   protocol              = "HTTPS"
+  timeout_sec           = 30
 
   backend {
-    group = google_compute_region_network_endpoint_group.hello_v1.id
+    group = google_compute_region_network_endpoint_group.backend[each.key].id
+  }
+
+  log_config {
+    enable      = true
+    sample_rate = 1.0
   }
 }
 
-resource "google_compute_backend_service" "hello_v2" {
-  project = var.project_id
-  name    = "${local.prefix}-hello-v2"
+# --- URL map (HTTPS) ----------------------------------------------------------
 
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  protocol              = "HTTPS"
-
-  backend {
-    group = google_compute_region_network_endpoint_group.hello_v2.id
-  }
-}
-
-# --- URL map ------------------------------------------------------------------
-
-resource "google_compute_url_map" "this" {
+resource "google_compute_url_map" "https" {
   project = var.project_id
   name    = "${local.prefix}-lb"
 
-  default_service = google_compute_backend_service.hello_v1.id
+  default_service = google_compute_backend_bucket.default_404.id
 
   host_rule {
     hosts        = [var.domain]
-    path_matcher = "api"
+    path_matcher = "routes"
   }
 
   path_matcher {
-    name            = "api"
-    default_service = google_compute_backend_service.hello_v1.id
+    name            = "routes"
+    default_service = google_compute_backend_bucket.default_404.id
 
-    path_rule {
-      paths   = ["/v1/*"]
-      service = google_compute_backend_service.hello_v1.id
-    }
-
-    path_rule {
-      paths   = ["/v2/*"]
-      service = google_compute_backend_service.hello_v2.id
+    dynamic "path_rule" {
+      for_each = var.backends
+      content {
+        paths   = path_rule.value.paths
+        service = google_compute_backend_service.backend[path_rule.key].id
+      }
     }
   }
 }
 
-# --- TLS + frontend -----------------------------------------------------------
+# --- URL map (HTTP → HTTPS redirect) ------------------------------------------
 
-resource "google_compute_managed_ssl_certificate" "this" {
+resource "google_compute_url_map" "http_redirect" {
+  project = var.project_id
+  name    = "${local.prefix}-lb-http-redirect"
+
+  default_url_redirect {
+    https_redirect         = true
+    redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+    strip_query            = false
+  }
+}
+
+# --- Certificate Manager ------------------------------------------------------
+# Preferred over the classic `google_compute_managed_ssl_certificate`:
+# scales past 15 certs per target proxy, supports DNS-01 for wildcards, and
+# lets one cert be shared across multiple LBs via cert maps. Free for the
+# first 100 certs per project.
+
+resource "google_certificate_manager_certificate" "this" {
   project = var.project_id
   name    = "${local.prefix}-lb-cert"
+  scope   = "DEFAULT"
 
   managed {
     domains = [var.domain]
   }
 }
 
+resource "google_certificate_manager_certificate_map" "this" {
+  project = var.project_id
+  name    = "${local.prefix}-lb-cert-map"
+}
+
+resource "google_certificate_manager_certificate_map_entry" "primary" {
+  project      = var.project_id
+  name         = "${local.prefix}-lb-cert-default"
+  map          = google_certificate_manager_certificate_map.this.name
+  certificates = [google_certificate_manager_certificate.this.id]
+  matcher      = "PRIMARY"
+}
+
+# --- Frontend: HTTPS (443) ----------------------------------------------------
+
 resource "google_compute_target_https_proxy" "this" {
-  project          = var.project_id
-  name             = "${local.prefix}-lb"
-  url_map          = google_compute_url_map.this.id
-  ssl_certificates = [google_compute_managed_ssl_certificate.this.id]
+  project         = var.project_id
+  name            = "${local.prefix}-lb"
+  url_map         = google_compute_url_map.https.id
+  certificate_map = "//certificatemanager.googleapis.com/${google_certificate_manager_certificate_map.this.id}"
 }
 
 resource "google_compute_global_address" "this" {
@@ -164,5 +153,22 @@ resource "google_compute_global_forwarding_rule" "https" {
   load_balancing_scheme = "EXTERNAL_MANAGED"
   port_range            = "443"
   target                = google_compute_target_https_proxy.this.id
+  ip_address            = google_compute_global_address.this.id
+}
+
+# --- Frontend: HTTP (80) → HTTPS redirect -------------------------------------
+
+resource "google_compute_target_http_proxy" "redirect" {
+  project = var.project_id
+  name    = "${local.prefix}-lb-http"
+  url_map = google_compute_url_map.http_redirect.id
+}
+
+resource "google_compute_global_forwarding_rule" "http_redirect" {
+  project               = var.project_id
+  name                  = "${local.prefix}-lb-http"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  port_range            = "80"
+  target                = google_compute_target_http_proxy.redirect.id
   ip_address            = google_compute_global_address.this.id
 }

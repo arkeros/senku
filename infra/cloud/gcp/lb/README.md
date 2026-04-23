@@ -1,54 +1,64 @@
 # `infra/cloud/gcp/lb` — shared external HTTPS load balancer
 
-Singleton root stack. One global external HTTPS load balancer fronting Cloud Run services, with path-based routing (`/v1/*`, `/v2/*`) on a single domain.
-
-This is the *instantiation* of the GLB pattern — not a reusable module. The `service_cloudrun` module at [`devtools/bifrost/terraform/modules/service_cloudrun`](../../../../devtools/bifrost/terraform/modules/service_cloudrun) is reusable; there is only ever one LB per environment, so it lives here as a concrete root stack instead.
+Singleton root stack. One global external HTTPS LB fronting Cloud Run services, with path-based routing on one configurable domain. No services are provisioned here — this stack only owns the LB; backends are declared via the `backends` variable and are created out-of-band (see [`examples/hello/`](./examples/hello) for a working companion stack).
 
 ## Topology
 
 ```
-user → LB IP (anycast)
-        ├── /v1/* → backend_hello_v1 → serverless-NEG → Cloud Run (hello-v1, europe-west1)
-        └── /v2/* → backend_hello_v2 → serverless-NEG → Cloud Run (hello-v2, europe-west1)
+user → LB IP (anycast)  ── :443 ──► URL map (HTTPS)        ── host+path rule ─► backend N → NEG → Cloud Run service
+                        └─ :80  ──► URL map (HTTP redirect) ── 301 ────────────► https://<same-url>
+                                                            └── unmatched ────► 404 (empty GCS bucket)
 ```
 
-Each service is attached via a serverless NEG. The backend services are per-service, not per-route, so adding a new region to a service means adding one more NEG and one more `backend` block inside the existing backend service — no URL-map changes.
+- **Per-backend pair**: one `google_compute_region_network_endpoint_group` + one `google_compute_backend_service`, created via `for_each` over `var.backends`.
+- **Per-region fan-out** of a single backend = add another NEG in the new region and an extra `backend` block on its backend service. No URL-map changes.
+- **Per-domain fan-out** = add a `google_certificate_manager_certificate_map_entry` with a matcher clause and a new `host_rule`/`path_matcher` on the HTTPS URL map.
 
-## Cloud Run ingress recipe
+## Certificate Manager, not classic managed certs
 
-The sample services are configured `public = true` + `ingress = INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER`. That combination is the canonical "behind an external HTTPS LB" shape:
+The stack uses `google_certificate_manager_certificate` + certificate map indirection rather than `google_compute_managed_ssl_certificate` because:
 
-- `public = true` grants `allUsers → roles/run.invoker`, so the LB can invoke without injecting identity on the hop.
-- `INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER` rejects direct `*.run.app` traffic — the only ingress path is via the LB.
+- Classic certs cap at **15 per target proxy**. Cert Manager is effectively unlimited (via cert maps).
+- Cert Manager supports DNS-01 authorization → wildcards and DNS-pre-cutover issuance. Classic is HTTP-01 only and blocks until DNS resolves to the LB.
+- One Cert Manager cert can front multiple LBs (cert map sharing).
+- Free for the first 100 certs per project; ~$0.20/cert/month beyond that.
 
-For private services that require caller identity, you would swap to IAM-authenticated NEGs, which is out of scope here.
+Same operational behaviour (auto-renewal, Google-managed private key) for the common case, strictly more capability when the stack grows.
 
-## Adding regions
+## 404 default
 
-Pick a service, then:
+The URL map's `default_service` points at an empty `google_storage_bucket` via a `google_compute_backend_bucket`. Unmatched paths get a 404 from GCS, not a silent fall-through to some backend. Swap the bucket contents to serve a landing page later; the bucket name is exported as `default_404_bucket`.
 
-1. Add a second `module "hello_v1_eu"` (or wherever) with a different `region`.
-2. Add a second `google_compute_region_network_endpoint_group "hello_v1_eu"` pointing at the new service.
-3. Add a second `backend { group = google_compute_region_network_endpoint_group.hello_v1_eu.id }` inside `google_compute_backend_service.hello_v1`.
+## State backend (Kubernetes)
 
-The LB's geo-routing will then pick the closest healthy NEG per request. No URL-map changes needed.
+```hcl
+backend "kubernetes" {}
+```
 
-## Adding domains
+Filled via `-backend-config` at init. Prereq: cluster + namespace exist and `kubectl` is authenticated before `terraform init`.
 
-The LB is shared across domains — don't create a second LB.
+```bash
+terraform init \
+  -backend-config="secret_suffix=prod" \
+  -backend-config="namespace=terraform-state" \
+  -backend-config="config_path=~/.kube/config" \
+  -backend-config="config_context=senku-prod"
+```
 
-1. Add `google_compute_managed_ssl_certificate` (or switch to `google_certificate_manager_certificate` with SAN if you'll exceed 15 domains).
-2. Attach it to the target proxy's `ssl_certificates` list.
-3. Add a `host_rule` + `path_matcher` to the URL map for the new domain.
-
-## DNS
-
-Point an A record for `var.domain` at the `lb_ip` output. Managed cert provisioning only completes once DNS resolves — allow 10–60 min from DNS change to first successful TLS handshake.
+> **Bootstrap caveat:** this stack creates GCP infra; state lives in a cluster. If a cluster is part of your bootstrap, seed it (and this stack's Secret) from a separate bootstrap stack with a local/GCS backend first.
 
 ## Usage
 
 ```bash
 cd infra/cloud/gcp/lb
-terraform init
-terraform apply -var="project_id=senku-prod" -var="domain=api.senku.example.com"
+terraform init -backend-config=…
+terraform apply \
+  -var="project_id=senku-prod" \
+  -var="domain=api.senku.example.com" \
+  -var='backends={
+    v1 = { region = "europe-west1", service_name = "hello-v1", paths = ["/v1/*"] }
+    v2 = { region = "europe-west1", service_name = "hello-v2", paths = ["/v2/*"] }
+  }'
 ```
+
+A companion stack at [`examples/hello/`](./examples/hello) provisions the two `service_cloudrun` services referenced above and exposes a `lb_backends` output shaped exactly like `var.backends` here.
