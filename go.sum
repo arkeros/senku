@@ -202,6 +202,8 @@ github.com/anchore/go-version v1.2.2-0.20210903204242-51efa5b487c4 h1:rmZG77uXgE
 github.com/anchore/go-version v1.2.2-0.20210903204242-51efa5b487c4/go.mod h1:Bkc+JYWjMCF8OyZ340IMSIi2Ebf3uwByOk6ho4wne1E=
 github.com/anchore/grype v0.111.0 h1:vpYN4dOnXIMMudKRKcXbbOzaARIoSy/S576jxB6SmWQ=
 github.com/anchore/grype v0.111.0/go.mod h1:jX7BYdyyxAtjpM6gCw8CpKG+IB/7Jq0teRklMZWu2cw=
+github.com/anchore/grype v0.111.1 h1:ENjBLiIVa8VBNrpViBKzBHgV1U/85AQ7ZfHnj7O5pGk=
+github.com/anchore/grype v0.111.1/go.mod h1:vTOS9tqhn2cZt6+x9rWwoN5THqN1GO7NJklXB0lJndE=
 github.com/anchore/packageurl-go v0.2.0 h1:CkrM4RMUwrEGAiE1OVlxaZNzWj0TuHRey7o4T/EAErk=
 github.com/anchore/packageurl-go v0.2.0/go.mod h1:2JCgOQMIsqZ7TmliXG4PnUthPJAKE3mWQbsW2XHjAOE=
 github.com/anchore/stereoscope v0.1.22 h1:L807G/kk0WZzOCGuRGF7knxMKzwW2PGdbPVRystryd8=
@@ -1026,11 +1028,13 @@ github.com/opencontainers/selinux v1.13.1 h1:A8nNeceYngH9Ow++M+VVEwJVpdFmrlxsN22
 github.com/opencontainers/selinux v1.13.1/go.mod h1:S10WXZ/osk2kWOYKy1x2f/eXF5ZHJoUs8UU/2caNRbg=
 github.com/openvex/go-vex v0.2.7 h1:/pN3bqvS4QOc6WkkL0hbKzJuAtsUD9vmvk9IZkzD3Zc=
 github.com/openvex/go-vex v0.2.7/go.mod h1:ZyQC3NXl9jjS53JOpBG3LAUXySkW8IlJ/GIhsnf5D54=
+github.com/openvex/go-vex v0.2.8/go.mod h1:V09jOICYN/3VS4oU2hthSN8wGI6UAv3FvvYbpYS1xCE=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
 github.com/owenrumney/go-sarif v1.1.2-0.20231003122901-1000f5e05554 h1:FvA4bwjKpPqik5WsQ8+4z4DKWgA1tO1RTTtNKr5oYNA=
 github.com/owenrumney/go-sarif v1.1.2-0.20231003122901-1000f5e05554/go.mod h1:n73K/hcuJ50MiVznXyN4rde6fZY7naGKWBXOLFTyc94=
 github.com/package-url/packageurl-go v0.1.3 h1:4juMED3hHiz0set3Vq3KeQ75KD1avthoXLtmE3I0PLs=
 github.com/package-url/packageurl-go v0.1.3/go.mod h1:nKAWB8E6uk1MHqiS/lQb9pYBGH2+mdJ2PJc2s50dQY0=
+github.com/package-url/packageurl-go v0.1.5/go.mod h1:nKAWB8E6uk1MHqiS/lQb9pYBGH2+mdJ2PJc2s50dQY0=
 github.com/pandatix/go-cvss v0.6.2 h1:TFiHlzUkT67s6UkelHmK6s1INKVUG7nlKYiWWDTITGI=
 github.com/pandatix/go-cvss v0.6.2/go.mod h1:jDXYlQBZrc8nvrMUVVvTG8PhmuShOnKrxP53nOFkt8Q=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
