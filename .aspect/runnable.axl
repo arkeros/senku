@@ -1,0 +1,73 @@
+"""Runfiles-aware spawn helper for Bazel-built binaries.
+
+Vendored from https://github.com/aspect-extensions/run via astrograde's
+copy. Local addition: `command(entrypoint, args, env)` returns the
+un-spawned `std.process.Command` so callers can chain `.stdout("piped")`
+etc. before `.spawn()`. This is what lets `aspect plan` capture each
+root's plan output for the PR comment without going through `bash | tee`.
+"""
+
+def _process_bes(state, event):
+    filesets = state.filesets
+    target_fileset = state.target_fileset
+    targets = state.targets
+    if event.kind == "named_set_of_files":
+        filesets[event.id.id] = event.payload.files
+    elif event.kind == "target_completed":
+        if event.id.label in targets:
+            for og in event.payload.output_group:
+                if og.name == "default":
+                    target_fileset[event.id.label] = og.file_sets
+
+def _determine_entrypoint(state, target):
+    filesets = state.filesets
+    target_fileset = state.target_fileset
+    if target not in target_fileset:
+        return None
+    targetfs = target_fileset[target][0].id
+    files = filesets[targetfs]
+    for file in files:
+        if len(file.path_prefix):
+            # file.file is a local path under a `bazel build`; under
+            # remote execution it can come back as a `bytestream://`
+            # URL — fall back to the canonical bazel-bin layout in
+            # that case (matches astrograde's vendored copy).
+            if file.file.startswith("bytestream://"):
+                return "bazel-bin/{}".format(file.name)
+            return file.file.removeprefix("file://")
+    return None
+
+def _command(ctx, entrypoint, args, env = {}):
+    """Build the `std.process.Command` for `entrypoint` without spawning
+    it. Sets the runfiles env vars common Bazel runfiles libraries look
+    for, plus `BUILD_WORKING_DIRECTORY`.
+    """
+    if not entrypoint.startswith("/"):
+        entrypoint = ctx.std.env.current_dir() + "/" + entrypoint
+    runfiles = entrypoint + ".runfiles"
+    proc = ctx.std.process.command(entrypoint) \
+        .current_dir(runfiles) \
+        .env("RUNFILES_DIR", runfiles) \
+        .env("JAVA_RUNFILES", runfiles) \
+        .env("RUNFILES_MANIFEST_FILE", runfiles + "_manifest") \
+        .env("BUILD_WORKING_DIRECTORY", ctx.std.env.current_dir())
+    for key, value in env.items():
+        proc = proc.env(key, value)
+    return proc.args(args)
+
+def _spawn(ctx, entrypoint, args, env = {}):
+    return _command(ctx, entrypoint, args, env).spawn()
+
+def runnable(ctx, targets):
+    state = struct(
+        ctx = ctx,
+        targets = targets,
+        filesets = {},
+        target_fileset = {},
+    )
+    return struct(
+        event = lambda event: _process_bes(state, event),
+        determine_entrypoint = lambda target: _determine_entrypoint(state, target),
+        command = lambda entrypoint, args, env = {}: _command(ctx, entrypoint, args, env),
+        spawn = lambda entrypoint, args, env = {}: _spawn(ctx, entrypoint, args, env),
+    )

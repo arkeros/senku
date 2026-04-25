@@ -5,33 +5,27 @@ Usage:
   aspect apply                                  # apply all roots, gar → registry → lb
   aspect apply //infra/cloud/gcp/gar:terraform  # apply one root
 
-Each root invokes `bazel run --stamp <target>.apply`. Stamping is required
-because the registry's image tags reference STABLE_MONOREPO_* workspace
-status keys; without it, tag substitution falls through to `<no value>` and
+Each root invokes `<target>.apply` via `runnable` (BES + direct spawn,
+with `--stamp` passed through). Stamping is required because the
+registry's image tags reference STABLE_MONOREPO_* workspace status
+keys; without it, tag substitution falls through to `<no value>` and
 the push rejects.
 
 Auto-approves Terraform when running non-interactively (`$CI` is set);
 locally you'll get the y/n confirmation prompt per root.
 """
 
-load("./stdlib.axl", "BOOTSTRAP_ROOTS", "TF_ROOTS", "bazel_run", "is_ci", "normalize_root")
+load("./stdlib.axl", "build_and_run", "is_ci", "select_targets")
 
 def impl(ctx) -> int:
     err = ctx.std.io.stderr
 
-    targets = [normalize_root(t) for t in ctx.args.target]
-    if len(targets) == 0:
-        # Default to all roots — but in CI, skip bootstrap-tier roots
-        # (managing CI from CI is not safe; if an apply revokes the SA's
-        # own perms, CI can't recover). Bootstrap roots still show up
-        # locally so `aspect apply` walks the whole DAG on a developer
-        # machine.
-        targets = TF_ROOTS
-        if is_ci(ctx):
-            targets = [t for t in targets if t not in BOOTSTRAP_ROOTS]
+    env = {"TF_AUTO_APPROVE": "1"} if is_ci(ctx) else {}
 
-    for root in targets:
-        result = bazel_run(ctx, root + ".apply", stamp = True)
+    for root in select_targets(ctx, ctx.args.target):
+        result = build_and_run(ctx, root + ".apply", env = env, build_flags = ["--stamp"])
+        if result == None:
+            return 1
         if not result.success:
             err.write("ERROR: apply failed for {} (exit {})\n".format(root, result.code))
             return result.code

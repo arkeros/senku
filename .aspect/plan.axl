@@ -5,126 +5,130 @@ Usage:
   aspect plan                                 # plan all roots, in order
   aspect plan //infra/cloud/gcp/gar:terraform # plan one root
 
-Each root invokes `bazel run <target>.plan`. State stays in GCS.
+Each root invokes `<target>.plan` via `runnable` (BES + direct spawn).
+State stays in GCS.
 
-CI mode (when `$CI` is set + `$GITHUB_REPOSITORY` + `$GITHUB_REF` look like
-a pull-request invocation): also captures each root's output and posts a
-per-root PR comment via `gh api`, update-in-place if a comment with the
-matching marker already exists. The CI workflow can therefore be a single
-step (`aspect plan`) — no matrix, no discover-then-fan-out, no
-github-script post-process.
+CI mode (when `$CI` is set + `$GITHUB_REPOSITORY` + `$GITHUB_REF` look
+like a pull-request invocation): also captures each root's output and
+upserts a per-root PR comment via the `tf_pr_comment` Go binary
+(`//devtools/build/tools/tf_pr_comment`). The comment is posted as a
+`Planning…` stub *before* the plan runs so reviewers see progress on
+slow roots, then patched in place with the captured output once the
+plan returns. The CI workflow stays a single step (`aspect plan`) — no
+matrix, no discover-then-fan-out, no github-script post-process.
 
 Local mode: no comment side-effects, output streams to the terminal as
 usual.
 """
 
-load("./stdlib.axl", "BOOTSTRAP_ROOTS", "TF_ROOTS", "is_ci", "normalize_root")
+load("./stdlib.axl", "build_runnable", "is_ci", "select_targets")
+
+# Bazel target for the comment-poster Go binary. Built once at the top
+# of `impl` and reused across all roots.
+_TF_PR_COMMENT = "//devtools/build/tools/tf_pr_comment:tf_pr_comment"
 
 def _slug(target):
     """Bazel label → filesystem-safe slug."""
     return target.replace("//", "").replace(":", "-").replace("/", "-")
 
 def _run_plan(ctx, target, plan_file = None):
-    """Run `bazel run <target>.plan`. If `plan_file` is set, also tee output
-    into it (via bash, for the GH comment step's later read). Return exit code.
+    """Build `<target>.plan` and run it. If `plan_file` is set, capture
+    combined stdout+stderr to that file (for the comment-poster) while
+    still echoing it to the runner log. Returns the plan's exit code,
+    or non-zero if the build itself failed.
     """
     out = ctx.std.io.stdout
-    full = target + ".plan"
-    out.write("==> bazel run {}\n".format(full))
-
-    if plan_file:
-        # Combined stdout+stderr so the comment captures terraform's plan
-        # output AND any bazel/aspect noise around it. `tee` keeps the runner
-        # log readable in real time.
-        script = "set -o pipefail; bazel run '{}' 2>&1 | tee '{}'".format(full, plan_file)
-        cmd = ctx.std.process.command("bash").arg("-c").arg(script)
-    else:
-        cmd = ctx.std.process.command("bazel").arg("run").arg(full)
-
-    return cmd.spawn().wait().code
-
-def _post_pr_comment(ctx, target, plan_file):
-    """Update-or-create a PR comment containing the plan output for `target`."""
     err = ctx.std.io.stderr
+    full = target + ".plan"
 
+    entrypoint, r = build_runnable(ctx, full)
+    if entrypoint == None:
+        return 1
+
+    if plan_file == None:
+        # Local path: stream straight through to the terminal.
+        return r.spawn(entrypoint, []).wait().code
+
+    # CI path: capture combined output for later comment posting. We
+    # buffer here rather than streaming via tee — GitHub Actions batches
+    # step logs anyway, so real-time streaming inside a step isn't
+    # observable. After the plan returns we mirror the buffered output
+    # to the runner log AND write it to disk.
+    proc = r.command(entrypoint, []) \
+        .stdout("piped").stderr("piped") \
+        .spawn()
+    result = proc.wait_with_output()
+    out.write(result.stdout)
+    err.write(result.stderr)
+    ctx.std.fs.write(plan_file, result.stdout + result.stderr)
+    return result.status.code
+
+def _pr_context(ctx):
+    """Return a struct(repo=, pr=) from $GITHUB_REPOSITORY and $GITHUB_REF,
+    or None if this isn't a pull-request invocation. `GITHUB_REF` for PR
+    triggers is `refs/pull/<number>/merge`.
+    """
     repo = ctx.std.env.var("GITHUB_REPOSITORY") or ""
     pr_ref = ctx.std.env.var("GITHUB_REF") or ""
-
-    # `GITHUB_REF` for PR triggers is `refs/pull/<number>/merge`.
     parts = pr_ref.split("/")
     if len(parts) < 4 or parts[1] != "pull" or not repo:
-        err.write("plan: not a PR ref ({}); skipping comment\n".format(pr_ref))
-        return
+        return None
+    return struct(repo = repo, pr = parts[2])
 
-    pr = parts[2]
-    marker = "<!-- tf-plan:" + target + " -->"
-
-    # gh CLI handles auth via $GITHUB_TOKEN / $GH_TOKEN (set by GHA).
-    # `--jq` filters comments by marker prefix; first match wins.
-    # Body via heredoc to preserve newlines + special chars; `head -c 60000`
-    # caps at GitHub's per-comment limit.
-    script = """
-set -euo pipefail
-MARKER='{marker}'
-TARGET='{target}'
-PR='{pr}'
-REPO='{repo}'
-PLAN_FILE='{plan_file}'
-
-BODY=$(printf '%s\\n### Terraform Plan (`%s`)\\n```\\n%s\\n```\\n' \\
-  "$MARKER" "$TARGET" "$(head -c 60000 "$PLAN_FILE")")
-
-EXISTING=$(gh api "repos/$REPO/issues/$PR/comments?per_page=100" \\
-  --jq ".[] | select(.body | startswith(\\"$MARKER\\")) | .id" \\
-  | head -n 1)
-
-if [ -n "$EXISTING" ]; then
-  gh api -X PATCH "repos/$REPO/issues/comments/$EXISTING" \\
-    -f body="$BODY" >/dev/null
-  echo "plan: updated comment $EXISTING for $TARGET"
-else
-  gh api "repos/$REPO/issues/$PR/comments" \\
-    -f body="$BODY" >/dev/null
-  echo "plan: created comment for $TARGET"
-fi
-""".format(
-        marker = marker,
-        target = target,
-        pr = pr,
-        repo = repo,
-        plan_file = plan_file,
-    )
-
-    return ctx.std.process.command("bash").arg("-c").arg(script).spawn().wait().code
+def _post_pr_comment(comment_ep, comment_r, pr_ctx, target, plan_file = None):
+    """Spawn the pre-built tf_pr_comment binary to upsert this root's
+    PR comment. With `plan_file == None`, posts a `Planning…` stub.
+    With a path, posts the captured plan output.
+    """
+    args = [
+        "--marker=<!-- tf-plan:" + target + " -->",
+        "--target=" + target,
+        "--repo=" + pr_ctx.repo,
+        "--pr=" + pr_ctx.pr,
+    ]
+    if plan_file != None:
+        args.append("--plan-file=" + plan_file)
+    return comment_r.spawn(comment_ep, args).wait().code
 
 def impl(ctx) -> int:
     err = ctx.std.io.stderr
 
-    targets = [normalize_root(t) for t in ctx.args.target]
-    if len(targets) == 0:
-        # Default to all roots — but in CI, skip bootstrap-tier roots
-        # (managing CI from CI is not safe; if an apply revokes the SA's
-        # own perms, CI can't recover). Bootstrap roots still show up
-        # locally so `aspect plan` walks the whole DAG on a developer
-        # machine.
-        targets = TF_ROOTS
-        if is_ci(ctx):
-            targets = [t for t in targets if t not in BOOTSTRAP_ROOTS]
+    targets = select_targets(ctx, ctx.args.target)
 
-    # In CI, capture per-root output to a tmpdir so we can post the comment
-    # right after each plan. Local runs skip this — output streams direct.
+    # In CI on a PR, build the comment-poster binary ONCE up front and
+    # reuse it for every stub + final post across all roots. Local runs
+    # and non-PR CI runs skip the build entirely.
+    pr_ctx = None
     plans_dir = None
+    comment_ep, comment_r = None, None
     if is_ci(ctx):
-        plans_dir = (ctx.std.env.var("RUNNER_TEMP") or "/tmp") + "/aspect-plans"
-        ctx.std.process.command("mkdir").arg("-p").arg(plans_dir).spawn().wait()
+        pr_ctx = _pr_context(ctx)
+        if pr_ctx == None:
+            err.write("plan: not a PR ref; skipping per-root comments\n")
+        else:
+            plans_dir = (ctx.std.env.var("RUNNER_TEMP") or "/tmp") + "/aspect-plans"
+            ctx.std.fs.create_dir_all(plans_dir)
+            comment_ep, comment_r = build_runnable(ctx, _TF_PR_COMMENT)
+            if comment_ep == None:
+                err.write("plan: tf_pr_comment build failed; continuing without per-root comments\n")
+                pr_ctx = None
 
     worst = 0
     for target in targets:
+        # Stub the comment immediately so reviewers see the plan is in
+        # flight. If posting fails (rate limit, transient 503), we log
+        # but continue — a missing stub is far better than blocking the
+        # actual plan.
+        if pr_ctx != None:
+            stub_code = _post_pr_comment(comment_ep, comment_r, pr_ctx, target)
+            if stub_code != 0:
+                err.write("plan: stub comment failed for {} (exit {}); continuing\n".format(target, stub_code))
+
         plan_file = (plans_dir + "/" + _slug(target) + ".txt") if plans_dir else None
         exit_code = _run_plan(ctx, target, plan_file)
 
-        if plans_dir:
-            _post_pr_comment(ctx, target, plan_file)
+        if pr_ctx != None and plan_file != None:
+            _post_pr_comment(comment_ep, comment_r, pr_ctx, target, plan_file)
 
         if exit_code != 0:
             err.write("ERROR: plan failed for {}\n".format(target))
