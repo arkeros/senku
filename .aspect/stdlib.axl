@@ -1,8 +1,14 @@
 """Shared helpers for senku aspect-cli tasks."""
 
-# Terraform roots in deploy order. This list is the single source of truth
-# for the deploy DAG; CI's `needs:` graph mirrors it for per-step UI.
+# Terraform roots in deploy order. Single source of truth for the deploy DAG.
+#
+# `ci` is bootstrap-tier — it provisions the CI service account and the
+# project-level IAM bindings every other root needs. **First apply must be
+# local** (a human with project-admin rights), since the CI SA can't grant
+# itself the permissions it doesn't yet have. Once bootstrapped, CI takes
+# over self-updates of this root and the rest.
 TF_ROOTS = [
+    "//infra/cloud/gcp/ci:terraform",
     "//infra/cloud/gcp/gar:terraform",
     "//oci/cmd/registry:terraform",
     "//infra/cloud/gcp/lb:terraform",
