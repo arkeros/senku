@@ -10,12 +10,12 @@ serial here; for parallel PR plans use CI's matrix (each job calls
 `aspect plan <one-root>`).
 """
 
-load("./stdlib.axl", "TF_ROOTS", "bazel_run")
+load("./stdlib.axl", "TF_ROOTS", "bazel_run", "normalize_root")
 
 def impl(ctx) -> int:
     err = ctx.std.io.stderr
 
-    targets = list(ctx.args.target)
+    targets = [normalize_root(t) for t in ctx.args.target]
     if len(targets) == 0:
         targets = TF_ROOTS
 

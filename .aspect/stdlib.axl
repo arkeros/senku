@@ -11,6 +11,18 @@ TF_ROOTS = [
 def is_ci(ctx) -> bool:
     return ctx.std.env.var("CI") != None
 
+def normalize_root(target) -> str:
+    """Accept either `//path` or `//path:terraform`; default to `:terraform`.
+
+    The convention for in-repo tf_root targets is `<root>:terraform`. Letting
+    callers omit the `:terraform` makes `aspect apply //oci/cmd/registry`
+    work as a sibling of the more explicit
+    `aspect apply //oci/cmd/registry:terraform`.
+    """
+    if ":" in target:
+        return target
+    return target + ":terraform"
+
 def bazel_run(ctx, target, stamp = False):
     """Spawn `bazel run [--stamp] <target>` and return its exit status.
 

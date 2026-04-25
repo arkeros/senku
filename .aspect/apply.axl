@@ -14,12 +14,12 @@ Auto-approves Terraform when running non-interactively (`$CI` is set);
 locally you'll get the y/n confirmation prompt per root.
 """
 
-load("./stdlib.axl", "TF_ROOTS", "bazel_run")
+load("./stdlib.axl", "TF_ROOTS", "bazel_run", "normalize_root")
 
 def impl(ctx) -> int:
     err = ctx.std.io.stderr
 
-    targets = list(ctx.args.target)
+    targets = [normalize_root(t) for t in ctx.args.target]
     if len(targets) == 0:
         targets = TF_ROOTS
 
