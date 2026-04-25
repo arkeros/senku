@@ -1,10 +1,19 @@
 """Runfiles-aware spawn helper for Bazel-built binaries.
 
 Vendored from https://github.com/aspect-extensions/run via astrograde's
-copy. Local addition: `command(entrypoint, args, env)` returns the
-un-spawned `std.process.Command` so callers can chain `.stdout("piped")`
-etc. before `.spawn()`. This is what lets `aspect plan` capture each
-root's plan output for the PR comment without going through `bash | tee`.
+copy. Local deviations:
+
+- `command(entrypoint, args, env)` returns the un-spawned
+  `std.process.Command` so callers can chain `.stdout("piped")` etc.
+  before `.spawn()`. This is what lets `aspect plan` capture each
+  root's plan output for the PR comment without going through
+  `bash | tee`.
+- `_command` no longer sets `current_dir` to the runfiles tree. Under
+  the workspace default `--nobuild_runfile_links` that directory isn't
+  materialized, so the chdir would fail. Spawned binaries should
+  resolve files via a Bazel runfiles library (RUNFILES_DIR /
+  RUNFILES_MANIFEST_FILE are still exported here) rather than via cwd.
+  Inherits the caller's cwd instead, which matches `BUILD_WORKING_DIRECTORY`.
 """
 
 def _process_bes(state, event):
@@ -40,13 +49,13 @@ def _determine_entrypoint(state, target):
 def _command(ctx, entrypoint, args, env = {}):
     """Build the `std.process.Command` for `entrypoint` without spawning
     it. Sets the runfiles env vars common Bazel runfiles libraries look
-    for, plus `BUILD_WORKING_DIRECTORY`.
+    for, plus `BUILD_WORKING_DIRECTORY`. Inherits the caller's cwd —
+    see module docstring for why we don't chdir into the runfiles tree.
     """
     if not entrypoint.startswith("/"):
         entrypoint = ctx.std.env.current_dir() + "/" + entrypoint
     runfiles = entrypoint + ".runfiles"
     proc = ctx.std.process.command(entrypoint) \
-        .current_dir(runfiles) \
         .env("RUNFILES_DIR", runfiles) \
         .env("JAVA_RUNFILES", runfiles) \
         .env("RUNFILES_MANIFEST_FILE", runfiles + "_manifest") \
