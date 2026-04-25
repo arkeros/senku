@@ -68,11 +68,17 @@ def build_runnable(ctx, target, build_flags = []):
     Returns `(entrypoint, runnable)` on success, or `(None, None)` on
     build failure. Callers reuse the returned `runnable` to spawn the
     same binary multiple times without rebuilding.
+
+    Stays on the workspace default `--nobuild_runfile_links`: spawned
+    binaries must use a runfiles library (Bazel's bash/Go/etc.) so they
+    resolve via the manifest. Forcing the symlink tree here would flip
+    the option vs. bare `bazel build` and discard the analysis cache on
+    every alternation.
     """
     out = ctx.std.io.stdout
     err = ctx.std.io.stderr
 
-    flags = ["--isatty=" + str(int(out.is_tty)), "--build_runfile_links"]
+    flags = ["--isatty=" + str(int(out.is_tty))]
     flags.extend(build_flags)
 
     out.write("==> bazel build {}\n".format(target))
