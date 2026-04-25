@@ -187,6 +187,9 @@ APPLY_IMPERSONATION_ALERT = monitoring_alert_policy_log_match(
     name = "apply_impersonation",
     project = PROJECT,
     display_name = "tf-apply impersonated by unexpected principal",
+    # CRITICAL: any non-prod-env subject minting a token for the apply
+    # SA is a potential active compromise. Wake somebody up.
+    severity = "CRITICAL",
     filter = (
         'protoPayload.serviceName="iamcredentials.googleapis.com" ' +
         'protoPayload.methodName="GenerateAccessToken" ' +
@@ -222,6 +225,9 @@ APPLY_SETIAMPOLICY_ALERT = monitoring_alert_policy_log_match(
     name = "apply_setiampolicy",
     project = PROJECT,
     display_name = "tf-apply called setIamPolicy",
+    # WARNING: often legitimate (a PR genuinely added an IAM resource).
+    # Review-worthy, not page-worthy.
+    severity = "WARNING",
     filter = (
         'protoPayload.authenticationInfo.principalEmail="%s" ' % APPLY_SA_EMAIL +
         '(protoPayload.methodName=~".*\\.setIamPolicy$" OR ' +
@@ -251,6 +257,10 @@ WIF_MUTATION_ALERT = monitoring_alert_policy_log_match(
     name = "wif_mutation",
     project = PROJECT,
     display_name = "WIF pool or provider modified",
+    # CRITICAL: this is the rebind-to-broad-scope path. CI cannot
+    # touch these resources by design, so any mutation is either a
+    # human-driven local apply (verifiable out-of-band) or compromise.
+    severity = "CRITICAL",
     filter = (
         'protoPayload.serviceName="iam.googleapis.com" ' +
         '(protoPayload.methodName=~".*UpdateWorkloadIdentityPool.*" OR ' +
@@ -306,6 +316,10 @@ DATA_ACCESS_SILENCE_ALERT = monitoring_alert_policy_metric_absent(
     name = "data_access_silence",
     project = PROJECT,
     display_name = "Data Access audit logs went silent",
+    # ERROR: the audit pipeline is broken. By the time this fires (1h
+    # after last entry) the damage is done — needs attention, but not
+    # the same urgency as an active impersonation in flight.
+    severity = "ERROR",
     # `resource.type="global"` is the correct monitored resource for a
     # user-defined log-based metric. The provider/console naming
     # ("logging metric") is for the *resource kind* in terraform, not
