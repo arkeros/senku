@@ -129,6 +129,18 @@ resource "google_compute_backend_service" "backend" {
     }
   }
 
+  # Cloud CDN respecting upstream `Cache-Control`. The backends behind us
+  # (Cloud Run services) are responsible for emitting accurate headers — this
+  # stack does not assume anything about cacheability per path.
+  enable_cdn = true
+  cdn_policy {
+    cache_mode       = "USE_ORIGIN_HEADERS"
+    negative_caching = true
+    # Provider requires one of cache_key_policy or signed_url_cache_max_age_sec.
+    # We don't issue signed URLs, so 0 is a no-op; keeps the schema happy.
+    signed_url_cache_max_age_sec = 0
+  }
+
   log_config {
     enable      = true
     sample_rate = 1.0
