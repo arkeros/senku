@@ -1,6 +1,6 @@
 # `infra/cloud/gcp/lb` — shared external HTTPS load balancer
 
-Singleton root stack. One global external HTTPS LB fronting Cloud Run services, with path-based routing on one configurable domain. No services are provisioned here — this stack only owns the LB. Each service root (see [`examples/hello/`](./examples/hello)) exposes an `lb_backends` output, and this stack reads those outputs via `terraform_remote_state`; the roots it should read are listed in `var.backend_states`.
+Singleton root stack. One global external HTTPS LB fronting Cloud Run services, with path-based routing on one configurable domain. No services are provisioned here — this stack only owns the LB. Service roots expose an `LB_BACKEND` Starlark constant from their own `defs.bzl` (see [`oci/cmd/registry/defs.bzl`](../../../../oci/cmd/registry/defs.bzl) for the canonical example), and this stack imports them directly via `load()` in [`infra/cloud/gcp/lb/defs.bzl`](./defs.bzl). No `terraform_remote_state`: cross-root coupling resolves at Bazel build time, not Terraform plan time.
 
 ## Topology
 
@@ -10,8 +10,8 @@ user → LB IP (anycast)  ── :443 ──► URL map (HTTPS)        ── ho
                                                             └── unmatched ────► 404 (GCS bucket) └─► NEG (region C) → Cloud Run
 ```
 
-- **Per backend**: one `google_compute_backend_service` + one `google_compute_region_network_endpoint_group` **per region** the backend declares. NEGs are `for_each`'d over the flattened `(backend_key, region)` pairs of the merged `local.backends`.
-- **Regional fan-out** is first-class: a service root declares `service_name = "<name>"` and `regions = ["us-central1", "europe-west3", …]` in its `lb_backends` output — one Cloud Run service name, many regions — and Google's global LB does the geo-steering.
+- **Per backend**: one `google_compute_backend_service` + one `google_compute_region_network_endpoint_group` **per region** the backend declares. NEGs are emitted as one resource per `(backend_key, region)` pair via Starlark expansion of `BACKENDS` in `defs.bzl`.
+- **Regional fan-out** is first-class: a service root's `LB_BACKEND` constant declares `service_name = "<name>"` and `regions = ["us-central1", "europe-west3", …]` — one Cloud Run service name, many regions — and Google's global LB does the geo-steering.
 - **Per-domain fan-out** = add a `google_certificate_manager_certificate_map_entry` with a matcher clause and a new `host_rule`/`path_matcher` on the HTTPS URL map.
 
 ## Certificate Manager, not classic managed certs
@@ -31,29 +31,24 @@ The URL map's `default_service` points at an empty `google_storage_bucket` via a
 
 ## State backend (GCS)
 
-Bucket (`senku-prod-terraform-state`) and prefix (`infra/cloud/gcp/lb`) are hardcoded in `versions.tf`, so `terraform init` takes no flags. Convention across the repo: one shared state bucket, prefix mirrors the root's path in the repo. GCS is required so each service root's own GCS-backed state can be read by this stack through `terraform_remote_state`.
+Bucket (`senku-prod-terraform-state`) and prefix (`infra/cloud/gcp/lb`) are baked into the generated `backend.tf.json` by `tf_root` (defaults to `native.package_name()`). Convention across the repo: one shared state bucket, prefix mirrors the root's path in the repo. Each root's state is independent — there's no cross-root state read at plan time.
 
 ## Usage
 
-Inputs live in `terraform.tfvars` next to this README — Terraform auto-loads it, so no `-var-file` flag. `-var` on the CLI is avoided so every apply has a reviewable input artifact.
+LB identity (project, domain, bucket location) is declared as Starlark constants at the top of [`defs.bzl`](./defs.bzl). The list of backends contributing to this LB lives in the `BACKENDS` dict in the same file — to add a service, import its `LB_BACKEND` constant and add an entry.
 
-`terraform.tfvars`:
-
-```hcl
-project_id = "senku-prod"
-domain     = "distroless.io"
-
-backend_states = {
-  registry = "oci/cmd/registry/terraform"
-}
-```
-
-Apply:
+Plan / apply this root alone:
 
 ```bash
-cd infra/cloud/gcp/lb
-terraform init
-terraform apply
+bazel run //infra/cloud/gcp/lb:terraform.plan
+bazel run //infra/cloud/gcp/lb:terraform.apply
 ```
 
-A companion stack at [`examples/hello/`](./examples/hello) provisions two `service_cloudrun` services and exposes an `lb_backends` output that this stack merges in. Adding a second service root is the same shape: apply it, then add another `backend_states` entry (key = friendly name, value = the root's repo path).
+Or the whole DAG at once (gar → registry → lb), which is what CI does:
+
+```bash
+aspect plan
+aspect apply
+```
+
+A companion stack at [`examples/hello/`](./examples/hello) is a standalone Terraform sample illustrating the underlying resource shape; it's not wired into this root.
