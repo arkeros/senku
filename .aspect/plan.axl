@@ -2,11 +2,17 @@
 Plan one or more Terraform roots via Bazel.
 
 Usage:
-  aspect plan                                 # plan all roots, in order
-  aspect plan //infra/cloud/gcp/gar:terraform # plan one root
+  aspect plan                                              # plan all roots, in order
+  aspect plan //infra/cloud/gcp/gar:terraform              # plan one root
+  aspect plan //x:terraform --refresh=false                # skip the state refresh
+  aspect plan //x:terraform --target=module.foo.bar        # surgical plan; repeatable
 
 Each root invokes `<target>.plan` via `runnable` (BES + direct spawn).
 State stays in GCS.
+
+Long-tail terraform flags that aren't promoted to first-class options
+(e.g. `-lock-timeout`, `-parallelism`) are reachable via
+`bazel run //x:terraform.plan -- -lock-timeout=5m`.
 
 CI mode (when `$CI` is set + `$GITHUB_REPOSITORY` + `$GITHUB_REF` look
 like a pull-request invocation): also captures each root's output and
@@ -22,6 +28,7 @@ usual.
 """
 
 load("./stdlib.axl", "build_runnable", "is_ci", "select_targets")
+load("./terraform.axl", "TF_ARGS", "build_tf_args")
 
 # Bazel target for the comment-poster Go binary. Built once at the top
 # of `impl` and reused across all roots.
@@ -31,11 +38,12 @@ def _slug(target):
     """Bazel label → filesystem-safe slug."""
     return target.replace("//", "").replace(":", "-").replace("/", "-")
 
-def _run_plan(ctx, target, plan_file = None):
-    """Build `<target>.plan` and run it. If `plan_file` is set, capture
-    combined stdout+stderr to that file (for the comment-poster) while
-    still echoing it to the runner log. Returns the plan's exit code,
-    or non-zero if the build itself failed.
+def _run_plan(ctx, target, tf_args, plan_file = None):
+    """Build `<target>.plan` and run it. `tf_args` are forwarded to the
+    underlying `terraform plan` invocation. If `plan_file` is set,
+    capture combined stdout+stderr to that file (for the comment-poster)
+    while still echoing it to the runner log. Returns the plan's exit
+    code, or non-zero if the build itself failed.
     """
     out = ctx.std.io.stdout
     err = ctx.std.io.stderr
@@ -47,14 +55,14 @@ def _run_plan(ctx, target, plan_file = None):
 
     if plan_file == None:
         # Local path: stream straight through to the terminal.
-        return r.spawn(entrypoint, []).wait().code
+        return r.spawn(entrypoint, tf_args).wait().code
 
     # CI path: capture combined output for later comment posting. We
     # buffer here rather than streaming via tee — GitHub Actions batches
     # step logs anyway, so real-time streaming inside a step isn't
     # observable. After the plan returns we mirror the buffered output
     # to the runner log AND write it to disk.
-    proc = r.command(entrypoint, []) \
+    proc = r.command(entrypoint, tf_args) \
         .stdout("piped").stderr("piped") \
         .spawn()
     result = proc.wait_with_output()
@@ -93,7 +101,8 @@ def _post_pr_comment(comment_ep, comment_r, pr_ctx, target, plan_file = None):
 def impl(ctx) -> int:
     err = ctx.std.io.stderr
 
-    targets = select_targets(ctx, ctx.args.target)
+    targets = select_targets(ctx, ctx.args.root)
+    tf_args = build_tf_args(ctx)
 
     # In CI on a PR, build the comment-poster binary ONCE up front and
     # reuse it for every stub + final post across all roots. Local runs
@@ -125,7 +134,7 @@ def impl(ctx) -> int:
                 err.write("plan: stub comment failed for {} (exit {}); continuing\n".format(target, stub_code))
 
         plan_file = (plans_dir + "/" + _slug(target) + ".txt") if plans_dir else None
-        exit_code = _run_plan(ctx, target, plan_file)
+        exit_code = _run_plan(ctx, target, tf_args, plan_file)
 
         if pr_ctx != None and plan_file != None:
             _post_pr_comment(comment_ep, comment_r, pr_ctx, target, plan_file)
@@ -139,7 +148,5 @@ def impl(ctx) -> int:
 
 plan = task(
     implementation = impl,
-    args = {
-        "target": args.positional(),
-    },
+    args = {"root": args.positional()} | TF_ARGS,
 )

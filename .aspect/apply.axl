@@ -2,8 +2,10 @@
 Apply one or more Terraform roots via Bazel, in dependency order.
 
 Usage:
-  aspect apply                                  # apply all roots, gar → registry → lb
-  aspect apply //infra/cloud/gcp/gar:terraform  # apply one root
+  aspect apply                                       # apply all roots, gar → registry → lb
+  aspect apply //infra/cloud/gcp/gar:terraform       # apply one root
+  aspect apply //x:terraform --refresh=false         # skip the state refresh
+  aspect apply //x:terraform --target=module.foo.bar # surgical apply; repeatable
 
 Each root invokes `<target>.apply` via `runnable` (BES + direct spawn,
 with `--stamp` passed through). Stamping is required because the
@@ -16,14 +18,16 @@ locally you'll get the y/n confirmation prompt per root.
 """
 
 load("./stdlib.axl", "build_and_run", "is_ci", "select_targets")
+load("./terraform.axl", "TF_ARGS", "build_tf_args")
 
 def impl(ctx) -> int:
     err = ctx.std.io.stderr
 
     env = {"TF_AUTO_APPROVE": "1"} if is_ci(ctx) else {}
+    tf_args = build_tf_args(ctx)
 
-    for root in select_targets(ctx, ctx.args.target):
-        result = build_and_run(ctx, root + ".apply", env = env, build_flags = ["--stamp"])
+    for root in select_targets(ctx, ctx.args.root):
+        result = build_and_run(ctx, root + ".apply", args = tf_args, env = env, build_flags = ["--stamp"])
         if result == None:
             return 1
         if not result.success:
@@ -33,7 +37,5 @@ def impl(ctx) -> int:
 
 apply = task(
     implementation = impl,
-    args = {
-        "target": args.positional(),
-    },
+    args = {"root": args.positional()} | TF_ARGS,
 )

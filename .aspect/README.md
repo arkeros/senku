@@ -12,8 +12,10 @@ multi-process orchestration belongs here, not inside the Bazel rules.
 Plan one or more Terraform roots.
 
 ```bash
-aspect plan                                  # all roots, in order
-aspect plan //infra/cloud/gcp/gar:terraform  # one root
+aspect plan                                              # all roots, in order
+aspect plan //infra/cloud/gcp/gar:terraform              # one root
+aspect plan //x:terraform --refresh=false                # skip the state refresh
+aspect plan //x:terraform --target=module.foo.bar        # surgical plan; repeatable
 ```
 
 Plans are serial. For parallel PR plans, CI runs each `aspect plan <root>`
@@ -24,13 +26,26 @@ in its own matrix job.
 Apply one or more Terraform roots, in dependency order (gar → registry → lb).
 
 ```bash
-aspect apply                                  # all roots, chained
-aspect apply //oci/cmd/registry:terraform     # one root
+aspect apply                                       # all roots, chained
+aspect apply //oci/cmd/registry:terraform          # one root
+aspect apply //x:terraform --refresh=false         # skip the state refresh
+aspect apply //x:terraform --target=module.foo.bar # surgical apply; repeatable
 ```
 
 Each root runs `bazel run --stamp <target>.apply`, which (for the registry)
 also pushes the image to GAR via the `pre_apply` hook. Auto-approves when
 `$CI` is set; prompts y/n locally.
+
+### Long-tail terraform flags
+
+`--refresh` and `--target` cover the common cases. Other terraform flags
+(`-lock-timeout`, `-parallelism`, `-replace`, `-detailed-exitcode`, …)
+aren't promoted to first-class options yet — reach them via the
+underlying runnable:
+
+```bash
+bazel run //x:terraform.plan -- -lock-timeout=5m
+```
 
 ## Bootstrap roots
 

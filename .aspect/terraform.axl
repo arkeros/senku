@@ -1,0 +1,29 @@
+"""Shared terraform-flag plumbing for `aspect plan` / `aspect apply`.
+
+Promotes a curated set of `terraform plan/apply` flags to first-class
+aspect-task options (`--refresh`, `--target`). Tasks merge `TF_ARGS`
+into their own args dict and call `build_tf_args(ctx)` to translate
+the parsed values into the corresponding terraform CLI arguments. The
+defaults mirror terraform's own — `aspect plan` with no flags is a
+no-op delta from `terraform plan`.
+
+Long-tail flags (`-lock-timeout`, `-parallelism`, …) aren't handled
+here; reach them via `bazel run //x:terraform.<verb> -- -X` instead.
+"""
+
+# Args dict fragment — callers merge into their task's `args` via `| TF_ARGS`.
+TF_ARGS = {
+    "refresh": args.boolean(default = True),
+    "target": args.string_list(),
+}
+
+def build_tf_args(ctx) -> list:
+    """Translate the parsed `TF_ARGS` flags from `ctx.args` into
+    `terraform`-CLI arguments. The task's `args` must include `TF_ARGS`.
+    """
+    out = []
+    if not ctx.args.refresh:
+        out.append("-refresh=false")
+    for t in ctx.args.target:
+        out.append("-target=" + t)
+    return out
