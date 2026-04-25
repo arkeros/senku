@@ -112,12 +112,14 @@ TFSTATE_BUCKET_BINDING = storage_bucket_iam_member(
 # Project-level role grants the CI SA needs to plan/apply every other root.
 # `google_project_iam_member` (not `_binding`) so adding a role here doesn't
 # evict roles granted out-of-band.
+_CI_SA_MEMBER = "serviceAccount:%s" % GITHUB_ACTIONS_SA.email
+
 def _ci_grant(slug, role):
     return project_iam_member(
         name = "ci_" + slug,
         project = PROJECT,
         role = role,
-        member = "serviceAccount:%s" % GITHUB_ACTIONS_SA.email,
+        member = _CI_SA_MEMBER,
     )
 
 PROJECT_IAM_BINDINGS = [
