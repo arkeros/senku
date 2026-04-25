@@ -5,26 +5,133 @@ Usage:
   aspect plan                                 # plan all roots, in order
   aspect plan //infra/cloud/gcp/gar:terraform # plan one root
 
-Each root invokes `bazel run <target>.plan`. State stays in GCS. Plans are
-serial here; for parallel PR plans use CI's matrix (each job calls
-`aspect plan <one-root>`).
+Each root invokes `bazel run <target>.plan`. State stays in GCS.
+
+CI mode (when `$CI` is set + `$GITHUB_REPOSITORY` + `$GITHUB_REF` look like
+a pull-request invocation): also captures each root's output and posts a
+per-root PR comment via `gh api`, update-in-place if a comment with the
+matching marker already exists. The CI workflow can therefore be a single
+step (`aspect plan`) — no matrix, no discover-then-fan-out, no
+github-script post-process.
+
+Local mode: no comment side-effects, output streams to the terminal as
+usual.
 """
 
-load("./stdlib.axl", "TF_ROOTS", "bazel_run", "normalize_root")
+load("./stdlib.axl", "BOOTSTRAP_ROOTS", "TF_ROOTS", "is_ci", "normalize_root")
+
+def _slug(target):
+    """Bazel label → filesystem-safe slug."""
+    return target.replace("//", "").replace(":", "-").replace("/", "-")
+
+def _run_plan(ctx, target, plan_file = None):
+    """Run `bazel run <target>.plan`. If `plan_file` is set, also tee output
+    into it (via bash, for the GH comment step's later read). Return exit code.
+    """
+    out = ctx.std.io.stdout
+    full = target + ".plan"
+    out.write("==> bazel run {}\n".format(full))
+
+    if plan_file:
+        # Combined stdout+stderr so the comment captures terraform's plan
+        # output AND any bazel/aspect noise around it. `tee` keeps the runner
+        # log readable in real time.
+        script = "set -o pipefail; bazel run '{}' 2>&1 | tee '{}'".format(full, plan_file)
+        cmd = ctx.std.process.command("bash").arg("-c").arg(script)
+    else:
+        cmd = ctx.std.process.command("bazel").arg("run").arg(full)
+
+    return cmd.spawn().wait().code
+
+def _post_pr_comment(ctx, target, plan_file):
+    """Update-or-create a PR comment containing the plan output for `target`."""
+    err = ctx.std.io.stderr
+
+    repo = ctx.std.env.var("GITHUB_REPOSITORY") or ""
+    pr_ref = ctx.std.env.var("GITHUB_REF") or ""
+
+    # `GITHUB_REF` for PR triggers is `refs/pull/<number>/merge`.
+    parts = pr_ref.split("/")
+    if len(parts) < 4 or parts[1] != "pull" or not repo:
+        err.write("plan: not a PR ref ({}); skipping comment\n".format(pr_ref))
+        return
+
+    pr = parts[2]
+    marker = "<!-- tf-plan:" + target + " -->"
+
+    # gh CLI handles auth via $GITHUB_TOKEN / $GH_TOKEN (set by GHA).
+    # `--jq` filters comments by marker prefix; first match wins.
+    # Body via heredoc to preserve newlines + special chars; `head -c 60000`
+    # caps at GitHub's per-comment limit.
+    script = """
+set -euo pipefail
+MARKER='{marker}'
+TARGET='{target}'
+PR='{pr}'
+REPO='{repo}'
+PLAN_FILE='{plan_file}'
+
+BODY=$(printf '%s\\n### Terraform Plan (`%s`)\\n```\\n%s\\n```\\n' \\
+  "$MARKER" "$TARGET" "$(head -c 60000 "$PLAN_FILE")")
+
+EXISTING=$(gh api "repos/$REPO/issues/$PR/comments?per_page=100" \\
+  --jq ".[] | select(.body | startswith(\\"$MARKER\\")) | .id" \\
+  | head -n 1)
+
+if [ -n "$EXISTING" ]; then
+  gh api -X PATCH "repos/$REPO/issues/comments/$EXISTING" \\
+    -f body="$BODY" >/dev/null
+  echo "plan: updated comment $EXISTING for $TARGET"
+else
+  gh api "repos/$REPO/issues/$PR/comments" \\
+    -f body="$BODY" >/dev/null
+  echo "plan: created comment for $TARGET"
+fi
+""".format(
+        marker = marker,
+        target = target,
+        pr = pr,
+        repo = repo,
+        plan_file = plan_file,
+    )
+
+    return ctx.std.process.command("bash").arg("-c").arg(script).spawn().wait().code
 
 def impl(ctx) -> int:
     err = ctx.std.io.stderr
 
     targets = [normalize_root(t) for t in ctx.args.target]
     if len(targets) == 0:
+        # Default to all roots — but in CI, skip bootstrap-tier roots
+        # (managing CI from CI is not safe; if an apply revokes the SA's
+        # own perms, CI can't recover). Bootstrap roots still show up
+        # locally so `aspect plan` walks the whole DAG on a developer
+        # machine.
         targets = TF_ROOTS
+        if is_ci(ctx):
+            targets = [t for t in targets if t not in BOOTSTRAP_ROOTS]
 
-    for root in targets:
-        result = bazel_run(ctx, root + ".plan")
-        if not result.success:
-            err.write("ERROR: plan failed for {}\n".format(root))
-            return result.code
-    return 0
+    # In CI, capture per-root output to a tmpdir so we can post the comment
+    # right after each plan. Local runs skip this — output streams direct.
+    plans_dir = None
+    if is_ci(ctx):
+        plans_dir = (ctx.std.env.var("RUNNER_TEMP") or "/tmp") + "/aspect-plans"
+        ctx.std.process.command("mkdir").arg("-p").arg(plans_dir).spawn().wait()
+
+    worst = 0
+    for target in targets:
+        plan_file = (plans_dir + "/" + _slug(target) + ".txt") if plans_dir else None
+        exit_code = _run_plan(ctx, target, plan_file)
+
+        if plans_dir:
+            _post_pr_comment(ctx, target, plan_file)
+
+        if exit_code != 0:
+            err.write("ERROR: plan failed for {}\n".format(target))
+            if worst == 0:
+                worst = exit_code
+
+    return worst
 
 plan = task(
     implementation = impl,

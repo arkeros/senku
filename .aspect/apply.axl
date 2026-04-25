@@ -14,14 +14,21 @@ Auto-approves Terraform when running non-interactively (`$CI` is set);
 locally you'll get the y/n confirmation prompt per root.
 """
 
-load("./stdlib.axl", "TF_ROOTS", "bazel_run", "normalize_root")
+load("./stdlib.axl", "BOOTSTRAP_ROOTS", "TF_ROOTS", "bazel_run", "is_ci", "normalize_root")
 
 def impl(ctx) -> int:
     err = ctx.std.io.stderr
 
     targets = [normalize_root(t) for t in ctx.args.target]
     if len(targets) == 0:
+        # Default to all roots — but in CI, skip bootstrap-tier roots
+        # (managing CI from CI is not safe; if an apply revokes the SA's
+        # own perms, CI can't recover). Bootstrap roots still show up
+        # locally so `aspect apply` walks the whole DAG on a developer
+        # machine.
         targets = TF_ROOTS
+        if is_ci(ctx):
+            targets = [t for t in targets if t not in BOOTSTRAP_ROOTS]
 
     for root in targets:
         result = bazel_run(ctx, root + ".apply", stamp = True)

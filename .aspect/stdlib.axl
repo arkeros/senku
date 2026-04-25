@@ -3,15 +3,23 @@
 # Terraform roots in deploy order. Single source of truth for the deploy DAG.
 #
 # `ci` is bootstrap-tier — it provisions the CI service account and the
-# project-level IAM bindings every other root needs. **First apply must be
-# local** (a human with project-admin rights), since the CI SA can't grant
-# itself the permissions it doesn't yet have. Once bootstrapped, CI takes
-# over self-updates of this root and the rest.
+# project-level IAM bindings every other root needs. **Apply locally only**
+# (see `BOOTSTRAP_ROOTS` below): a botched CI-side apply could revoke the
+# SA's own permissions and leave CI unable to recover.
 TF_ROOTS = [
     "//infra/cloud/gcp/ci:terraform",
     "//infra/cloud/gcp/gar:terraform",
     "//oci/cmd/registry:terraform",
     "//infra/cloud/gcp/lb:terraform",
+]
+
+# Bootstrap-tier roots: skipped by `aspect plan` / `aspect apply` when run
+# under CI. They stay in TF_ROOTS so `aspect plan` and `aspect apply` work
+# end-to-end locally, but the CI SA never plans or applies them — the only
+# safe place to manage CI's own credentials is from a human's machine with
+# its own project-admin rights.
+BOOTSTRAP_ROOTS = [
+    "//infra/cloud/gcp/ci:terraform",
 ]
 
 def is_ci(ctx) -> bool:

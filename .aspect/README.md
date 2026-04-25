@@ -32,11 +32,21 @@ Each root runs `bazel run --stamp <target>.apply`, which (for the registry)
 also pushes the image to GAR via the `pre_apply` hook. Auto-approves when
 `$CI` is set; prompts y/n locally.
 
+## Bootstrap roots
+
+`BOOTSTRAP_ROOTS` in `.aspect/stdlib.axl` is the subset of `TF_ROOTS` that
+`aspect plan` and `aspect apply` skip when running under `$CI`. Today
+that's just `//infra/cloud/gcp/ci:terraform` — the WIF + GHA SA + project
+IAM bindings every other root depends on. Apply it locally only: a
+botched CI-side apply could revoke the SA's own permissions and leave CI
+unable to recover.
+
+Locally, `aspect plan` / `aspect apply` walk the full DAG (including
+bootstrap roots) — the filter only kicks in when `$CI` is set.
+
 ## Adding a root
 
 1. Add the new `tf_root` target to `.aspect/stdlib.axl`'s `TF_ROOTS` list,
    in the position that matches its GCP-level dependencies.
-2. Mirror the position in CI's `needs:` graph for the apply chain.
-
-The list is the single source of truth for deploy order; CI's `needs:`
-graph is its mechanical reflection for per-step UI.
+2. If the root manages credentials or anything else CI shouldn't touch
+   on its own, add it to `BOOTSTRAP_ROOTS` too.
