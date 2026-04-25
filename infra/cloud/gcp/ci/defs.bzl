@@ -79,10 +79,6 @@ GITHUB_ACTIONS_SA = service_account(
     display_name = "GitHub Actions (senku)",
 )
 
-# IAM member string for the CI SA. Used everywhere we grant a role to it —
-# bucket bindings, project bindings, etc. Constructed once at load.
-_CI_SA_MEMBER = "serviceAccount:%s" % GITHUB_ACTIONS_SA.email
-
 # Bind the WIF principal set (any token from this repo) to the SA's
 # workloadIdentityUser role — that's what lets `google-github-actions/auth`
 # exchange the OIDC token for a Google access token.
@@ -101,7 +97,7 @@ CACHE_BUCKET_BINDING = storage_bucket_iam_member(
     name = "cache_admin",
     bucket = BAZEL_CACHE.name,
     role = "roles/storage.objectAdmin",
-    member = _CI_SA_MEMBER,
+    member = GITHUB_ACTIONS_SA.member,
 )
 
 TFSTATE_BUCKET_BINDING = storage_bucket_iam_member(
@@ -110,7 +106,7 @@ TFSTATE_BUCKET_BINDING = storage_bucket_iam_member(
     # see plan doc. Referenced by name, not by `${...}` interpolation.
     bucket = "senku-prod-terraform-state",
     role = "roles/storage.objectAdmin",
-    member = _CI_SA_MEMBER,
+    member = GITHUB_ACTIONS_SA.member,
 )
 
 # Project-level role grants the CI SA needs to plan/apply every other root.
@@ -121,7 +117,7 @@ def _ci_grant(slug, role):
         name = "ci_" + slug,
         project = PROJECT,
         role = role,
-        member = _CI_SA_MEMBER,
+        member = GITHUB_ACTIONS_SA.member,
     )
 
 PROJECT_IAM_BINDINGS = [
