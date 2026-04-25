@@ -1,0 +1,38 @@
+"""
+Apply one or more Terraform roots via Bazel, in dependency order.
+
+Usage:
+  aspect apply                                  # apply all roots, gar → registry → lb
+  aspect apply //infra/cloud/gcp/gar:terraform  # apply one root
+
+Each root invokes `bazel run --stamp <target>.apply`. Stamping is required
+because the registry's image tags reference STABLE_MONOREPO_* workspace
+status keys; without it, tag substitution falls through to `<no value>` and
+the push rejects.
+
+Auto-approves Terraform when running non-interactively (`$CI` is set);
+locally you'll get the y/n confirmation prompt per root.
+"""
+
+load("./stdlib.axl", "TF_ROOTS", "bazel_run")
+
+def impl(ctx) -> int:
+    err = ctx.std.io.stderr
+
+    targets = list(ctx.args.target)
+    if len(targets) == 0:
+        targets = TF_ROOTS
+
+    for root in targets:
+        result = bazel_run(ctx, root + ".apply", stamp = True)
+        if not result.success:
+            err.write("ERROR: apply failed for {} (exit {})\n".format(root, result.code))
+            return result.code
+    return 0
+
+apply = task(
+    implementation = impl,
+    args = {
+        "target": args.positional(),
+    },
+)

@@ -1,0 +1,34 @@
+"""
+Plan one or more Terraform roots via Bazel.
+
+Usage:
+  aspect plan                                 # plan all roots, in order
+  aspect plan //infra/cloud/gcp/gar:terraform # plan one root
+
+Each root invokes `bazel run <target>.plan`. State stays in GCS. Plans are
+serial here; for parallel PR plans use CI's matrix (each job calls
+`aspect plan <one-root>`).
+"""
+
+load("./stdlib.axl", "TF_ROOTS", "bazel_run")
+
+def impl(ctx) -> int:
+    err = ctx.std.io.stderr
+
+    targets = list(ctx.args.target)
+    if len(targets) == 0:
+        targets = TF_ROOTS
+
+    for root in targets:
+        result = bazel_run(ctx, root + ".plan")
+        if not result.success:
+            err.write("ERROR: plan failed for {}\n".format(root))
+            return result.code
+    return 0
+
+plan = task(
+    implementation = impl,
+    args = {
+        "target": args.positional(),
+    },
+)

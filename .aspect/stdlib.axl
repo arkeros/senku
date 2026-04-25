@@ -1,0 +1,35 @@
+"""Shared helpers for senku aspect-cli tasks."""
+
+# Terraform roots in deploy order. This list is the single source of truth
+# for the deploy DAG; CI's `needs:` graph mirrors it for per-step UI.
+TF_ROOTS = [
+    "//infra/cloud/gcp/gar:terraform",
+    "//oci/cmd/registry:terraform",
+    "//infra/cloud/gcp/lb:terraform",
+]
+
+def is_ci(ctx) -> bool:
+    return ctx.std.env.var("CI") != None
+
+def bazel_run(ctx, target, stamp = False):
+    """Spawn `bazel run [--stamp] <target>` and return its exit status.
+
+    Auto-approves Terraform applies when running non-interactively (CI).
+    """
+    out = ctx.std.io.stdout
+
+    flags = ["run"]
+    if stamp:
+        flags.append("--stamp")
+    flags.append(target)
+
+    out.write("==> bazel {}\n".format(" ".join(flags)))
+
+    cmd = ctx.std.process.command("bazel")
+    for f in flags:
+        cmd = cmd.arg(f)
+
+    if is_ci(ctx):
+        cmd = cmd.env("TF_AUTO_APPROVE", "1")
+
+    return cmd.spawn().wait()
