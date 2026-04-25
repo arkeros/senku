@@ -13,8 +13,16 @@ root's resources (gar's `google_project_service`, lb's compute resources,
 etc.) without per-root IAM duplication.
 """
 
-load("//devtools/build/tools/tf:defs.bzl", "resource")
-load("//devtools/build/tools/tf/resources:gcp.bzl", "service_account")
+load(
+    "//devtools/build/tools/tf/resources:gcp.bzl",
+    "iam_workload_identity_pool",
+    "iam_workload_identity_pool_provider",
+    "project_iam_member",
+    "service_account",
+    "service_account_iam_member",
+    "storage_bucket",
+    "storage_bucket_iam_member",
+)
 
 PROJECT = "senku-prod"
 
@@ -29,52 +37,38 @@ REPO = "arkeros/senku"
 # Bazel remote cache bucket. Lifecycle rule deletes blobs after 30 days —
 # Bazel's remote cache is a content-addressed cache, so old objects fall
 # out naturally as inputs change. 30 days is the cushion before churn.
-BAZEL_CACHE = resource(
-    rtype = "google_storage_bucket",
+BAZEL_CACHE = storage_bucket(
     name = "bazel_cache",
-    body = {
-        "project": PROJECT,
-        "name": "bazel-senku-remote-cache",
-        "location": CACHE_REGION,
-        "uniform_bucket_level_access": True,
-        "lifecycle_rule": [{
-            "condition": [{"age": 30}],
-            "action": [{"type": "Delete"}],
-        }],
-    },
-    attrs = ["id", "name", "url"],
+    project = PROJECT,
+    bucket_name = "bazel-senku-remote-cache",
+    location = CACHE_REGION,
+    uniform_bucket_level_access = True,
+    lifecycle_rule = [{
+        "condition": [{"age": 30}],
+        "action": [{"type": "Delete"}],
+    }],
 )
 
 # WIF pool + GitHub OIDC provider.
-WIF_POOL = resource(
-    rtype = "google_iam_workload_identity_pool",
+WIF_POOL = iam_workload_identity_pool(
     name = "github",
-    body = {
-        "project": PROJECT,
-        "workload_identity_pool_id": "github",
-        "display_name": "GitHub Actions",
-    },
-    attrs = ["id", "name", "workload_identity_pool_id"],
+    project = PROJECT,
+    workload_identity_pool_id = "github",
+    display_name = "GitHub Actions",
 )
 
-WIF_PROVIDER = resource(
-    rtype = "google_iam_workload_identity_pool_provider",
+WIF_PROVIDER = iam_workload_identity_pool_provider(
     name = "github",
-    body = {
-        "project": PROJECT,
-        "workload_identity_pool_id": WIF_POOL.workload_identity_pool_id,
-        "workload_identity_pool_provider_id": "github-oidc",
-        "display_name": "GitHub OIDC",
-        "attribute_mapping": {
-            "google.subject": "assertion.sub",
-            "attribute.repository": "assertion.repository",
-        },
-        "attribute_condition": "assertion.repository == '%s'" % REPO,
-        "oidc": [{
-            "issuer_uri": "https://token.actions.githubusercontent.com",
-        }],
+    project = PROJECT,
+    workload_identity_pool_id = WIF_POOL.workload_identity_pool_id,
+    workload_identity_pool_provider_id = "github-oidc",
+    display_name = "GitHub OIDC",
+    attribute_mapping = {
+        "google.subject": "assertion.sub",
+        "attribute.repository": "assertion.repository",
     },
-    attrs = ["id", "name"],
+    attribute_condition = "assertion.repository == '%s'" % REPO,
+    oidc = {"issuer_uri": "https://token.actions.githubusercontent.com"},
 )
 
 # CI service account: the principal every GHA workflow runs as.
@@ -88,76 +82,54 @@ GITHUB_ACTIONS_SA = service_account(
 # Bind the WIF principal set (any token from this repo) to the SA's
 # workloadIdentityUser role — that's what lets `google-github-actions/auth`
 # exchange the OIDC token for a Google access token.
-WIF_BINDING = resource(
-    rtype = "google_service_account_iam_member",
+WIF_BINDING = service_account_iam_member(
     name = "wif_binding",
-    body = {
-        "service_account_id": GITHUB_ACTIONS_SA.name,
-        "role": "roles/iam.workloadIdentityUser",
-        "member": "principalSet://iam.googleapis.com/%s/attribute.repository/%s" % (
-            WIF_POOL.name,
-            REPO,
-        ),
-    },
-    attrs = ["id", "etag"],
+    service_account_id = GITHUB_ACTIONS_SA.name,
+    role = "roles/iam.workloadIdentityUser",
+    member = "principalSet://iam.googleapis.com/%s/attribute.repository/%s" % (
+        WIF_POOL.name,
+        REPO,
+    ),
 )
 
 # Storage bucket bindings — narrow to objectAdmin on the specific buckets.
-CACHE_BUCKET_BINDING = resource(
-    rtype = "google_storage_bucket_iam_member",
+CACHE_BUCKET_BINDING = storage_bucket_iam_member(
     name = "cache_admin",
-    body = {
-        "bucket": BAZEL_CACHE.name,
-        "role": "roles/storage.objectAdmin",
-        "member": "serviceAccount:%s" % GITHUB_ACTIONS_SA.email,
-    },
-    attrs = ["id", "etag"],
+    bucket = BAZEL_CACHE.name,
+    role = "roles/storage.objectAdmin",
+    member = "serviceAccount:%s" % GITHUB_ACTIONS_SA.email,
 )
 
-TFSTATE_BUCKET_BINDING = resource(
-    rtype = "google_storage_bucket_iam_member",
+TFSTATE_BUCKET_BINDING = storage_bucket_iam_member(
     name = "tfstate_admin",
-    body = {
-        # `senku-prod-terraform-state` is provisioned out-of-band (bootstrap);
-        # see README. Referenced by name, not by `${...}` interpolation.
-        "bucket": "senku-prod-terraform-state",
-        "role": "roles/storage.objectAdmin",
-        "member": "serviceAccount:%s" % GITHUB_ACTIONS_SA.email,
-    },
-    attrs = ["id", "etag"],
+    # `senku-prod-terraform-state` is provisioned out-of-band (bootstrap);
+    # see plan doc. Referenced by name, not by `${...}` interpolation.
+    bucket = "senku-prod-terraform-state",
+    role = "roles/storage.objectAdmin",
+    member = "serviceAccount:%s" % GITHUB_ACTIONS_SA.email,
 )
 
 # Project-level role grants the CI SA needs to plan/apply every other root.
 # `google_project_iam_member` (not `_binding`) so adding a role here doesn't
 # evict roles granted out-of-band.
-def _project_iam_member(role, slug):
-    return resource(
-        rtype = "google_project_iam_member",
-        name = "ci_" + slug,
-        body = {
-            "project": PROJECT,
-            "role": role,
-            "member": "serviceAccount:%s" % GITHUB_ACTIONS_SA.email,
-        },
-        attrs = ["id", "etag"],
-    )
+_CI_SA_MEMBER = "serviceAccount:%s" % GITHUB_ACTIONS_SA.email
 
 PROJECT_IAM_BINDINGS = [
     # WIF/SA management. Lets the CI SA touch its own pool, provider, etc.
-    _project_iam_member("roles/iam.workloadIdentityPoolAdmin",  "wif_admin"),
-    _project_iam_member("roles/iam.serviceAccountAdmin",        "sa_admin"),
+    project_iam_member(name = "ci_wif_admin",     project = PROJECT, role = "roles/iam.workloadIdentityPoolAdmin",  member = _CI_SA_MEMBER),
+    project_iam_member(name = "ci_sa_admin",      project = PROJECT, role = "roles/iam.serviceAccountAdmin",        member = _CI_SA_MEMBER),
     # ActAs on runtime SAs (e.g. svc-registry) when terraform deploys
     # Cloud Run services that pin a `service_account_email`.
-    _project_iam_member("roles/iam.serviceAccountUser",         "sa_user"),
+    project_iam_member(name = "ci_sa_user",       project = PROJECT, role = "roles/iam.serviceAccountUser",         member = _CI_SA_MEMBER),
     # Read/enable APIs (gar's `google_project_service`).
     # Was the missing role that broke the first CI plan run.
-    _project_iam_member("roles/serviceusage.serviceUsageAdmin", "serviceusage"),
+    project_iam_member(name = "ci_serviceusage",  project = PROJECT, role = "roles/serviceusage.serviceUsageAdmin", member = _CI_SA_MEMBER),
     # Per-resource admins for the rest of the deploy DAG.
-    _project_iam_member("roles/storage.admin",                  "storage_admin"),
-    _project_iam_member("roles/artifactregistry.admin",         "ar_admin"),
-    _project_iam_member("roles/run.admin",                      "run_admin"),
-    _project_iam_member("roles/compute.admin",                  "compute_admin"),
-    _project_iam_member("roles/certificatemanager.editor",      "certmgr_editor"),
+    project_iam_member(name = "ci_storage_admin", project = PROJECT, role = "roles/storage.admin",                  member = _CI_SA_MEMBER),
+    project_iam_member(name = "ci_ar_admin",      project = PROJECT, role = "roles/artifactregistry.admin",         member = _CI_SA_MEMBER),
+    project_iam_member(name = "ci_run_admin",     project = PROJECT, role = "roles/run.admin",                      member = _CI_SA_MEMBER),
+    project_iam_member(name = "ci_compute_admin", project = PROJECT, role = "roles/compute.admin",                  member = _CI_SA_MEMBER),
+    project_iam_member(name = "ci_certmgr_editor",project = PROJECT, role = "roles/certificatemanager.editor",      member = _CI_SA_MEMBER),
 ]
 
 # Outputs.
