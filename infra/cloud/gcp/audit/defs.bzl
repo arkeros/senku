@@ -41,6 +41,12 @@ What's enabled:
   - Update/delete on the `github` WIF pool or provider (the rebind path
     that would re-widen the principalSet).
 
+* **Meta-alert** on the alerting itself: a Data Access log-volume
+  counter + absence alert that fires if no audit entries are seen for
+  an hour. Catches the "someone disabled the audit config" or "an
+  exclusion was widened" failure modes that would otherwise leave the
+  other alerts silent.
+
 Not enabled (deliberately):
 
 * `service = "allServices"` — would be a cost footgun once data-plane
@@ -58,8 +64,10 @@ load(
 )
 load(
     "//devtools/build/tools/tf/resources:gcp.bzl",
+    "logging_metric",
     "logging_project_exclusion",
     "monitoring_alert_policy_log_match",
+    "monitoring_alert_policy_metric_absent",
     "monitoring_notification_channel",
     "project_iam_audit_config",
 )
@@ -267,4 +275,64 @@ ALERT_POLICIES = [
     WIF_MUTATION_ALERT,
 ]
 
-AUDIT_DOCS = AUDIT_CONFIGS + LOG_EXCLUSIONS + [ALERT_EMAIL_VAR, ALERT_EMAIL] + ALERT_POLICIES
+# ---------- meta-alert: alerts on the alerting -----------------------------
+
+# A logging metric counting all Data Access audit entries the project
+# emits (across the services we enabled above), and an absence alert
+# that fires when that count drops to zero for an hour.
+#
+# Failure modes this catches:
+# * Someone disabled `google_project_iam_audit_config` for one or more
+#   services (via terraform or out-of-band). Logs stop flowing, the
+#   other alerts go silent.
+# * A project-level log exclusion was widened too aggressively (e.g.
+#   the 404-bucket exclusion's filter was dropped of its
+#   `bucket_name=` clause and now matches all storage Data Access).
+# * Audit Logs API itself broke (rare, but possible during outages).
+#
+# Steady state: tfstate and bazel cache reads generate continuous Data
+# Access entries every CI run, so the metric is non-zero on any active
+# day. An hour of silence is well past any plausible quiet window for
+# this project.
+DATA_ACCESS_VOLUME_METRIC = logging_metric(
+    name = "data_access_volume",
+    project = PROJECT,
+    metric_name = "data_access_volume",
+    description = "Count of Data Access audit log entries across enabled services. Used as the input to the data-access-silence absence alert.",
+    filter = 'logName=~"projects/.+/logs/cloudaudit.googleapis.com%2Fdata_access"',
+)
+
+DATA_ACCESS_SILENCE_ALERT = monitoring_alert_policy_metric_absent(
+    name = "data_access_silence",
+    project = PROJECT,
+    display_name = "Data Access audit logs went silent",
+    # `resource.type="global"` is the correct monitored resource for a
+    # user-defined log-based metric. The provider/console naming
+    # ("logging metric") is for the *resource kind* in terraform, not
+    # the Cloud Monitoring resource type the metric reports against.
+    metric_filter = (
+        'metric.type="logging.googleapis.com/user/data_access_volume" ' +
+        'resource.type="global"'
+    ),
+    notification_channels = _CHANNELS,
+    duration = "3600s",
+    documentation = (
+        "**No Data Access audit entries for an hour. The other alerts may have gone silent.**\n\n" +
+        "Steady state: tfstate + bazel cache reads keep this metric non-zero through any active day. " +
+        "Going to zero means either:\n\n" +
+        "1. `google_project_iam_audit_config` for one or more services was disabled (check `bazel run //infra/cloud/gcp/audit:terraform.plan` for unexpected drift).\n" +
+        "2. A project-level log exclusion was widened (compare `_Default` sink exclusions to `LOG_EXCLUSIONS` in `audit/defs.bzl`).\n" +
+        "3. The senku-prod project went genuinely idle (no CI runs, no terraform apply) — confirm by checking GHA for recent activity. If yes, dismiss; otherwise the apparent quiet is a tampering signal.\n" +
+        "4. Cloud Audit Logs API outage — check the GCP status page."
+    ),
+)
+
+META_ALERTS = [DATA_ACCESS_VOLUME_METRIC, DATA_ACCESS_SILENCE_ALERT]
+
+AUDIT_DOCS = (
+    AUDIT_CONFIGS +
+    LOG_EXCLUSIONS +
+    [ALERT_EMAIL_VAR, ALERT_EMAIL] +
+    ALERT_POLICIES +
+    META_ALERTS
+)
