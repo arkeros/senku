@@ -87,8 +87,5 @@ def image_tfvars(name, image_push, var_name = "image", out_file = None, **kwargs
         name = name,
         in_file = ":" + json_target,
         out_file = out_file,
-        # Output is gitignored and rotates every build, so the bazel-lib
-        # default diff_test would always fail / be useless here.
-        diff_test = False,
         **kwargs
     )
