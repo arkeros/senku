@@ -53,12 +53,17 @@ _NEG_ENTRIES = {
 # 404 for any key that doesn't exist in the bucket). Avoids the trap where
 # unmatched traffic silently lands on whichever backend was listed first.
 
+# Public so downstream Starlark (e.g. the audit root's log-exclusion
+# filter) can reference the canonical bucket name without re-deriving
+# the format string.
+DEFAULT_404_BUCKET_NAME = "{}-{}-lb-404".format(PROJECT, NAME)
+
 _DEFAULT_404_BUCKET = resource(
     rtype = "google_storage_bucket",
     name = "default_404",
     body = {
         "project": PROJECT,
-        "name": "{}-{}-lb-404".format(PROJECT, NAME),
+        "name": DEFAULT_404_BUCKET_NAME,
         "location": BUCKET_LOCATION,
         "uniform_bucket_level_access": True,
         "force_destroy": True,
