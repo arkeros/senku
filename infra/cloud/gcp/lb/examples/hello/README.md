@@ -8,26 +8,43 @@ The LB is a singleton per environment; these services are not. Keeping them in s
 
 - Services can be applied and rolled without touching the LB.
 - The LB state doesn't churn on every image bump.
-- Multiple examples / teams can share the same LB by appending to its `backends` var.
+- Multiple examples / teams can share the same LB by adding another entry to its `backend_states` var.
 
-The bridge between the two roots is the `lb_backends` output here, shaped exactly like the LB stack's `var.backends`.
+The bridge between the two roots is the `lb_backends` output here: the LB stack reads it directly via `terraform_remote_state`, so there is no tfvars file to keep in sync.
 
 ## Usage
 
-```bash
-# 1. Apply the services.
-cd infra/cloud/gcp/lb/examples/hello
-terraform init
-terraform apply -var="project_id=senku-prod"
+Each root is driven by a `terraform.tfvars` file checked in next to it — auto-loaded by Terraform, so no `-var-file` flag is needed. State backend (bucket + prefix) is hardcoded in `versions.tf`, so `terraform init` takes no flags either. Repo convention: one shared state bucket, prefix mirrors the root's path in the repo.
 
-# 2. Pipe the lb_backends output into the LB stack's tfvars.
-terraform output -json lb_backends > ../../backends.auto.tfvars.json
+`infra/cloud/gcp/lb/examples/hello/terraform.tfvars`:
 
-# 3. Apply the LB.
-cd ../..
-terraform apply \
-  -var="project_id=senku-prod" \
-  -var="domain=api.senku.example.com"
+```hcl
+project_id = "senku-prod"
 ```
 
-Step 2 can be automated in CI. In fancier setups, substitute it with a `terraform_remote_state` data source in the LB stack.
+`infra/cloud/gcp/lb/terraform.tfvars`:
+
+```hcl
+project_id = "senku-prod"
+domain     = "api.senku.example.com"
+
+backend_states = {
+  hello = "infra/cloud/gcp/lb/examples/hello"
+}
+```
+
+Apply order — services first, LB second:
+
+```bash
+# 1. Services.
+cd infra/cloud/gcp/lb/examples/hello
+terraform init
+terraform apply
+
+# 2. LB (reads the hello root's state via terraform_remote_state).
+cd ../..
+terraform init
+terraform apply
+```
+
+Adding a second service root: apply it, then extend `backend_states` in the LB's tfvars with another key (key = friendly name, value = the root's repo path). The LB merges every root's `lb_backends` output into one set of backends.

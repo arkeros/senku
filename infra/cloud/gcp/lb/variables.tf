@@ -14,17 +14,10 @@ variable "domain" {
   description = "Fully-qualified domain served by this LB. A Certificate Manager cert is provisioned for it; create an A record pointing at the `lb_ip` output so LB-authorized issuance can complete."
 }
 
-variable "backends" {
-  type = map(object({
-    region       = string
-    service_name = string
-    paths        = list(string)
-  }))
-  description = "Map of backend key → Cloud Run service coordinates and URL-map path rules. Each entry becomes one serverless NEG + one backend service; the URL map routes `paths` to it. Unmatched requests fall through to a 404 (backed by an empty storage bucket)."
-  validation {
-    condition     = alltrue([for k, v in var.backends : length(v.paths) > 0])
-    error_message = "Every backend entry must declare at least one path (use [\"/*\"] if you want to catch-all)."
-  }
+variable "backend_states" {
+  type        = map(string)
+  description = "Map of friendly service-root key → state prefix (which by convention equals the root's path in the repo). Every referenced root must live in the same state bucket as this root (`senku-prod-terraform-state`) and expose an `lb_backends` output shaped like `map(object({ region, service_name, paths }))`; the LB merges them into a single set of backends. Example: `{ hello = \"infra/cloud/gcp/lb/examples/hello\" }`."
+  default     = {}
 }
 
 variable "bucket_location" {

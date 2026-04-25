@@ -7,4 +7,9 @@ terraform {
       version = "~> 7.0"
     }
   }
+
+  backend "gcs" {
+    bucket = "senku-prod-terraform-state"
+    prefix = "infra/cloud/gcp/lb/examples/hello"
+  }
 }

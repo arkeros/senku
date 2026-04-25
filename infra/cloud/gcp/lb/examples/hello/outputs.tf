@@ -1,17 +1,17 @@
 output "lb_backends" {
   value = {
     v1 = {
-      region       = var.region
       service_name = module.hello_v1.service_name
+      regions      = [var.region]
       paths        = ["/v1/*"]
     }
     v2 = {
-      region       = var.region
       service_name = module.hello_v2.service_name
+      regions      = [var.region]
       paths        = ["/v2/*"]
     }
   }
-  description = "Shaped exactly like `var.backends` in the sibling LB stack. Feed it in via: `terraform output -json lb_backends > ../../backends.auto.tfvars.json`."
+  description = "LB backends exposed for the sibling LB stack to read via `terraform_remote_state`. Shape: each backend carries a single `service_name`, a list of GCP `regions` it runs in, and the URL-map `paths` that route to it. Sample services here are single-region; real services fan out by adding regions."
 }
 
 output "service_account_emails" {

@@ -6,6 +6,73 @@ locals {
   prefix = var.name
 }
 
+# --- Backends sourced from service-root state --------------------------------
+# Each service root (e.g. examples/hello, oci/cmd/registry) exposes an
+# `lb_backends` output shaped like
+#   map(backend_key => object({
+#     service_name = string                # Cloud Run service name (same in every region)
+#     regions      = list(string)          # GCP regions the service is deployed to
+#     paths        = list(string)          # URL-map paths routed to this backend
+#   }))
+# We pull those outputs via `terraform_remote_state` and merge them into one
+# map. One backend can span multiple regions — each region becomes its own
+# Serverless NEG attached to a single backend service, so Google's global LB
+# does the geo-steering. Collisions between service roots on the same backend
+# key are rejected at plan time by the check block.
+
+data "terraform_remote_state" "backends" {
+  for_each = var.backend_states
+
+  backend = "gcs"
+  config = {
+    bucket = "senku-prod-terraform-state"
+    prefix = each.value
+  }
+}
+
+locals {
+  backends = merge([
+    for _, s in data.terraform_remote_state.backends : s.outputs.lb_backends
+  ]...)
+
+  # Flattened (backend_key, region) pairs. Used to `for_each` NEGs, where the
+  # resource key is a stable `"<backend>-<region>"` slug — both backend-level
+  # and region-level fan-out in a single resource block.
+  neg_entries = merge([
+    for backend_key, backend in local.backends : {
+      for region in backend.regions :
+      "${backend_key}-${region}" => {
+        backend_key  = backend_key
+        region       = region
+        service_name = backend.service_name
+      }
+    }
+  ]...)
+}
+
+check "backend_keys_unique" {
+  assert {
+    condition = length(local.backends) == sum([
+      for _, s in data.terraform_remote_state.backends : length(s.outputs.lb_backends)
+    ])
+    error_message = "Two or more service roots produced overlapping backend keys in their `lb_backends` outputs; rename to disambiguate."
+  }
+}
+
+check "backend_paths_non_empty" {
+  assert {
+    condition     = alltrue([for _, v in local.backends : length(v.paths) > 0])
+    error_message = "Every backend must declare at least one path (use [\"/*\"] for catch-all)."
+  }
+}
+
+check "backend_regions_non_empty" {
+  assert {
+    condition     = alltrue([for _, v in local.backends : length(v.regions) > 0])
+    error_message = "Every backend must declare at least one region in its `regions` map."
+  }
+}
+
 # --- 404 default --------------------------------------------------------------
 # Empty GCS bucket fronted by a backend bucket. Used as the URL map's
 # `default_service` so unmatched host+path requests return 404 (GCS serves
@@ -26,13 +93,14 @@ resource "google_compute_backend_bucket" "default_404" {
   bucket_name = google_storage_bucket.default_404.name
 }
 
-# --- Serverless NEG + backend service per registered backend ------------------
-# One (NEG, backend_service) pair per entry in var.backends. Adding a region
-# to a backend = add another NEG in that region and an extra `backend` block
-# in the matching backend_service — no URL-map restructuring.
+# --- Serverless NEGs + backend services ---------------------------------------
+# One NEG per (backend, region) pair, then one backend_service per backend
+# that aggregates every NEG belonging to it. The URL map routes `paths` to
+# the backend_service; the backend_service's NEGs do the regional fan-out
+# via Google's geo-aware LB — closest healthy NEG wins.
 
 resource "google_compute_region_network_endpoint_group" "backend" {
-  for_each = var.backends
+  for_each = local.neg_entries
 
   project               = var.project_id
   name                  = "${local.prefix}-${each.key}"
@@ -45,7 +113,7 @@ resource "google_compute_region_network_endpoint_group" "backend" {
 }
 
 resource "google_compute_backend_service" "backend" {
-  for_each = var.backends
+  for_each = local.backends
 
   project = var.project_id
   name    = "${local.prefix}-${each.key}"
@@ -54,8 +122,11 @@ resource "google_compute_backend_service" "backend" {
   protocol              = "HTTPS"
   timeout_sec           = 30
 
-  backend {
-    group = google_compute_region_network_endpoint_group.backend[each.key].id
+  dynamic "backend" {
+    for_each = toset(each.value.regions)
+    content {
+      group = google_compute_region_network_endpoint_group.backend["${each.key}-${backend.value}"].id
+    }
   }
 
   log_config {
@@ -82,7 +153,7 @@ resource "google_compute_url_map" "https" {
     default_service = google_compute_backend_bucket.default_404.id
 
     dynamic "path_rule" {
-      for_each = var.backends
+      for_each = local.backends
       content {
         paths   = path_rule.value.paths
         service = google_compute_backend_service.backend[path_rule.key].id
