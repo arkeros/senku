@@ -1,33 +1,32 @@
 """CI bootstrap: WIF pool/provider, GitHub Actions SAs, Bazel remote cache, IAM.
 
 Bootstrap-tier — these resources need to exist before any other root can
-plan or apply via CI. The CI SAs defined here are the principals every
-other job runs as, so the *first* apply has to be local: a human, with
-their own project-admin rights, runs `bazel run :terraform.apply` once.
-After that, the apply SA can self-update the rest (and even most of
-itself, with the exception of the IAM bindings that grant the SA its own
-permissions — those would be a chicken-and-egg if the SA didn't already
-have them).
+plan or apply via CI. This whole root is applied locally only (filtered
+out of CI by `.aspect/stdlib.axl`), so the apply SA never modifies its
+own identity infrastructure: any change to the WIF pool, providers, or
+SA IAM bindings goes through a human running `bazel run :terraform.apply`
+with their own project-admin credentials.
 
 Two SAs, scoped by GitHub deployment environment:
 
 * `tf-plan` — read-only. Bound to the `pr-plan` GitHub environment, which
   is unprotected on purpose so PR plans run on any branch. Worst case if
   compromised: read project metadata, churn tfstate. Recoverable.
-* `tf-apply` — admin. Bound to the `prod` GitHub environment, which is
-  configured with `main`-only deployment branches and required reviewers.
-  An attacker needs push-to-main *and* a reviewer to mint a token.
+* `tf-apply` — admin over the project's resource plane (storage, run,
+  compute, artifactregistry, etc.). Crucially, **not** admin over the
+  identity plane — no `iam.workloadIdentityPoolAdmin`, no
+  `iam.serviceAccountAdmin`. A compromised apply token cannot rebind
+  itself to a wider principalSet or grant itself new SAs because the
+  IAM API rejects those calls outright. Bound to the `prod` GitHub
+  environment, which is configured with `main`-only deployment branches
+  and required reviewers.
 
 The split moves the branch/reviewer gate out of the workflow YAML (which
 any committer can edit on a feature branch) and into the GitHub identity
-layer (configured in repo settings, separate credential surface).
-
-Caveat: `tf-apply` retains `iam.workloadIdentityPoolAdmin` and
-`serviceAccountAdmin`, so it can in principle re-bind itself to a wider
-principalSet. That privilege escalation is now gated by main + reviewer
-+ Cloud Audit Logs, but it remains a path. Follow-up work: extract the
-bootstrap roles into a separate human-applied root so CI cannot edit
-its own identity infrastructure.
+layer (configured in repo settings, separate credential surface). The
+identity-plane role split closes the privilege-escalation path that
+would otherwise let a compromised apply token rewrite the very gates
+protecting it.
 
 Project-level role grants live here so the CI SAs can act on every other
 root's resources (gar's `google_project_service`, lb's compute resources,
@@ -207,16 +206,21 @@ PLAN_PROJECT_BINDINGS = [
     _grant("plan_serviceusage", "roles/serviceusage.serviceUsageConsumer", TF_PLAN_SA),
 ]
 
-# Apply SA: admin roles for every root in the deploy DAG.
+# Apply SA: admin roles for every root in the deploy DAG, deliberately
+# scoped to the *resource* plane only — no identity-plane admin.
+#
+# Identity-plane roles (`iam.workloadIdentityPoolAdmin`,
+# `iam.serviceAccountAdmin`) are intentionally absent: this whole root
+# is bootstrap-tier (applied locally only), so terraform never needs
+# the apply SA to manage WIF or SA resources from CI. Excluding them
+# means a compromised apply token cannot rebind itself to a wider
+# principalSet, can't create new SAs, and can't widen another SA's
+# bindings. Direct API calls to those endpoints fail with PERMISSION_DENIED.
 APPLY_PROJECT_BINDINGS = [
-    # WIF/SA management. Lets the apply SA touch its own pool, provider,
-    # etc. NOTE: this is the privilege-escalation path called out in the
-    # module docstring — pulling these out into a separate human-applied
-    # root is the planned follow-up.
-    _grant("apply_wif_admin", "roles/iam.workloadIdentityPoolAdmin", TF_APPLY_SA),
-    _grant("apply_sa_admin", "roles/iam.serviceAccountAdmin", TF_APPLY_SA),
     # ActAs on runtime SAs (e.g. svc-registry) when terraform deploys
-    # Cloud Run services that pin a `service_account_email`.
+    # Cloud Run services that pin a `service_account_email`. This does
+    # NOT let the SA modify the runtime SA's bindings — only assume its
+    # identity at deploy time.
     _grant("apply_sa_user", "roles/iam.serviceAccountUser", TF_APPLY_SA),
     # Read/enable APIs (gar's `google_project_service`).
     _grant("apply_serviceusage", "roles/serviceusage.serviceUsageAdmin", TF_APPLY_SA),
