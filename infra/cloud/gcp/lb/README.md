@@ -51,4 +51,3 @@ aspect plan
 aspect apply
 ```
 
-A companion stack at [`examples/hello/`](./examples/hello) is a standalone Terraform sample illustrating the underlying resource shape; it's not wired into this root.
