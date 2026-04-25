@@ -11,7 +11,7 @@ output "lb_backends" {
       paths        = ["/v2/*"]
     }
   }
-  description = "LB backends exposed for the sibling LB stack to read via `terraform_remote_state`. Shape: each backend carries a single `service_name`, a list of GCP `regions` it runs in, and the URL-map `paths` that route to it. Sample services here are single-region; real services fan out by adding regions."
+  description = "Illustrates the backend descriptor shape: each backend carries a single `service_name`, a list of GCP `regions` it runs in, and the URL-map `paths` that route to it. The shared LB stack imports the equivalent from in-repo service roots via Starlark (`LB_BACKEND` from each root's `defs.bzl`) — this output is the analogous Terraform-side artifact for a standalone consumer. Sample services here are single-region; real services fan out by adding regions."
 }
 
 output "service_account_emails" {
