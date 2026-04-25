@@ -112,24 +112,30 @@ TFSTATE_BUCKET_BINDING = storage_bucket_iam_member(
 # Project-level role grants the CI SA needs to plan/apply every other root.
 # `google_project_iam_member` (not `_binding`) so adding a role here doesn't
 # evict roles granted out-of-band.
-_CI_SA_MEMBER = "serviceAccount:%s" % GITHUB_ACTIONS_SA.email
+def _ci_grant(slug, role):
+    return project_iam_member(
+        name = "ci_" + slug,
+        project = PROJECT,
+        role = role,
+        member = "serviceAccount:%s" % GITHUB_ACTIONS_SA.email,
+    )
 
 PROJECT_IAM_BINDINGS = [
     # WIF/SA management. Lets the CI SA touch its own pool, provider, etc.
-    project_iam_member(name = "ci_wif_admin",     project = PROJECT, role = "roles/iam.workloadIdentityPoolAdmin",  member = _CI_SA_MEMBER),
-    project_iam_member(name = "ci_sa_admin",      project = PROJECT, role = "roles/iam.serviceAccountAdmin",        member = _CI_SA_MEMBER),
+    _ci_grant("wif_admin",      "roles/iam.workloadIdentityPoolAdmin"),
+    _ci_grant("sa_admin",       "roles/iam.serviceAccountAdmin"),
     # ActAs on runtime SAs (e.g. svc-registry) when terraform deploys
     # Cloud Run services that pin a `service_account_email`.
-    project_iam_member(name = "ci_sa_user",       project = PROJECT, role = "roles/iam.serviceAccountUser",         member = _CI_SA_MEMBER),
+    _ci_grant("sa_user",        "roles/iam.serviceAccountUser"),
     # Read/enable APIs (gar's `google_project_service`).
     # Was the missing role that broke the first CI plan run.
-    project_iam_member(name = "ci_serviceusage",  project = PROJECT, role = "roles/serviceusage.serviceUsageAdmin", member = _CI_SA_MEMBER),
+    _ci_grant("serviceusage",   "roles/serviceusage.serviceUsageAdmin"),
     # Per-resource admins for the rest of the deploy DAG.
-    project_iam_member(name = "ci_storage_admin", project = PROJECT, role = "roles/storage.admin",                  member = _CI_SA_MEMBER),
-    project_iam_member(name = "ci_ar_admin",      project = PROJECT, role = "roles/artifactregistry.admin",         member = _CI_SA_MEMBER),
-    project_iam_member(name = "ci_run_admin",     project = PROJECT, role = "roles/run.admin",                      member = _CI_SA_MEMBER),
-    project_iam_member(name = "ci_compute_admin", project = PROJECT, role = "roles/compute.admin",                  member = _CI_SA_MEMBER),
-    project_iam_member(name = "ci_certmgr_editor",project = PROJECT, role = "roles/certificatemanager.editor",      member = _CI_SA_MEMBER),
+    _ci_grant("storage_admin",  "roles/storage.admin"),
+    _ci_grant("ar_admin",       "roles/artifactregistry.admin"),
+    _ci_grant("run_admin",      "roles/run.admin"),
+    _ci_grant("compute_admin",  "roles/compute.admin"),
+    _ci_grant("certmgr_editor", "roles/certificatemanager.editor"),
 ]
 
 # Outputs.
