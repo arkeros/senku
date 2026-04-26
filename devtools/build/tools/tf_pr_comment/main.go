@@ -6,14 +6,20 @@
 // that marker already exists on the PR, we PATCH it, otherwise we POST a new
 // one. This is what makes `aspect plan` re-runnable without spamming the PR.
 //
-// Two body modes:
+// Body shape (see render.go for the full matrix):
 //
-//	--plan-file empty            → posts a `Planning…` stub. Used by the
-//	                               axl task immediately before invoking
-//	                               `bazel run :terraform.plan` so reviewers
-//	                               see "something is happening" while the
-//	                               plan runs.
-//	--plan-file <path>           → posts the captured plan output, fenced.
+//	no flags                  → posts a `Planning…` stub. Used by the
+//	                            axl task immediately before invoking
+//	                            `bazel run :terraform.plan` so reviewers
+//	                            see "something is happening" while the
+//	                            plan runs.
+//	--plan-json <path>        → renders a structured summary (status
+//	                            callout + per-resource action table)
+//	                            from `terraform show -json` output.
+//	--plan-file <path>        → human plan log; collapsed under the
+//	                            structured summary if --plan-json is
+//	                            also given, otherwise the body is just
+//	                            the fenced log (legacy behaviour).
 //
 // Auth is the same as the `gh` CLI: $GITHUB_TOKEN or $GH_TOKEN. GitHub
 // Actions sets the former when `pull-requests: write` is granted.
@@ -46,7 +52,8 @@ type config struct {
 	target   string
 	repo     string // owner/name
 	pr       int
-	planFile string // empty → "Planning…" stub
+	planFile string // captured human plan log; collapsed under the JSON summary
+	planJSON string // `terraform show -json` output; drives the structured summary
 	maxBytes int
 }
 
@@ -57,23 +64,6 @@ type issuesAPI interface {
 	ListComments(ctx context.Context, owner, repo string, number int, opts *github.IssueListCommentsOptions) ([]*github.IssueComment, *github.Response, error)
 	EditComment(ctx context.Context, owner, repo string, commentID int64, comment *github.IssueComment) (*github.IssueComment, *github.Response, error)
 	CreateComment(ctx context.Context, owner, repo string, number int, comment *github.IssueComment) (*github.IssueComment, *github.Response, error)
-}
-
-func renderBody(cfg config) (string, error) {
-	var content string
-	if cfg.planFile == "" {
-		content = "_Planning…_"
-	} else {
-		raw, err := os.ReadFile(cfg.planFile)
-		if err != nil {
-			return "", fmt.Errorf("read plan file: %w", err)
-		}
-		if cfg.maxBytes > 0 && len(raw) > cfg.maxBytes {
-			raw = raw[:cfg.maxBytes]
-		}
-		content = "```\n" + string(raw) + "\n```"
-	}
-	return fmt.Sprintf("%s\n### Terraform Plan (`%s`)\n%s\n", cfg.marker, cfg.target, content), nil
 }
 
 // findExisting walks every page of issue comments looking for the first
@@ -146,8 +136,9 @@ func parseFlags(args []string) (config, error) {
 	fs.StringVar(&cfg.target, "target", "", "bazel target label, used in the comment heading (required)")
 	fs.StringVar(&cfg.repo, "repo", "", "owner/name (required)")
 	fs.IntVar(&cfg.pr, "pr", 0, "PR number (required)")
-	fs.StringVar(&cfg.planFile, "plan-file", "", "path to captured plan output; empty posts a 'Planning…' stub")
-	fs.IntVar(&cfg.maxBytes, "max-bytes", defaultMaxBytes, "truncate plan content to this many bytes (GitHub caps comments at 65536)")
+	fs.StringVar(&cfg.planFile, "plan-file", "", "path to captured human plan log; collapsed under the JSON summary if --plan-json is also set")
+	fs.StringVar(&cfg.planJSON, "plan-json", "", "path to `terraform show -json` output; drives the structured summary")
+	fs.IntVar(&cfg.maxBytes, "max-bytes", defaultMaxBytes, "truncate plan-file content to this many bytes (GitHub caps comments at 65536)")
 	if err := fs.Parse(args); err != nil {
 		return cfg, err
 	}
