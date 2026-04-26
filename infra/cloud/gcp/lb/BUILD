@@ -6,12 +6,7 @@ load(":defs.bzl", "LB_DOCS", "PROJECT")
 tf_root(
     name = "terraform",
     docs = [google_provider(project = PROJECT)] + LB_DOCS,
-    required_providers = {
-        "google": {
-            "source": "hashicorp/google",
-            "version": "~> 7.0",
-        },
-    },
+    providers = ["@terraform_providers//:google"],
     visibility = ["//visibility:public"],
 )
 
