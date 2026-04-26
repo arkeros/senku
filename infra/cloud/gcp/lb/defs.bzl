@@ -30,8 +30,20 @@ BUCKET_LOCATION = "EU"
 # Map backend_key → backend descriptor. New services contributing to this LB
 # add an entry here and an `LB_BACKEND` constant in their root.
 
+def _normalize(backend):
+    """Sort the regions list so contributors don't have to.
+
+    `google_compute_backend_service.backend[]` is order-significant in
+    Terraform state, so an unsorted regions list at the source would
+    silently churn the LB plan whenever a new region is appended. Sorting
+    here makes the invariant the LB's responsibility — services can
+    declare regions in any order (geographic, deploy-date, etc.) without
+    knowing it matters downstream.
+    """
+    return dict(backend, regions = sorted(backend["regions"]))
+
 BACKENDS = {
-    "registry": _REGISTRY_LB_BACKEND,
+    "registry": _normalize(_REGISTRY_LB_BACKEND),
 }
 
 # Flattened {slug → entry} for one NEG per (backend, region). The slug is a
