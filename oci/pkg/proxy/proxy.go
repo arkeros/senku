@@ -66,11 +66,13 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/v2/" || r.URL.Path == "/v2" {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Docker-Distribution-Api-Version", "registry/2.0")
+		w.Header().Set("Cache-Control", cacheControl(r.URL.Path))
 		fmt.Fprint(w, "{}")
 		return
 	}
 
 	if r.URL.Path == "/v2/_catalog" {
+		w.Header().Set("Cache-Control", cacheControl(r.URL.Path))
 		p.serveCatalog(w)
 		return
 	}
@@ -93,6 +95,62 @@ func (p *Proxy) serveCatalog(w http.ResponseWriter) {
 	}{Repositories: repos}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// cacheControl returns the Cache-Control policy for a registry path. Returns
+// "" when the path is unrecognized or should not be cached.
+//
+// The policy separates "how long fresh" (max-age) from "how long stale-OK"
+// (stale-while-revalidate, stale-if-error). Mutable paths get a short
+// max-age plus a longer SWR window so the CDN serves the cached response
+// immediately and async-revalidates with origin via `If-None-Match` — the
+// proxy already returns `ETag: "sha256:..."`, so revalidations are 304 round
+// trips, not full re-fetches.
+//
+// Blob TTL stays well under the ~10-min validity of ghcr's signed URLs, so
+// the cache never serves an expired signature even at the SWR boundary.
+func cacheControl(path string) string {
+	// Mutable list-shaped responses (catalog, tag list, tag→digest mapping):
+	// republished any time. 15-minute fresh window + 1-hour SWR — async
+	// revalidations are conditional GETs (the proxy forwards
+	// If-None-Match), so most refreshes are 304s and origin load stays low.
+	const mutableShort = "public, max-age=900, stale-while-revalidate=3600, stale-if-error=86400"
+
+	if path == "/v2/" || path == "/v2" {
+		// Constant `{}`. Long max-age, plus `stale-if-error` so a
+		// dead origin doesn't break v2 discovery for clients.
+		return "public, max-age=86400, stale-if-error=86400"
+	}
+	if path == "/v2/_catalog" {
+		return mutableShort
+	}
+	if strings.HasSuffix(path, "/tags/list") {
+		return mutableShort
+	}
+	rest := strings.TrimPrefix(path, "/v2/")
+	segments := strings.Split(rest, "/")
+	i := findOp(segments)
+	if i < 0 || i == len(segments)-1 {
+		return ""
+	}
+	switch segments[i] {
+	case "manifests":
+		if strings.HasPrefix(segments[i+1], "sha256:") {
+			// Content-addressed; never changes.
+			return "public, max-age=31536000, immutable"
+		}
+		return mutableShort
+	case "blobs":
+		// 307 to a presigned ghcr URL. The `se=` expiry is rounded
+		// down to the next 5-min wall-clock boundary on a 10-min
+		// target, so signed-URL validity ranges from 5–10 min
+		// depending on phase. Cache life is bounded by
+		// `max-age + max(SWR, SIE)` because the URL must still be
+		// valid when *any* stale response is served — keep that under
+		// the 5-min worst case, with buffer.
+		return "public, max-age=120, stale-while-revalidate=120, stale-if-error=120"
+	}
+	return ""
 }
 
 func RewritePath(path, repositoryPrefix string) string {
@@ -212,6 +270,16 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
 		req.Header.Add("Accept", v)
 	}
 
+	// Forward conditional headers so Cloud CDN's stale-while-revalidate
+	// fetches collapse to 304 round trips when the upstream content hasn't
+	// changed — saves the cost of a full manifest re-fetch on every async
+	// revalidation.
+	for _, h := range []string{"If-None-Match", "If-Modified-Since"} {
+		if v := r.Header.Get(h); v != "" {
+			req.Header.Set(h, v)
+		}
+	}
+
 	resp, err := t.RoundTrip(req)
 	if err != nil {
 		http.Error(w, "upstream request failed", http.StatusBadGateway)
@@ -228,6 +296,12 @@ func (p *Proxy) proxyRequest(w http.ResponseWriter, r *http.Request) {
 	for _, h := range proxyHeaders {
 		if v := resp.Header.Get(h); v != "" {
 			w.Header().Set(h, v)
+		}
+	}
+
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusTemporaryRedirect {
+		if cc := cacheControl(r.URL.Path); cc != "" {
+			w.Header().Set("Cache-Control", cc)
 		}
 	}
 
