@@ -50,23 +50,23 @@ def _command(ctx, entrypoint, args, env = {}):
     """Build the `std.process.Command` for `entrypoint` without spawning
     it. Sets the runfiles env vars common Bazel runfiles libraries look
     for, plus `BUILD_WORKING_DIRECTORY` and `BUILD_WORKSPACE_DIRECTORY`
-    (the same vars `bazel run` sets — `BUILD_WORKSPACE_DIRECTORY` is
-    propagated from this process's env, which Aspect CLI itself
-    inherits from the user's `bazel`/`aspect` invocation cwd).
-    Inherits the caller's cwd — see module docstring for why we don't
-    chdir into the runfiles tree.
+    (the same vars `bazel run` sets). `BUILD_WORKSPACE_DIRECTORY` is
+    forwarded from this process's env when set (e.g. when aspect itself
+    was launched via `bazel run`), and falls back to the current dir
+    otherwise — aspect is normally invoked from the workspace root, so
+    that matches what `bazel run` would set. Inherits the caller's cwd
+    — see module docstring for why we don't chdir into the runfiles tree.
     """
     if not entrypoint.startswith("/"):
         entrypoint = ctx.std.env.current_dir() + "/" + entrypoint
     runfiles = entrypoint + ".runfiles"
+    bws = ctx.std.env.var("BUILD_WORKSPACE_DIRECTORY") or ctx.std.env.current_dir()
     proc = ctx.std.process.command(entrypoint) \
         .env("RUNFILES_DIR", runfiles) \
         .env("JAVA_RUNFILES", runfiles) \
         .env("RUNFILES_MANIFEST_FILE", runfiles + "_manifest") \
-        .env("BUILD_WORKING_DIRECTORY", ctx.std.env.current_dir())
-    bws = ctx.std.env.var("BUILD_WORKSPACE_DIRECTORY")
-    if bws != None:
-        proc = proc.env("BUILD_WORKSPACE_DIRECTORY", bws)
+        .env("BUILD_WORKING_DIRECTORY", ctx.std.env.current_dir()) \
+        .env("BUILD_WORKSPACE_DIRECTORY", bws)
     for key, value in env.items():
         proc = proc.env(key, value)
     return proc.args(args)
