@@ -75,11 +75,23 @@ def build_runnable(ctx, target, build_flags = []):
     resolve via the manifest. Forcing the symlink tree here would flip
     the option vs. bare `bazel build` and discard the analysis cache on
     every alternation.
+
+    Forces `--remote_download_outputs=toplevel` to override the CI-wide
+    `minimal` default: when a pure cache-hit build produces no local
+    actions (no processwrapper-sandbox, etc.), nothing materializes the
+    binary or its runfiles on disk and the subsequent spawn fails with
+    ENOENT. `toplevel` downloads the executable and its runfiles tree,
+    which is exactly what we're about to spawn. This is an execution
+    flag, so it doesn't invalidate the analysis cache across alternations
+    with bare `bazel build`.
     """
     out = ctx.std.io.stdout
     err = ctx.std.io.stderr
 
-    flags = ["--isatty=" + str(int(out.is_tty))]
+    flags = [
+        "--isatty=" + str(int(out.is_tty)),
+        "--remote_download_outputs=toplevel",
+    ]
     flags.extend(build_flags)
 
     out.write("==> bazel build {}\n".format(target))
