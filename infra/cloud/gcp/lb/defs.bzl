@@ -7,7 +7,7 @@ That replaces the previous `terraform_remote_state` data sources — same
 content, no runtime indirection.
 """
 
-load("//devtools/build/tools/tf:defs.bzl", "resource")
+load("//devtools/build/tools/tf:defs.bzl", "output", "resource")
 load("//oci/cmd/registry:defs.bzl", _REGISTRY_LB_BACKEND = "LB_BACKEND")
 
 PROJECT = "senku-prod"
@@ -292,22 +292,26 @@ _FORWARDING_RULE_HTTP_REDIRECT = resource(
 
 # --- Outputs -----------------------------------------------------------------
 _OUTPUTS = [
-    {"output": {"lb_ip": {
-        "value": _GLOBAL_ADDRESS.address,
-        "description": "Anycast IP for the LB frontend. Create an A record for var.domain pointing at this address; managed cert issuance completes once DNS resolves.",
-    }}},
-    {"output": {"certificate_map_id": {
-        "value": _CERT_MAP.id,
-        "description": "Certificate Manager cert map. Attach additional certs as extra `certificate_map_entry` resources outside this stack to serve more domains on the same LB.",
-    }}},
-    {"output": {"url_map_id": {
-        "value": _URL_MAP_HTTPS.id,
-        "description": "HTTPS URL map. Add host_rule/path_matcher blocks here to route additional domains to the same backends.",
-    }}},
-    {"output": {"default_404_bucket": {
-        "value": _DEFAULT_404_BUCKET.name,
-        "description": "Empty bucket that serves the 404 default. Drop a landing page in here (and adjust Cache-Control) if you'd rather a friendly page on unmatched paths.",
-    }}},
+    output(
+        "lb_ip",
+        value = _GLOBAL_ADDRESS.address,
+        description = "Anycast IP for the LB frontend. Create an A record for var.domain pointing at this address; managed cert issuance completes once DNS resolves.",
+    ),
+    output(
+        "certificate_map_id",
+        value = _CERT_MAP.id,
+        description = "Certificate Manager cert map. Attach additional certs as extra `certificate_map_entry` resources outside this stack to serve more domains on the same LB.",
+    ),
+    output(
+        "url_map_id",
+        value = _URL_MAP_HTTPS.id,
+        description = "HTTPS URL map. Add host_rule/path_matcher blocks here to route additional domains to the same backends.",
+    ),
+    output(
+        "default_404_bucket",
+        value = _DEFAULT_404_BUCKET.name,
+        description = "Empty bucket that serves the 404 default. Drop a landing page in here (and adjust Cache-Control) if you'd rather a friendly page on unmatched paths.",
+    ),
 ]
 
 # Aggregated list of all docs that go into the tf_root.

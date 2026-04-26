@@ -33,6 +33,7 @@ root's resources (gar's `google_project_service`, lb's compute resources,
 etc.) without per-root IAM duplication.
 """
 
+load("//devtools/build/tools/tf:defs.bzl", "output")
 load(
     "//devtools/build/tools/tf/resources:gcp.bzl",
     "iam_workload_identity_pool",
@@ -236,18 +237,21 @@ PROJECT_IAM_BINDINGS = PLAN_PROJECT_BINDINGS + APPLY_PROJECT_BINDINGS
 
 # Outputs.
 OUTPUTS = [
-    {"output": {"wif_provider": {
-        "value": WIF_PROVIDER.name,
-        "description": "Workload Identity Federation provider resource name. Used by GHA's `google-github-actions/auth` action as `workload_identity_provider`.",
-    }}},
-    {"output": {"tf_plan_sa_email": {
-        "value": TF_PLAN_SA.email,
-        "description": "Plan SA email. Used by the PR `plan` job (under the `pr-plan` environment) as `service_account` in `google-github-actions/auth`.",
-    }}},
-    {"output": {"tf_apply_sa_email": {
-        "value": TF_APPLY_SA.email,
-        "description": "Apply SA email. Used by the `apply` job (under the `prod` environment) as `service_account` in `google-github-actions/auth`.",
-    }}},
+    output(
+        "wif_provider",
+        value = WIF_PROVIDER.name,
+        description = "Workload Identity Federation provider resource name. Used by GHA's `google-github-actions/auth` action as `workload_identity_provider`.",
+    ),
+    output(
+        "tf_plan_sa_email",
+        value = TF_PLAN_SA.email,
+        description = "Plan SA email. Used by the PR `plan` job (under the `pr-plan` environment) as `service_account` in `google-github-actions/auth`.",
+    ),
+    output(
+        "tf_apply_sa_email",
+        value = TF_APPLY_SA.email,
+        description = "Apply SA email. Used by the `apply` job (under the `prod` environment) as `service_account` in `google-github-actions/auth`.",
+    ),
 ]
 
 CI_DOCS = [
