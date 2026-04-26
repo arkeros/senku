@@ -28,7 +28,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/google/go-github/v85/github"
 )
@@ -182,7 +185,11 @@ func main() {
 	}
 
 	client := github.NewClient(nil).WithAuthToken(token)
-	msg, err := upsert(context.Background(), client.Issues, cfg)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	msg, err := upsert(ctx, client.Issues, cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tf_pr_comment: %v\n", err)
 		os.Exit(1)
