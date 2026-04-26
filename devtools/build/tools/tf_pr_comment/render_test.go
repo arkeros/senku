@@ -202,12 +202,14 @@ func TestRenderBodyJSONErrored(t *testing.T) {
 	}
 }
 
-func TestRenderBodyJSONMissingFileFallsBackWithCaution(t *testing.T) {
-	// Plan crashed before producing JSON: still want the text log and a
-	// loud CAUTION header so the reviewer sees the failure.
+func TestRenderBodyJSONMissingFileFallsBackWithWarning(t *testing.T) {
+	// Missing JSON usually means terraform plan succeeded but `show -json`
+	// failed (or wasn't run). The text log is authoritative, and CAUTION
+	// would mislead a reviewer of an actually-passing plan. WARNING flags
+	// the degraded view without claiming the plan itself failed.
 	tmp := t.TempDir()
 	planFile := filepath.Join(tmp, "plan.txt")
-	if err := os.WriteFile(planFile, []byte("Error: invalid argument"), 0o644); err != nil {
+	if err := os.WriteFile(planFile, []byte("Plan: 1 to add."), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	body, err := renderBody(config{
@@ -220,10 +222,13 @@ func TestRenderBodyJSONMissingFileFallsBackWithCaution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(body, "[!CAUTION]") {
-		t.Errorf("expected CAUTION callout when JSON missing; got %q", body)
+	if !strings.Contains(body, "[!WARNING]") {
+		t.Errorf("expected WARNING callout when JSON missing; got %q", body)
 	}
-	if !strings.Contains(body, "Error: invalid argument") {
+	if strings.Contains(body, "Plan failed") {
+		t.Errorf("must not say `Plan failed` for missing JSON; got %q", body)
+	}
+	if !strings.Contains(body, "Plan: 1 to add.") {
 		t.Errorf("expected raw plan log appended; got %q", body)
 	}
 }

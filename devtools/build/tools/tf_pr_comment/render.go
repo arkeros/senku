@@ -250,10 +250,13 @@ func renderJSON(p *planJSON) string {
 //	planJSON set,   planFile empty → structured summary only.
 //	planJSON set,   planFile set   → structured summary + collapsed log.
 //
-// JSON read/parse failures degrade gracefully: a CAUTION/WARNING
-// callout, then the raw log if available. We never return an error
-// just because the JSON was missing — a failed plan is itself useful
-// signal to surface to the PR.
+// JSON read/parse failures degrade gracefully: a WARNING callout (the
+// plan log itself is the source of truth, and most often shows that
+// the plan actually succeeded — only the JSON conversion didn't), then
+// the raw log if available. We never return an error just because the
+// JSON was missing. CAUTION is reserved for the case where the JSON
+// parses cleanly and reports `errored: true`, which is unambiguously a
+// terraform-level failure.
 func renderBody(cfg config) (string, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n### Terraform Plan — `%s`\n\n", cfg.marker, cfg.target)
@@ -268,7 +271,7 @@ func renderBody(cfg config) (string, error) {
 		raw, err := os.ReadFile(cfg.planJSON)
 		switch {
 		case err != nil:
-			b.WriteString("> [!CAUTION]\n> **Plan failed.** No structured plan available — see output below.\n")
+			b.WriteString("> [!WARNING]\n> **Structured summary unavailable.** See full output below for plan results.\n")
 		default:
 			var p planJSON
 			if err := json.Unmarshal(raw, &p); err != nil {
