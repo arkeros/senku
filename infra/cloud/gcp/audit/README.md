@@ -15,7 +15,7 @@ Bootstrap-tier root. Applied locally only — `aspect plan` / `aspect apply` ski
   | `apply_setiampolicy` | Any `*.setIamPolicy` call where `principalEmail` is `tf-apply` | Steady-state apply rarely touches IAM. False positives expected when a PR genuinely adds an IAM resource — accept the noise for the signal. |
   | `wif_mutation` | Update/Delete on a resource matching `workloadIdentityPools/github` | This is the rebind-to-broad-scope path. CI never mutates these resources (bootstrap filter); only a human-driven local apply should. |
 
-- **One meta-alert** on the alerting itself: a log-based metric counting all Data Access entries, plus an absence alert that fires after an hour of zero. Catches the "someone disabled the audit config" or "an exclusion was widened" failure modes that would otherwise leave the other alerts silent.
+- **One meta-alert** on the alerting itself: a log-based metric counting all Data Access entries, plus an absence alert that fires after 23h30m of zero (the GCP-imposed maximum for absence-alert duration; longer durations are rejected by the API). Catches the "someone disabled the audit config" or "an exclusion was widened" failure modes that would otherwise leave the other alerts silent. Shorter windows (1h) flooded the inbox during normal idle stretches.
 
 Each alert carries a `documentation` markdown block that lands in the notification body — written as a triage runbook for 3am, not a description of the filter.
 
@@ -68,9 +68,9 @@ Both calls fire the alert (one for each `UpdateWorkloadIdentityPool` event). Kee
 
 Triggering this safely from outside CI is awkward (you'd have to impersonate `tf-apply` *and* call setIamPolicy, which would also fire `apply_impersonation` and create real IAM changes). Easier: leave it untested and wait for the next PR that genuinely adds an IAM resource. The first apply on main after merge will fire the alert. If the email arrives, the filter works.
 
-### `data_access_silence` — wait an hour
+### `data_access_silence` — wait ~24h
 
-Hard to test without breaking the audit config. Trust the design: the metric is updating continuously (any tfstate read or bazel cache fetch produces a Data Access entry), so absence for >1h means tampering. To force a test, you'd need to disable one of the audit configs and wait — not worth it.
+Hard to test without breaking the audit config. Trust the design: any tfstate read, bazel cache fetch, or terraform plan produces a Data Access entry, so 23h30m of absence means either tampering or a genuinely idle stretch. To force a test, you'd need to disable one of the audit configs and wait a day — not worth it.
 
 ## Caveats
 

@@ -43,9 +43,10 @@ What's enabled:
 
 * **Meta-alert** on the alerting itself: a Data Access log-volume
   counter + absence alert that fires if no audit entries are seen for
-  an hour. Catches the "someone disabled the audit config" or "an
-  exclusion was widened" failure modes that would otherwise leave the
-  other alerts silent.
+  23h30m (the GCP-imposed maximum for absence-alert duration).
+  Catches the "someone disabled the audit config" or "an exclusion
+  was widened" failure modes that would otherwise leave the other
+  alerts silent.
 
 Not enabled (deliberately):
 
@@ -290,7 +291,7 @@ ALERT_POLICIES = [
 
 # A logging metric counting all Data Access audit entries the project
 # emits (across the services we enabled above), and an absence alert
-# that fires when that count drops to zero for an hour.
+# that fires when that count stays at zero for 23h30m.
 #
 # Failure modes this catches:
 # * Someone disabled `google_project_iam_audit_config` for one or more
@@ -301,10 +302,12 @@ ALERT_POLICIES = [
 #   `bucket_name=` clause and now matches all storage Data Access).
 # * Audit Logs API itself broke (rare, but possible during outages).
 #
-# Steady state: tfstate and bazel cache reads generate continuous Data
-# Access entries every CI run, so the metric is non-zero on any active
-# day. An hour of silence is well past any plausible quiet window for
-# this project.
+# Steady state: this is a single-maintainer project with bursty CI
+# activity — quiet evenings and weekends are normal, so an hour of
+# silence is well within the plausible idle window. 23h30m is the
+# maximum GCP allows for absence-alert duration (the API rejects
+# anything > 23h30m), and is also approximately the longest plausible
+# quiet stretch — a workday plus an evening of inactivity.
 DATA_ACCESS_VOLUME_METRIC = logging_metric(
     name = "data_access_volume",
     project = PROJECT,
@@ -317,9 +320,9 @@ DATA_ACCESS_SILENCE_ALERT = monitoring_alert_policy_metric_absent(
     name = "data_access_silence",
     project = PROJECT,
     display_name = "Data Access audit logs went silent",
-    # ERROR: the audit pipeline is broken. By the time this fires (1h
-    # after last entry) the damage is done — needs attention, but not
-    # the same urgency as an active impersonation in flight.
+    # ERROR: the audit pipeline is broken. By the time this fires
+    # (23h30m after last entry) the damage is done — needs attention,
+    # but not the same urgency as an active impersonation in flight.
     severity = "ERROR",
     # `resource.type="global"` is the correct monitored resource for a
     # user-defined log-based metric. The provider/console naming
@@ -330,14 +333,17 @@ DATA_ACCESS_SILENCE_ALERT = monitoring_alert_policy_metric_absent(
         'resource.type="global"'
     ),
     notification_channels = _CHANNELS,
-    duration = "3600s",
+    # 23h30m is the GCP-imposed maximum for absence-alert duration —
+    # the API rejects anything longer with "Durations longer than
+    # 23h30m are not supported".
+    duration = "84600s",
     documentation = (
-        "**No Data Access audit entries for an hour. The other alerts may have gone silent.**\n\n" +
-        "Steady state: tfstate + bazel cache reads keep this metric non-zero through any active day. " +
-        "Going to zero means either:\n\n" +
+        "**No Data Access audit entries for ~24 hours. The other alerts may have gone silent.**\n\n" +
+        "Steady state: bursty CI + occasional local tfstate reads keep this metric non-zero across any normal day. " +
+        "A full day of zero means either:\n\n" +
         "1. `google_project_iam_audit_config` for one or more services was disabled (check `bazel run //infra/cloud/gcp/audit:terraform.plan` for unexpected drift).\n" +
         "2. A project-level log exclusion was widened (compare `_Default` sink exclusions to `LOG_EXCLUSIONS` in `audit/defs.bzl`).\n" +
-        "3. The senku-prod project went genuinely idle (no CI runs, no terraform apply) — confirm by checking GHA for recent activity. If yes, dismiss; otherwise the apparent quiet is a tampering signal.\n" +
+        "3. The senku-prod project went genuinely idle for 24h+ (no CI runs, no terraform apply, no local reads) — confirm by checking GHA for recent activity. If yes, dismiss; otherwise the apparent quiet is a tampering signal.\n" +
         "4. Cloud Audit Logs API outage — check the GCP status page."
     ),
 )
