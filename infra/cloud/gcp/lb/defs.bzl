@@ -83,6 +83,21 @@ _DEFAULT_404_BUCKET = resource(
     attrs = ["id", "name", "url"],
 )
 
+# `google_compute_backend_bucket` cannot authenticate to a private GCS bucket;
+# without this `allUsers` grant the LB would return 403 (not 404) for
+# unmatched paths, contradicting the documented behavior. Requires the project
+# to not enforce `storage.publicAccessPrevention`.
+_DEFAULT_404_BUCKET_PUBLIC = resource(
+    rtype = "google_storage_bucket_iam_member",
+    name = "default_404_public",
+    body = {
+        "bucket": _DEFAULT_404_BUCKET.name,
+        "role": "roles/storage.objectViewer",
+        "member": "allUsers",
+    },
+    attrs = ["id", "etag"],
+)
+
 _DEFAULT_404_BACKEND_BUCKET = resource(
     rtype = "google_compute_backend_bucket",
     name = "default_404",
@@ -328,7 +343,7 @@ _OUTPUTS = [
 
 # Aggregated list of all docs that go into the tf_root.
 LB_DOCS = (
-    [_DEFAULT_404_BUCKET, _DEFAULT_404_BACKEND_BUCKET] +
+    [_DEFAULT_404_BUCKET, _DEFAULT_404_BUCKET_PUBLIC, _DEFAULT_404_BACKEND_BUCKET] +
     list(_NEGS.values()) +
     list(_BACKEND_SERVICES.values()) +
     [
