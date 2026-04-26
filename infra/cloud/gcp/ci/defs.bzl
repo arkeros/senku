@@ -9,9 +9,13 @@ with their own project-admin credentials.
 
 Two SAs, scoped by GitHub deployment environment:
 
-* `tf-plan` — read-only. Bound to the `pr-plan` GitHub environment, which
-  is unprotected on purpose so PR plans run on any branch. Worst case if
-  compromised: read project metadata, churn tfstate. Recoverable.
+* `tf-plan` — read-only on the resource plane, plus narrow write on
+  tfstate `*.tflock` objects (state-lock acquire/release, scoped via an
+  IAM condition — see `TFSTATE_BUCKET_BINDINGS`). Bound to the `pr-plan`
+  GitHub environment, which is unprotected on purpose so PR plans run
+  on any branch. Worst case if compromised: read project metadata,
+  churn lock files (which a fresh apply heals). State objects
+  themselves are read-only to this SA.
 * `tf-apply` — admin over the project's resource plane (storage, run,
   compute, artifactregistry, etc.). Crucially, **not** admin over the
   identity plane — no `iam.workloadIdentityPoolAdmin`, no
@@ -153,8 +157,11 @@ TF_APPLY_WIF_BINDING = service_account_iam_member(
 # Storage bucket bindings.
 #
 # Bazel cache: both SAs read/write. Content-addressed, not security-sensitive.
-# Tfstate: both SAs read/write. Plan needs the lock + state read; apply
-# needs to write state.
+# Tfstate: apply SA gets full write; plan SA gets read on state files plus
+# write *only* on `*.tflock` objects (lock acquire/release). The narrow
+# write scope is what keeps the docstring's "read-only plan" promise
+# honest — a compromised plan token can churn lock files but cannot
+# corrupt or delete the state objects themselves.
 CACHE_BUCKET_BINDINGS = [
     storage_bucket_iam_member(
         name = "cache_admin_plan",
@@ -172,12 +179,28 @@ CACHE_BUCKET_BINDINGS = [
 
 # `senku-prod-terraform-state` is provisioned out-of-band (bootstrap);
 # see plan doc. Referenced by name, not by `${...}` interpolation.
+#
+# IAM-condition note: bindings on objects use `resource.name` of the form
+# `projects/_/buckets/<bucket>/objects/<path>`. `endsWith(".tflock")`
+# matches the GCS backend's lock objects (`<prefix>/default.tflock`)
+# regardless of which root's prefix they live under.
 TFSTATE_BUCKET_BINDINGS = [
     storage_bucket_iam_member(
-        name = "tfstate_admin_plan",
+        name = "tfstate_viewer_plan",
+        bucket = "senku-prod-terraform-state",
+        role = "roles/storage.objectViewer",
+        member = TF_PLAN_SA.member,
+    ),
+    storage_bucket_iam_member(
+        name = "tfstate_lock_plan",
         bucket = "senku-prod-terraform-state",
         role = "roles/storage.objectAdmin",
         member = TF_PLAN_SA.member,
+        condition = {
+            "title": "tflock_only",
+            "description": "Plan SA writes restricted to terraform lock files.",
+            "expression": "resource.name.endsWith(\".tflock\")",
+        },
     ),
     storage_bucket_iam_member(
         name = "tfstate_admin_apply",
