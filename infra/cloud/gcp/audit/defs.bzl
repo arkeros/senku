@@ -61,6 +61,7 @@ Not enabled (deliberately):
 load(
     "//devtools/build/tools/tf:defs.bzl",
     "var",
+    "variable",
 )
 load(
     "//devtools/build/tools/tf/resources:gcp.bzl",
@@ -153,11 +154,11 @@ LOG_EXCLUSIONS = [
 #
 # `terraform plan` runs with `-input=false`, so a missing var fails fast
 # with "No value for required variable" rather than hanging on a prompt.
-ALERT_EMAIL_VAR = {"variable": {"alert_email": {
-    "type": "string",
-    "description": "Destination email for security-alert notifications. Supplied via $TF_VAR_alert_email; no default so a missing value fails plan fast.",
-    "sensitive": True,
-}}}
+ALERT_EMAIL_VAR = variable(
+    "alert_email",
+    description = "Destination email for security-alert notifications. Supplied via $TF_VAR_alert_email; no default so a missing value fails plan fast.",
+    sensitive = True,
+)
 
 # Email is the lowest-friction channel and the right shape for a
 # single-maintainer project. To swap to Slack/PagerDuty: change `type`
