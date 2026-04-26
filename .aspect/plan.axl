@@ -1,0 +1,172 @@
+"""
+Plan one or more Terraform roots via Bazel.
+
+Usage:
+  aspect plan                                              # plan all roots, in order
+  aspect plan //infra/cloud/gcp/gar:terraform              # plan one root
+  aspect plan //x:terraform --refresh=false                # skip the state refresh
+  aspect plan //x:terraform --target=module.foo.bar        # surgical plan; repeatable
+
+Each root invokes `<target>.plan` via `runnable` (BES + direct spawn).
+State stays in GCS.
+
+Long-tail terraform flags that aren't promoted to first-class options
+(e.g. `-lock-timeout`, `-parallelism`) are reachable via
+`bazel run //x:terraform.plan -- -lock-timeout=5m`.
+
+CI mode (when `$CI` is set + `$GITHUB_REPOSITORY` + `$GITHUB_REF` look
+like a pull-request invocation): also captures each root's output and
+upserts a per-root PR comment via the `tf_pr_comment` Go binary
+(`//devtools/build/tools/tf_pr_comment`). The comment is posted as a
+`Planning…` stub *before* the plan runs so reviewers see progress on
+slow roots, then patched in place with the captured output once the
+plan returns. The CI workflow stays a single step (`aspect plan`) — no
+matrix, no discover-then-fan-out, no github-script post-process.
+
+For the structured comment body we also ask the runner to save the
+binary plan and emit `terraform show -json` to a sibling `*.json` file
+(via `TF_PLAN_JSON_OUT`). `tf_pr_comment` reads that JSON to render a
+status callout + per-resource action table, and collapses the raw text
+log under a `<details>` block. JSON failures degrade gracefully — the
+text log is always posted, structured or not.
+
+Local mode: no comment side-effects, output streams to the terminal as
+usual.
+"""
+
+load("./stdlib.axl", "build_runnable", "is_ci", "select_targets")
+load("./terraform.axl", "TF_ARGS", "build_tf_args")
+
+# Bazel target for the comment-poster Go binary. Built once at the top
+# of `impl` and reused across all roots.
+_TF_PR_COMMENT = "//devtools/build/tools/tf_pr_comment:tf_pr_comment"
+
+def _slug(target):
+    """Bazel label → filesystem-safe slug."""
+    return target.replace("//", "").replace(":", "-").replace("/", "-")
+
+def _run_plan(ctx, target, tf_args, plan_file = None, plan_json = None):
+    """Build `<target>.plan` and run it. `tf_args` are forwarded to the
+    underlying `terraform plan` invocation. If `plan_file` is set,
+    capture combined stdout+stderr to that file (for the comment-poster)
+    while still echoing it to the runner log. If `plan_json` is set,
+    ask the runner (via `TF_PLAN_JSON_OUT`) to save the binary plan and
+    emit `terraform show -json` output to that path; the comment-poster
+    then renders a structured summary from the JSON. Returns the plan's
+    exit code, or non-zero if the build itself failed.
+    """
+    out = ctx.std.io.stdout
+    err = ctx.std.io.stderr
+    full = target + ".plan"
+
+    entrypoint, r = build_runnable(ctx, full)
+    if entrypoint == None:
+        return 1
+
+    if plan_file == None:
+        # Local path: stream straight through to the terminal.
+        return r.spawn(entrypoint, tf_args).wait().code
+
+    # CI path: capture combined output for later comment posting. We
+    # buffer here rather than streaming via tee — GitHub Actions batches
+    # step logs anyway, so real-time streaming inside a step isn't
+    # observable. After the plan returns we mirror the buffered output
+    # to the runner log AND write it to disk.
+    env = {"TF_PLAN_JSON_OUT": plan_json} if plan_json != None else {}
+    proc = r.command(entrypoint, tf_args, env) \
+        .stdout("piped").stderr("piped") \
+        .spawn()
+    result = proc.wait_with_output()
+    out.write(result.stdout)
+    err.write(result.stderr)
+    ctx.std.fs.write(plan_file, result.stdout + result.stderr)
+    return result.status.code
+
+def _pr_context(ctx):
+    """Return a struct(repo=, pr=) from $GITHUB_REPOSITORY and $GITHUB_REF,
+    or None if this isn't a pull-request invocation. `GITHUB_REF` for PR
+    triggers is `refs/pull/<number>/merge`.
+    """
+    repo = ctx.std.env.var("GITHUB_REPOSITORY") or ""
+    pr_ref = ctx.std.env.var("GITHUB_REF") or ""
+    parts = pr_ref.split("/")
+    if len(parts) < 4 or parts[1] != "pull" or not repo:
+        return None
+    return struct(repo = repo, pr = parts[2])
+
+def _post_pr_comment(comment_ep, comment_r, pr_ctx, target, plan_file = None, plan_json = None):
+    """Spawn the pre-built tf_pr_comment binary to upsert this root's
+    PR comment. With both `plan_file` and `plan_json` unset, posts a
+    `Planning…` stub. `plan_json` drives the structured summary;
+    `plan_file` is the raw text log (collapsed under the summary if both
+    are set, or the full body if not).
+    """
+    args = [
+        "--marker=<!-- tf-plan:" + target + " -->",
+        "--target=" + target,
+        "--repo=" + pr_ctx.repo,
+        "--pr=" + pr_ctx.pr,
+    ]
+    if plan_file != None:
+        args.append("--plan-file=" + plan_file)
+    if plan_json != None:
+        args.append("--plan-json=" + plan_json)
+    return comment_r.spawn(comment_ep, args).wait().code
+
+def impl(ctx) -> int:
+    err = ctx.std.io.stderr
+
+    targets = select_targets(ctx, ctx.args.root)
+    tf_args = build_tf_args(ctx)
+
+    # In CI on a PR, build the comment-poster binary ONCE up front and
+    # reuse it for every stub + final post across all roots. Local runs
+    # and non-PR CI runs skip the build entirely.
+    pr_ctx = None
+    plans_dir = None
+    comment_ep, comment_r = None, None
+    if is_ci(ctx):
+        pr_ctx = _pr_context(ctx)
+        if pr_ctx == None:
+            err.write("plan: not a PR ref; skipping per-root comments\n")
+        else:
+            plans_dir = (ctx.std.env.var("RUNNER_TEMP") or "/tmp") + "/aspect-plans"
+            ctx.std.fs.create_dir_all(plans_dir)
+            comment_ep, comment_r = build_runnable(ctx, _TF_PR_COMMENT)
+            if comment_ep == None:
+                err.write("plan: tf_pr_comment build failed; continuing without per-root comments\n")
+                pr_ctx = None
+
+    worst = 0
+    for target in targets:
+        # Stub the comment immediately so reviewers see the plan is in
+        # flight. If posting fails (rate limit, transient 503), we log
+        # but continue — a missing stub is far better than blocking the
+        # actual plan.
+        if pr_ctx != None:
+            stub_code = _post_pr_comment(comment_ep, comment_r, pr_ctx, target)
+            if stub_code != 0:
+                err.write("plan: stub comment failed for {} (exit {}); continuing\n".format(target, stub_code))
+
+        plan_file = (plans_dir + "/" + _slug(target) + ".txt") if plans_dir else None
+        # JSON path lives next to the text log. The runner only writes
+        # this file on a clean plan; the renderer handles a missing path
+        # by emitting a CAUTION callout + raw text log, so we always
+        # forward the path and let the renderer detect emptiness.
+        plan_json = (plans_dir + "/" + _slug(target) + ".json") if plans_dir else None
+        exit_code = _run_plan(ctx, target, tf_args, plan_file, plan_json)
+
+        if pr_ctx != None and plan_file != None:
+            _post_pr_comment(comment_ep, comment_r, pr_ctx, target, plan_file, plan_json)
+
+        if exit_code != 0:
+            err.write("ERROR: plan failed for {}\n".format(target))
+            if worst == 0:
+                worst = exit_code
+
+    return worst
+
+plan = task(
+    implementation = impl,
+    args = {"root": args.positional()} | TF_ARGS,
+)

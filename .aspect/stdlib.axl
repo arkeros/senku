@@ -1,0 +1,127 @@
+"""Shared helpers for senku aspect-cli tasks."""
+
+load("./runnable.axl", "runnable")
+
+# Terraform roots in deploy order. Single source of truth for the deploy DAG.
+#
+# `bootstrap = True` marks roots that must **only** be applied locally:
+# they provision the CI service account and the project-level IAM bindings
+# that every other root needs. A botched CI-side apply could revoke the
+# SA's own permissions and leave CI unable to recover, so `aspect plan`
+# and `aspect apply` skip these when running under `$CI`. They stay in
+# the list so a developer's `aspect plan` walks the whole DAG.
+TF_ROOTS = [
+    struct(target = "//infra/cloud/gcp/ci:terraform", bootstrap = True),
+    struct(target = "//infra/cloud/gcp/audit:terraform", bootstrap = True),
+    struct(target = "//infra/cloud/gcp/gar:terraform", bootstrap = False),
+    struct(target = "//oci/cmd/registry:terraform", bootstrap = False),
+    struct(target = "//infra/cloud/gcp/lb:terraform", bootstrap = False),
+]
+
+def is_ci(ctx) -> bool:
+    return ctx.std.env.var("CI") != None
+
+def normalize_root(target) -> str:
+    """Accept either `//path` or `//path:terraform`; default to `:terraform`.
+
+    The convention for in-repo tf_root targets is `<root>:terraform`. Letting
+    callers omit the `:terraform` makes `aspect apply //oci/cmd/registry`
+    work as a sibling of the more explicit
+    `aspect apply //oci/cmd/registry:terraform`.
+    """
+    if ":" in target:
+        return target
+    return target + ":terraform"
+
+def select_targets(ctx, requested) -> list:
+    """Resolve the list of targets to act on.
+
+    If the caller passed explicit targets, honor them verbatim (the
+    bootstrap filter is bypassed — an explicit `aspect plan
+    //infra/cloud/gcp/ci:terraform` should still work in CI for the rare
+    case a maintainer wants it).
+
+    With no targets, default to all `TF_ROOTS`. Under CI, drop the
+    bootstrap-tier roots and announce the skip on stderr so the CI log
+    self-documents — a future reader scanning the log won't have to
+    cross-reference `TF_ROOTS` to figure out why a root is missing.
+    """
+    if len(requested) > 0:
+        return [normalize_root(t) for t in requested]
+
+    if is_ci(ctx):
+        err = ctx.std.io.stderr
+        targets = []
+        for r in TF_ROOTS:
+            if r.bootstrap:
+                err.write("skipping {} (bootstrap-tier; apply locally only)\n".format(r.target))
+            else:
+                targets.append(r.target)
+        return targets
+
+    return [r.target for r in TF_ROOTS]
+
+def build_runnable(ctx, target, build_flags = []):
+    """Build `target` and resolve its runtime entrypoint via BES, so the
+    binary can be spawned directly (with the runfiles env wired up by
+    `runnable`) instead of round-tripping through `bazel run`.
+
+    Returns `(entrypoint, runnable)` on success, or `(None, None)` on
+    build failure. Callers reuse the returned `runnable` to spawn the
+    same binary multiple times without rebuilding.
+
+    Stays on the workspace default `--nobuild_runfile_links`: spawned
+    binaries must use a runfiles library (Bazel's bash/Go/etc.) so they
+    resolve via the manifest. Forcing the symlink tree here would flip
+    the option vs. bare `bazel build` and discard the analysis cache on
+    every alternation.
+
+    Forces `--remote_download_outputs=toplevel` to override the CI-wide
+    `minimal` default: when a pure cache-hit build produces no local
+    actions (no processwrapper-sandbox, etc.), nothing materializes the
+    binary or its runfiles on disk and the subsequent spawn fails with
+    ENOENT. `toplevel` downloads the executable and its runfiles tree,
+    which is exactly what we're about to spawn. This is an execution
+    flag, so it doesn't invalidate the analysis cache across alternations
+    with bare `bazel build`.
+    """
+    out = ctx.std.io.stdout
+    err = ctx.std.io.stderr
+
+    flags = [
+        "--isatty=" + str(int(out.is_tty)),
+        "--remote_download_outputs=toplevel",
+    ]
+    flags.extend(build_flags)
+
+    out.write("==> bazel build {}\n".format(target))
+    build = ctx.bazel.build(target, build_events = True, flags = flags)
+    r = runnable(ctx, [target])
+    for event in build.build_events():
+        if event.kind == "progress":
+            out.write(event.payload.stdout)
+            err.write(event.payload.stderr)
+        else:
+            r.event(event)
+
+    if not build.wait().success:
+        err.write("ERROR: build failed for {}\n".format(target))
+        return None, None
+
+    entrypoint = r.determine_entrypoint(target)
+    if entrypoint == None:
+        err.write("ERROR: could not determine entrypoint for {}\n".format(target))
+        return None, None
+
+    return entrypoint, r
+
+def build_and_run(ctx, target, args = [], env = {}, build_flags = []):
+    """Build `target`, then spawn it once with `args` + `env` and wait.
+
+    Returns the exit struct (`.success`, `.code`) on success, or `None`
+    if the build itself failed.
+    """
+    entrypoint, r = build_runnable(ctx, target, build_flags)
+    if entrypoint == None:
+        return None
+    return r.spawn(entrypoint, args, env).wait()

@@ -1,0 +1,89 @@
+"""Runfiles-aware spawn helper for Bazel-built binaries.
+
+Vendored from https://github.com/aspect-extensions/run via astrograde's
+copy. Local deviations:
+
+- `command(entrypoint, args, env)` returns the un-spawned
+  `std.process.Command` so callers can chain `.stdout("piped")` etc.
+  before `.spawn()`. This is what lets `aspect plan` capture each
+  root's plan output for the PR comment without going through
+  `bash | tee`.
+- `_command` no longer sets `current_dir` to the runfiles tree. Under
+  the workspace default `--nobuild_runfile_links` that directory isn't
+  materialized, so the chdir would fail. Spawned binaries should
+  resolve files via a Bazel runfiles library (RUNFILES_DIR /
+  RUNFILES_MANIFEST_FILE are still exported here) rather than via cwd.
+  Inherits the caller's cwd instead, which matches `BUILD_WORKING_DIRECTORY`.
+"""
+
+def _process_bes(state, event):
+    filesets = state.filesets
+    target_fileset = state.target_fileset
+    targets = state.targets
+    if event.kind == "named_set_of_files":
+        filesets[event.id.id] = event.payload.files
+    elif event.kind == "target_completed":
+        if event.id.label in targets:
+            for og in event.payload.output_group:
+                if og.name == "default":
+                    target_fileset[event.id.label] = og.file_sets
+
+def _determine_entrypoint(state, target):
+    filesets = state.filesets
+    target_fileset = state.target_fileset
+    if target not in target_fileset:
+        return None
+    targetfs = target_fileset[target][0].id
+    files = filesets[targetfs]
+    for file in files:
+        if len(file.path_prefix):
+            # file.file is a local path under a `bazel build`; under
+            # remote execution it can come back as a `bytestream://`
+            # URL — fall back to the canonical bazel-bin layout in
+            # that case (matches astrograde's vendored copy).
+            if file.file.startswith("bytestream://"):
+                return "bazel-bin/{}".format(file.name)
+            return file.file.removeprefix("file://")
+    return None
+
+def _command(ctx, entrypoint, args, env = {}):
+    """Build the `std.process.Command` for `entrypoint` without spawning
+    it. Sets the runfiles env vars common Bazel runfiles libraries look
+    for, plus `BUILD_WORKING_DIRECTORY` and `BUILD_WORKSPACE_DIRECTORY`
+    (the same vars `bazel run` sets). `BUILD_WORKSPACE_DIRECTORY` is
+    forwarded from this process's env when set (e.g. when aspect itself
+    was launched via `bazel run`), and falls back to the current dir
+    otherwise — aspect is normally invoked from the workspace root, so
+    that matches what `bazel run` would set. Inherits the caller's cwd
+    — see module docstring for why we don't chdir into the runfiles tree.
+    """
+    if not entrypoint.startswith("/"):
+        entrypoint = ctx.std.env.current_dir() + "/" + entrypoint
+    runfiles = entrypoint + ".runfiles"
+    bws = ctx.std.env.var("BUILD_WORKSPACE_DIRECTORY") or ctx.std.env.current_dir()
+    proc = ctx.std.process.command(entrypoint) \
+        .env("RUNFILES_DIR", runfiles) \
+        .env("JAVA_RUNFILES", runfiles) \
+        .env("RUNFILES_MANIFEST_FILE", runfiles + "_manifest") \
+        .env("BUILD_WORKING_DIRECTORY", ctx.std.env.current_dir()) \
+        .env("BUILD_WORKSPACE_DIRECTORY", bws)
+    for key, value in env.items():
+        proc = proc.env(key, value)
+    return proc.args(args)
+
+def _spawn(ctx, entrypoint, args, env = {}):
+    return _command(ctx, entrypoint, args, env).spawn()
+
+def runnable(ctx, targets):
+    state = struct(
+        ctx = ctx,
+        targets = targets,
+        filesets = {},
+        target_fileset = {},
+    )
+    return struct(
+        event = lambda event: _process_bes(state, event),
+        determine_entrypoint = lambda target: _determine_entrypoint(state, target),
+        command = lambda entrypoint, args, env = {}: _command(ctx, entrypoint, args, env),
+        spawn = lambda entrypoint, args, env = {}: _spawn(ctx, entrypoint, args, env),
+    )

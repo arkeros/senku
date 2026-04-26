@@ -426,6 +426,168 @@ func TestNonExistentRepoForwardsUpstreamStatus(t *testing.T) {
 	}
 }
 
+func TestCacheControlV2Base(t *testing.T) {
+	p := proxy.New("ghcr.io", "arkeros/senku")
+	srv := httptest.NewServer(p)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/v2/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if got, want := resp.Header.Get("Cache-Control"), "public, max-age=86400, stale-if-error=86400"; got != want {
+		t.Errorf("Cache-Control = %q, want %q", got, want)
+	}
+}
+
+func TestCacheControlCatalog(t *testing.T) {
+	p := proxy.New("ghcr.io", "arkeros/senku")
+	srv := httptest.NewServer(p)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/v2/_catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if got, want := resp.Header.Get("Cache-Control"), "public, max-age=900, stale-while-revalidate=3600, stale-if-error=86400"; got != want {
+		t.Errorf("Cache-Control = %q, want %q", got, want)
+	}
+}
+
+func TestCacheControlManifestByTag(t *testing.T) {
+	upstream := ocitest.NewServer(t)
+	upstream.MustPushImage(t, "arkeros/senku/redis", "latest")
+
+	srv := newTestProxy(t, upstream)
+
+	resp, err := http.Get(srv.URL + "/v2/redis/manifests/latest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if got, want := resp.Header.Get("Cache-Control"), "public, max-age=900, stale-while-revalidate=3600, stale-if-error=86400"; got != want {
+		t.Errorf("Cache-Control = %q, want %q", got, want)
+	}
+}
+
+func TestCacheControlManifestByDigest(t *testing.T) {
+	upstream := ocitest.NewServer(t)
+	img := upstream.MustPushImage(t, "arkeros/senku/redis", "latest")
+	digest, err := img.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	srv := newTestProxy(t, upstream)
+
+	resp, err := http.Get(fmt.Sprintf("%s/v2/redis/manifests/%s", srv.URL, digest))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if got, want := resp.Header.Get("Cache-Control"), "public, max-age=31536000, immutable"; got != want {
+		t.Errorf("Cache-Control = %q, want %q", got, want)
+	}
+}
+
+func TestCacheControlBlobRedirect(t *testing.T) {
+	const redirectURL = "https://storage.example.com/blob/sha256:abc123"
+
+	upstream := ocitest.NewServer(t)
+	redirector := upstream.WithBlobRedirect(t, redirectURL)
+
+	p := proxy.New(redirector.Listener.Addr().String(), "arkeros/senku", proxy.Insecure())
+	srv := httptest.NewServer(p)
+	t.Cleanup(srv.Close)
+
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+
+	resp, err := client.Get(srv.URL + "/v2/redis/blobs/sha256:abc123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if got, want := resp.Header.Get("Cache-Control"), "public, max-age=120, stale-while-revalidate=120, stale-if-error=120"; got != want {
+		t.Errorf("Cache-Control = %q, want %q", got, want)
+	}
+}
+
+func TestCacheControlTagsList(t *testing.T) {
+	upstream := ocitest.NewServer(t)
+	upstream.MustPushImage(t, "arkeros/senku/redis", "latest")
+
+	srv := newTestProxy(t, upstream)
+
+	resp, err := http.Get(srv.URL + "/v2/redis/tags/list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if got, want := resp.Header.Get("Cache-Control"), "public, max-age=900, stale-while-revalidate=3600, stale-if-error=86400"; got != want {
+		t.Errorf("Cache-Control = %q, want %q", got, want)
+	}
+}
+
+func TestConditionalGetForwardsIfNoneMatch(t *testing.T) {
+	// Verify the proxy forwards `If-None-Match` to upstream and passes a
+	// 304 response back unchanged. This is what makes Cloud CDN's
+	// stale-while-revalidate fetches collapse to cheap conditional GETs
+	// instead of full re-fetches.
+	const etag = `"sha256:abc"`
+
+	var receivedINM string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Anonymous /v2/ ping — go-containerregistry's transport probes
+		// here; a 200 means "no auth challenge, proceed without token".
+		if r.URL.Path == "/v2/" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		receivedINM = r.Header.Get("If-None-Match")
+		if receivedINM == etag {
+			w.Header().Set("ETag", etag)
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Content-Type", "application/vnd.oci.image.manifest.v1+json")
+		fmt.Fprint(w, `{}`)
+	}))
+	defer upstream.Close()
+
+	p := proxy.New(strings.TrimPrefix(upstream.URL, "http://"), "arkeros/senku", proxy.Insecure())
+	srv := httptest.NewServer(p)
+	defer srv.Close()
+
+	req, err := http.NewRequest("GET", srv.URL+"/v2/redis/manifests/sha256:abc", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("If-None-Match", etag)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotModified {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusNotModified)
+	}
+	if receivedINM != etag {
+		t.Errorf("upstream received If-None-Match = %q, want %q", receivedINM, etag)
+	}
+}
+
 func TestQueryStringForwarded(t *testing.T) {
 	upstream := ocitest.NewServer(t)
 	upstream.MustPushImage(t, "arkeros/senku/redis", "v1.0.0")
