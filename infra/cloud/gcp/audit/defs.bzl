@@ -196,12 +196,24 @@ APPLY_IMPERSONATION_ALERT = monitoring_alert_policy_log_match(
         'protoPayload.serviceName="iamcredentials.googleapis.com" ' +
         'protoPayload.methodName="GenerateAccessToken" ' +
         'resource.labels.email_id="%s" ' % APPLY_SA_EMAIL +
+        # Restrict to the caller-side audit entry. Each GenerateAccessToken
+        # call emits two Data Access entries: an ADMIN_READ entry whose
+        # `principalSubject` (or `principalEmail`) identifies the *caller*,
+        # and a DATA_READ companion entry recording that a short-lived
+        # credential was issued, whose `principalEmail` is set to the SA
+        # being impersonated and whose `principalSubject` is absent. Without
+        # this clause the `NOT … : substring` predicate below evaluates
+        # true on the DATA_READ companion (absent field → non-match), and
+        # the alert fires on every legitimate apply. Empirically verified
+        # via op-id correlation; not documented by GCP, but stable behavior.
+        'protoPayload.authorizationInfo.permissionType="ADMIN_READ" ' +
         # `principalSubject` is set for federated identities (WIF). For
         # non-WIF callers (humans via gcloud, other SAs with
-        # serviceAccountTokenCreator) the field is absent, which the
-        # `NOT … : substring` operator treats as non-matching — so the
-        # alert fires for those too. That's intentional: any
-        # impersonation that isn't the prod WIF subject is anomalous.
+        # serviceAccountTokenCreator) the field is absent on the ADMIN_READ
+        # entry too — the `NOT … : substring` operator treats absence as
+        # non-matching, so the alert fires for those callers as well. That
+        # part is intentional: any impersonation that isn't the prod WIF
+        # subject is anomalous.
         'NOT protoPayload.authenticationInfo.principalSubject:"%s"' % EXPECTED_APPLY_SUBJECT
     ),
     notification_channels = _CHANNELS,
