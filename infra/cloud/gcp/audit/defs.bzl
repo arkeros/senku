@@ -34,12 +34,23 @@ What's enabled:
 
 * **Alert policies** for high-signal patterns on the WIF/SA path:
 
-  - Impersonation of `tf-apply` from any subject other than the
-    expected `repo:arkeros/senku:environment:prod`.
+  - WIF impersonation of `tf-apply` from a subject other than the
+    expected `repo:arkeros/senku:environment:prod` (the prod WIF
+    binding has been widened, or another GitHub OIDC subject is
+    minting prod tokens).
+  - Non-WIF impersonation of `tf-apply` (a human via `gcloud
+    --impersonate-service-account`, or another SA holding
+    `serviceAccountTokenCreator` on tf-apply).
   - `setIamPolicy` calls authored by `tf-apply` itself (steady-state
     apply rarely touches IAM; review every occurrence).
   - Update/delete on the `github` WIF pool or provider (the rebind path
     that would re-widen the principalSet).
+
+  The two impersonation alerts are split rather than fused into one
+  because their triage paths diverge: a wrong WIF subject points at a
+  binding mutation in `ci/defs.bzl`, while a non-WIF caller points at
+  an IAM policy on the SA. Each filter then expresses one yes/no
+  question, which makes both readable and testable.
 
 * **Meta-alert** on the alerting itself: a Data Access log-volume
   counter + absence alert that fires if no audit entries are seen for
@@ -176,54 +187,95 @@ _CHANNELS = [ALERT_EMAIL.id]
 
 # ---------- alert policies --------------------------------------------------
 
-# Alert 1: tf-apply impersonated by anything other than the expected
-# `environment: prod` subject.
+# Each GenerateAccessToken call emits two Data Access audit entries:
+# an ADMIN_READ entry identifying the caller (carries `principalSubject`
+# for WIF, `principalEmail` for human / cross-SA), and a DATA_READ
+# companion that records the short-lived credential issuance on the
+# impersonated SA (`principalEmail = <SA itself>`, `principalSubject`
+# absent, no `operation.id`). Both alerts below qualify on
+# `permissionType="ADMIN_READ"` to look at the caller-side entry only;
+# without this the `NOT field:"x"` substring predicate matches the
+# DATA_READ twin on every legitimate apply (absent-field → non-match)
+# and pages CRITICAL on every CI run. Empirically verified via op-id
+# correlation; not spelled out in GCP docs but stable behavior.
 #
-# In the steady state, every legitimate impersonation of tf-apply
-# carries `principalSubject = principal://.../subject/<EXPECTED_APPLY_SUBJECT>`
-# (the OIDC `sub` from a `prod` job). Any other principal — a different
-# WIF subject, a human via `gcloud auth ...`, another SA with
-# `serviceAccountTokenCreator` — is anomalous and worth a notification,
-# even if technically authorized.
-APPLY_IMPERSONATION_ALERT = monitoring_alert_policy_log_match(
-    name = "apply_impersonation",
+# The split into WIF vs non-WIF lets each filter answer one yes/no
+# question (subject set or absent) and maps to distinct triage paths
+# (binding widened vs IAM policy on the SA).
+
+# Alert 1a: WIF impersonation of tf-apply from a subject other than
+# the expected `environment: prod` one. Steady state: every legitimate
+# impersonation carries `principalSubject = principal://.../subject/
+# <EXPECTED_APPLY_SUBJECT>`. A different WIF subject means either the
+# `attribute.environment/prod` principalSet binding has been widened
+# (check `infra/cloud/gcp/ci:terraform.plan`), or another GitHub OIDC
+# subject has been bound to tf-apply out-of-band.
+APPLY_IMPERSONATION_WIF_ALERT = monitoring_alert_policy_log_match(
+    name = "apply_impersonation_wif",
     project = PROJECT,
-    display_name = "tf-apply impersonated by unexpected principal",
-    # CRITICAL: any non-prod-env subject minting a token for the apply
-    # SA is a potential active compromise. Wake somebody up.
+    display_name = "tf-apply impersonated by unexpected WIF subject",
+    # CRITICAL: a wrong WIF subject minting prod tokens is one rebind
+    # away from full apply-SA control. Wake somebody up.
     severity = "CRITICAL",
     filter = (
         'protoPayload.serviceName="iamcredentials.googleapis.com" ' +
         'protoPayload.methodName="GenerateAccessToken" ' +
         'resource.labels.email_id="%s" ' % APPLY_SA_EMAIL +
-        # Restrict to the caller-side audit entry. Each GenerateAccessToken
-        # call emits two Data Access entries: an ADMIN_READ entry whose
-        # `principalSubject` (or `principalEmail`) identifies the *caller*,
-        # and a DATA_READ companion entry recording that a short-lived
-        # credential was issued, whose `principalEmail` is set to the SA
-        # being impersonated and whose `principalSubject` is absent. Without
-        # this clause the `NOT … : substring` predicate below evaluates
-        # true on the DATA_READ companion (absent field → non-match), and
-        # the alert fires on every legitimate apply. Empirically verified
-        # via op-id correlation; not documented by GCP, but stable behavior.
         'protoPayload.authorizationInfo.permissionType="ADMIN_READ" ' +
-        # `principalSubject` is set for federated identities (WIF). For
-        # non-WIF callers (humans via gcloud, other SAs with
-        # serviceAccountTokenCreator) the field is absent on the ADMIN_READ
-        # entry too — the `NOT … : substring` operator treats absence as
-        # non-matching, so the alert fires for those callers as well. That
-        # part is intentional: any impersonation that isn't the prod WIF
-        # subject is anomalous.
+        # `principalSubject:"principal://"` is a positive existence
+        # check — every WIF subject starts with that scheme, so this
+        # restricts to "subject is set and looks like a principalSet
+        # member." Then the NOT excludes the prod-env one.
+        'protoPayload.authenticationInfo.principalSubject:"principal://" ' +
         'NOT protoPayload.authenticationInfo.principalSubject:"%s"' % EXPECTED_APPLY_SUBJECT
     ),
     notification_channels = _CHANNELS,
     documentation = (
-        "**tf-apply was impersonated by a principal other than the expected `prod` GitHub environment.**\n\n" +
+        "**tf-apply was impersonated by a WIF subject other than the expected `prod` GitHub environment.**\n\n" +
         "Expected subject: `%s`\n\n" % EXPECTED_APPLY_SUBJECT +
         "Triage:\n" +
-        "1. Check `protoPayload.authenticationInfo.principalSubject` / `principalEmail` in the matching log entry.\n" +
-        "2. If a human: confirm with that human directly out-of-band.\n" +
-        "3. If a different WIF subject: the `attribute.environment/prod` principalSet binding may have been widened — check `infra/cloud/gcp/ci:terraform.plan`.\n" +
+        "1. Check `protoPayload.authenticationInfo.principalSubject` in the matching log entry — what subject was used?\n" +
+        "2. The `attribute.environment/prod` principalSet binding may have been widened — run `bazel run //infra/cloud/gcp/ci:terraform.plan` and look for a delta on `TF_APPLY_WIF_BINDING`.\n" +
+        "3. If the binding is intact: another principalSet was bound out-of-band. `gcloud iam service-accounts get-iam-policy %s` and look for unexpected `principalSet://` members.\n" % APPLY_SA_EMAIL +
+        "4. If unexplained: rotate the apply SA, freeze main, and audit recent `setIamPolicy` events on the project."
+    ),
+)
+
+# Alert 1b: non-WIF impersonation of tf-apply (a human via gcloud, or
+# another SA holding `serviceAccountTokenCreator` on tf-apply). Steady
+# state: nothing should impersonate tf-apply except the prod WIF
+# subject. A human or sibling SA showing up means either intentional
+# operator action (verifiable out-of-band) or a widened SA-IAM policy.
+APPLY_IMPERSONATION_NONWIF_ALERT = monitoring_alert_policy_log_match(
+    name = "apply_impersonation_nonwif",
+    project = PROJECT,
+    display_name = "tf-apply impersonated by non-WIF principal",
+    # CRITICAL: same urgency as the WIF case — different attacker
+    # profile, same blast radius (full apply-SA control).
+    severity = "CRITICAL",
+    filter = (
+        'protoPayload.serviceName="iamcredentials.googleapis.com" ' +
+        'protoPayload.methodName="GenerateAccessToken" ' +
+        'resource.labels.email_id="%s" ' % APPLY_SA_EMAIL +
+        'protoPayload.authorizationInfo.permissionType="ADMIN_READ" ' +
+        # Subject absent → not a WIF call. The `NOT … :"principal://"`
+        # form treats absent as non-matching, so the outer NOT flips
+        # to true → matches when the field is absent.
+        'NOT protoPayload.authenticationInfo.principalSubject:"principal://" ' +
+        # Belt-and-braces against any pathological case where an
+        # ADMIN_READ entry could carry `principalEmail = tf-apply`
+        # (the SA acting as itself). Not observed in practice given
+        # the permissionType filter, but a no-op exclusion if it
+        # never happens.
+        'NOT protoPayload.authenticationInfo.principalEmail="%s"' % APPLY_SA_EMAIL
+    ),
+    notification_channels = _CHANNELS,
+    documentation = (
+        "**tf-apply was impersonated by a non-WIF principal (human or other SA).**\n\n" +
+        "Triage:\n" +
+        "1. Check `protoPayload.authenticationInfo.principalEmail` in the matching log entry — who called?\n" +
+        "2. If a human you recognize: confirm out-of-band that the impersonation was intentional (gcloud `--impersonate-service-account` or similar).\n" +
+        "3. If another SA: `gcloud iam service-accounts get-iam-policy %s` and look for unexpected `serviceAccountTokenCreator` bindings.\n" % APPLY_SA_EMAIL +
         "4. If unexplained: rotate the apply SA, freeze main, and audit recent `setIamPolicy` events on the project."
     ),
 )
@@ -294,7 +346,8 @@ WIF_MUTATION_ALERT = monitoring_alert_policy_log_match(
 )
 
 ALERT_POLICIES = [
-    APPLY_IMPERSONATION_ALERT,
+    APPLY_IMPERSONATION_WIF_ALERT,
+    APPLY_IMPERSONATION_NONWIF_ALERT,
     APPLY_SETIAMPOLICY_ALERT,
     WIF_MUTATION_ALERT,
 ]
