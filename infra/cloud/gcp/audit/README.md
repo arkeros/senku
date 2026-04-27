@@ -28,6 +28,24 @@ bazel run //infra/cloud/gcp/audit:terraform.apply
 
 Plan is non-blocking on a missing var (`terraform plan -input=false`), so it'll fail fast with "No value for required variable" rather than hang.
 
+## Validate alert filters before apply
+
+A log-match filter is a server-side string with no compile-time checks — `NOT field:"x"` matches absent fields, operator precedence is easy to miss, and a typo silently widens the filter. The first feedback signal otherwise is a 3am page (or worse, silence).
+
+Before touching any alert filter, run:
+
+```bash
+bazel run //infra/cloud/gcp/audit:validate_alerts
+```
+
+It reads each `condition_matched_log` filter from the rendered `main.tf.json` and runs it against the last 7 days of real logs in `senku-prod`, printing match counts and a few sample timestamps. Cross-check the counts:
+
+- **0** — fine for filters that catch rare events (`apply_impersonation`, `wif_mutation`).
+- **A handful** — sanity-check the samples against recent activity (a real CI apply, your own manual alert verification per the section below). Expected for `apply_setiampolicy` after PRs that touch IAM.
+- **A flood** — the filter is wrong (almost certainly a false-positive pattern). Don't apply until you've narrowed it.
+
+Pass `--strict` to exit non-zero if any alert has matches; useful as a pre-apply guard. The script needs an authenticated `gcloud` (any account with `logging.entries.list` on `senku-prod`).
+
 ## Manual alert verification
 
 The filters were written against documented audit log schemas, not against observed entries. Verify each fires at least once after apply.
