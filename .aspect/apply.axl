@@ -7,11 +7,10 @@ Usage:
   aspect apply //x:terraform --refresh=false         # skip the state refresh
   aspect apply //x:terraform --target=module.foo.bar # surgical apply; repeatable
 
-Each root invokes `<target>.apply` via `runnable` (BES + direct spawn,
-with `--stamp` passed through). Stamping is required because the
-registry's image tags reference STABLE_MONOREPO_* workspace status
-keys; without it, tag substitution falls through to `<no value>` and
-the push rejects.
+Each root invokes `<target>.apply` via `runnable` (BES + direct
+spawn). The registry's image_push targets set `stamp = "force"`, so
+they always consume STABLE_MONOREPO_* workspace status keys without
+needing `--stamp` on the command line.
 
 Auto-approves Terraform when running non-interactively (`$CI` is set);
 locally you'll get the y/n confirmation prompt per root.
@@ -27,7 +26,7 @@ def impl(ctx) -> int:
     tf_args = build_tf_args(ctx)
 
     for root in select_targets(ctx, ctx.args.root):
-        result = build_and_run(ctx, root + ".apply", args = tf_args, env = env, build_flags = ["--stamp"])
+        result = build_and_run(ctx, root + ".apply", args = tf_args, env = env)
         if result == None:
             return 1
         if not result.success:

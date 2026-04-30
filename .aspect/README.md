@@ -32,7 +32,7 @@ aspect apply //x:terraform --refresh=false         # skip the state refresh
 aspect apply //x:terraform --target=module.foo.bar # surgical apply; repeatable
 ```
 
-Each root runs `bazel run --stamp <target>.apply`, which (for the registry)
+Each root runs `bazel run <target>.apply`, which (for the registry)
 also pushes the image to GAR via the `pre_apply` hook. Auto-approves when
 `$CI` is set; prompts y/n locally.
 
