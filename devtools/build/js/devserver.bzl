@@ -78,7 +78,7 @@ def devserver(name, entry_point, components, browser_deps, html_template, css, e
 
     # Copy cross-package files into this package so js_binary can use them.
     # Wrap in Label() so the source resolves to @senku regardless of the
-    # caller's repo (mirrors go_image.bzl's distroless-base pattern).
+    # caller's repo.
     copy_file(
         name = name + "_devserver_script",
         src = Label("//devtools/build/js:devserver.mjs"),
