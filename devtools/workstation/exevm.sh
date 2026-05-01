@@ -10,6 +10,7 @@ set -euo pipefail
 
 readonly IMAGE="${WORKSTATION_IMAGE:-ghcr.io/arkeros/senku/workstation:latest}"
 readonly TAG="arkeros-senku"
+readonly REPO_URL="${WORKSTATION_REPO_URL:-https://arkeros-senku.int.exe.xyz/arkeros/senku.git}"
 
 usage() {
     cat <<EOF
@@ -25,7 +26,9 @@ Commands:
   url <name>   Print the HTTPS URL
 
 Env:
-  WORKSTATION_IMAGE  Override image (default: ${IMAGE})
+  WORKSTATION_IMAGE     Override image (default: ${IMAGE})
+  WORKSTATION_REPO_URL  Override clone-on-boot repo (default: ${REPO_URL})
+                        Set empty to skip cloning.
 EOF
 }
 
@@ -36,7 +39,14 @@ cmd_new() {
         args+=(--name="$name")
         shift
     fi
-    ssh exe.dev new "${args[@]}" "$@"
+    if [ -n "$REPO_URL" ]; then
+        # Pipe a setup script via stdin. exe-setup.service runs it once
+        # at first boot as the exedev user (passwordless sudo if needed).
+        printf '#!/bin/sh\nset -eu\ncd /home/exedev\ngit clone --depth=1 %q senku\n' "$REPO_URL" |
+            ssh exe.dev new "${args[@]}" --setup-script=/dev/stdin "$@"
+    else
+        ssh exe.dev new "${args[@]}" "$@"
+    fi
 }
 
 cmd_ls() {
