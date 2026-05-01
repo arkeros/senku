@@ -49,6 +49,7 @@ tar(
         "files/etc/systemd/system/shelley.service",
         "files/etc/systemd/system/shelley.socket",
         "files/usr/local/bin/init",
+        "files/usr/share/terminfo/x/xterm-ghostty",
     ],
     compress = COMPRESSION,
     mtree = [
@@ -75,6 +76,11 @@ tar(
         "./etc/systemd/system/shelley.service uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/systemd/system/shelley.service)",
         "./etc/systemd/system/shelley.socket uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/systemd/system/shelley.socket)",
         "./usr/local/bin/init uid=0 gid=0 mode=0755 type=file content=$(execpath files/usr/local/bin/init)",
+        # ghostty terminfo — pre-compiled in the image's ncurses 6.6
+        # tic. Source at https://github.com/boldsoftware/exeuntu/blob/main/xterm-ghostty.terminfo;
+        # `ghostty` alias is a symlink to the canonical entry.
+        "./usr/share/terminfo/x/xterm-ghostty uid=0 gid=0 mode=0644 type=file content=$(execpath files/usr/share/terminfo/x/xterm-ghostty)",
+        "./usr/share/terminfo/g/ghostty type=link uid=0 gid=0 link=../x/xterm-ghostty",
         # update-alternatives wires these via postinst, which we don't
         # run. Bake the symlinks directly. Crucially, write to
         # ./usr/bin/* and not ./bin/* — base-files ships /bin as a
