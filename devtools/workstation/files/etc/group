@@ -8,5 +8,6 @@ disk:x:6:
 shadow:x:42:
 sudo:x:27:exedev
 messagebus:x:101:
+docker:x:998:exedev
 exedev:x:1000:
 nogroup:x:65534:

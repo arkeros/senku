@@ -68,6 +68,13 @@ packages:
   # C toolchain — bazel's cc_autoconf needs gcc on PATH even for builds
   # that don't compile C themselves; cgo / rules_go assume it exists.
   - build-essential
+  # Container runtime — docker.io matches CI exactly (BuildBuddy
+  # executors run docker) and is the path of least surprise for
+  # rules_img / container_structure_test. docker-buildx covers the
+  # buildkit features rules_img can call into.
+  - docker.io
+  - docker-cli
+  - docker-buildx
   # The three tools this image is for
   - direnv
   - fish

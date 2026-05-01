@@ -4,7 +4,7 @@ The package list mirrors `debian.lock.json`; regenerate after every
 `bazel run @workstation//:lock`. Listed explicitly so PR review sees
 every package landing in the rootfs.
 
-The closure splits into a shared core (228 packages identical between
+The closure splits into a shared core (~248 packages identical between
 amd64 and arm64) and a small set of arch-specific toolchain packages
 that ship under arch-mangled names (e.g. `gcc-x86-64-linux-gnu` vs
 `gcc-aarch64-linux-gnu`). `WORKSTATION_PACKAGES_BY_ARCH` is the only
@@ -16,7 +16,9 @@ WORKSTATION_ARCHITECTURES = ["amd64", "arm64"]
 
 # Shared core — packages identical across architectures. Keep alphabetized.
 _SHARED = [
+    "adduser",
     "base-files",
+    "base-passwd",
     "bash",
     "bind9-dnsutils",
     "bind9-host",
@@ -27,6 +29,7 @@ _SHARED = [
     "build-essential",
     "bzip2",
     "ca-certificates",
+    "containerd",
     "coreutils",
     "cpp",
     "cpp-15",
@@ -42,6 +45,9 @@ _SHARED = [
     "debianutils",
     "diffutils",
     "direnv",
+    "docker-buildx",
+    "docker-cli",
+    "docker.io",
     "dpkg",
     "dpkg-dev",
     "findutils",
@@ -65,6 +71,7 @@ _SHARED = [
     "htop",
     "init-system-helpers",
     "iproute2",
+    "iptables",
     "iputils-ping",
     "jq",
     "less",
@@ -99,6 +106,7 @@ _SHARED = [
     "libcurl4t64",
     "libdb5.3t64",
     "libdbus-1-3",
+    "libdebconfclient0",
     "libdpkg-perl",
     "libedit2",
     "libelf1t64",
@@ -121,6 +129,8 @@ _SHARED = [
     "libhogweed6t64",
     "libhwasan0",
     "libidn2-0",
+    "libip4tc2",
+    "libip6tc2",
     "libisl23",
     "libitm1",
     "libjansson4",
@@ -144,7 +154,10 @@ _SHARED = [
     "libmpc3",
     "libmpfr6",
     "libncursesw6",
+    "libnetfilter-conntrack3",
     "libnettle8t64",
+    "libnfnetlink0",
+    "libnftnl11",
     "libnghttp2-14",
     "libnghttp3-9",
     "libngtcp2-16",
@@ -172,6 +185,9 @@ _SHARED = [
     "libsasl2-modules-db",
     "libseccomp2",
     "libselinux1",
+    "libsemanage-common",
+    "libsemanage2",
+    "libsepol2",
     "libsframe3",
     "libsmartcols1",
     "libsqlite3-0",
@@ -201,6 +217,7 @@ _SHARED = [
     "libxtables12",
     "libzstd1",
     "linux-libc-dev",
+    "login.defs",
     "lua-lpeg",
     "lua-luv",
     "make",
@@ -219,6 +236,7 @@ _SHARED = [
     "openssh-client",
     "openssl",
     "openssl-provider-legacy",
+    "passwd",
     "patch",
     "perl",
     "perl-base",
@@ -232,11 +250,14 @@ _SHARED = [
     "readline-common",
     "ripgrep",
     "rpcsvc-proto",
+    "runc",
     "sed",
     "sudo",
     "systemd",
     "systemd-sysv",
+    "sysvinit-utils",
     "tar",
+    "tini-static",
     "tmux",
     "tree",
     "tzdata",

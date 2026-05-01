@@ -5467,6 +5467,563 @@
 			"arch": "amd64",
 			"dependencies": [
 				{
+					"key": "tini-static_0.19.0-6-p-b1_amd64",
+					"name": "tini-static",
+					"version": "0.19.0-6+b1"
+				},
+				{
+					"key": "runc_1.3.5-p-ds1-1_amd64",
+					"name": "runc",
+					"version": "1.3.5+ds1-1"
+				},
+				{
+					"key": "libseccomp2_2.6.0-2-p-b1_amd64",
+					"name": "libseccomp2",
+					"version": "2.6.0-2+b1"
+				},
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "sysvinit-utils_3.18-1_amd64",
+					"name": "sysvinit-utils",
+					"version": "3.18-1"
+				},
+				{
+					"key": "iptables_1.8.13-1_amd64",
+					"name": "iptables",
+					"version": "1.8.13-1"
+				},
+				{
+					"key": "libnftnl11_1.3.1-1-p-b1_amd64",
+					"name": "libnftnl11",
+					"version": "1.3.1-1+b1"
+				},
+				{
+					"key": "libmnl0_1.0.5-3-p-b2_amd64",
+					"name": "libmnl0",
+					"version": "1.0.5-3+b2"
+				},
+				{
+					"key": "libnfnetlink0_1.0.2-3-p-b2_amd64",
+					"name": "libnfnetlink0",
+					"version": "1.0.2-3+b2"
+				},
+				{
+					"key": "libnetfilter-conntrack3_1.1.1-1_amd64",
+					"name": "libnetfilter-conntrack3",
+					"version": "1.1.1-1"
+				},
+				{
+					"key": "netbase_6.5_amd64",
+					"name": "netbase",
+					"version": "6.5"
+				},
+				{
+					"key": "libxtables12_1.8.13-1_amd64",
+					"name": "libxtables12",
+					"version": "1.8.13-1"
+				},
+				{
+					"key": "libip6tc2_1.8.13-1_amd64",
+					"name": "libip6tc2",
+					"version": "1.8.13-1"
+				},
+				{
+					"key": "libip4tc2_1.8.13-1_amd64",
+					"name": "libip4tc2",
+					"version": "1.8.13-1"
+				},
+				{
+					"key": "containerd_2.1.6-p-ds1-1_amd64",
+					"name": "containerd",
+					"version": "2.1.6+ds1-1"
+				},
+				{
+					"key": "adduser_3.155_amd64",
+					"name": "adduser",
+					"version": "3.155"
+				},
+				{
+					"key": "passwd_1-4.19.3-2_amd64",
+					"name": "passwd",
+					"version": "1:4.19.3-2"
+				},
+				{
+					"key": "libsemanage2_3.10-1_amd64",
+					"name": "libsemanage2",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libsepol2_3.10-1_amd64",
+					"name": "libsepol2",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libselinux1_3.10-1_amd64",
+					"name": "libselinux1",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_amd64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libbz2-1.0_1.0.8-6-p-b2_amd64",
+					"name": "libbz2-1.0",
+					"version": "1.0.8-6+b2"
+				},
+				{
+					"key": "libaudit1_1-4.1.2-1-p-b1_amd64",
+					"name": "libaudit1",
+					"version": "1:4.1.2-1+b1"
+				},
+				{
+					"key": "libcap-ng0_0.9.3-1_amd64",
+					"name": "libcap-ng0",
+					"version": "0.9.3-1"
+				},
+				{
+					"key": "libaudit-common_1-4.1.2-1_amd64",
+					"name": "libaudit-common",
+					"version": "1:4.1.2-1"
+				},
+				{
+					"key": "libsemanage-common_3.10-1_amd64",
+					"name": "libsemanage-common",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpam0g_1.7.0-5-p-b2_amd64",
+					"name": "libpam0g",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "debconf_1.5.92_amd64",
+					"name": "debconf",
+					"version": "1.5.92"
+				},
+				{
+					"key": "libcrypt1_1-4.5.1-1-p-b1_amd64",
+					"name": "libcrypt1",
+					"version": "1:4.5.1-1+b1"
+				},
+				{
+					"key": "libbsd0_0.12.2-2-p-b2_amd64",
+					"name": "libbsd0",
+					"version": "0.12.2-2+b2"
+				},
+				{
+					"key": "libmd0_1.1.0-2-p-b2_amd64",
+					"name": "libmd0",
+					"version": "1.1.0-2+b2"
+				},
+				{
+					"key": "libattr1_1-2.5.2-4_amd64",
+					"name": "libattr1",
+					"version": "1:2.5.2-4"
+				},
+				{
+					"key": "libacl1_2.3.2-3_amd64",
+					"name": "libacl1",
+					"version": "2.3.2-3"
+				},
+				{
+					"key": "login.defs_1-4.19.3-2_amd64",
+					"name": "login.defs",
+					"version": "1:4.19.3-2"
+				},
+				{
+					"key": "libpam-modules_1.7.0-5-p-b2_amd64",
+					"name": "libpam-modules",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "libpam-modules-bin_1.7.0-5-p-b2_amd64",
+					"name": "libpam-modules-bin",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "libsystemd0_260.1-1_amd64",
+					"name": "libsystemd0",
+					"version": "260.1-1"
+				},
+				{
+					"key": "libdb5.3t64_5.3.28-p-dfsg2-11-p-b1_amd64",
+					"name": "libdb5.3t64",
+					"version": "5.3.28+dfsg2-11+b1"
+				},
+				{
+					"key": "base-passwd_3.6.8_amd64",
+					"name": "base-passwd",
+					"version": "3.6.8"
+				},
+				{
+					"key": "libdebconfclient0_0.282-p-b3_amd64",
+					"name": "libdebconfclient0",
+					"version": "0.282+b3"
+				}
+			],
+			"key": "docker.io_28.5.2-p-dfsg4-1_amd64",
+			"name": "docker.io",
+			"sha256": "dd9132924cb5974172a2144f638989dba598770309e8202f8012ceb4005ea940",
+			"source": "docker.io",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker.io/docker.io_28.5.2+dfsg4-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker.io/docker.io_28.5.2+dfsg4-1_amd64.deb"
+			],
+			"version": "28.5.2+dfsg4-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "tini-static_0.19.0-6-p-b1_amd64",
+			"name": "tini-static",
+			"sha256": "73ba41e6ccf6e1be81a6cf96c1a386d1ab36775b60fbb07b7fddb72eb0a2d8a4",
+			"source": "tini",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/t/tini/tini-static_0.19.0-6+b1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/t/tini/tini-static_0.19.0-6+b1_amd64.deb"
+			],
+			"version": "0.19.0-6+b1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "runc_1.3.5-p-ds1-1_amd64",
+			"name": "runc",
+			"sha256": "6c1b21289a2a91550a633d2592382b0c71baeaf27dd269930655d1b993c1f784",
+			"source": "runc",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/r/runc/runc_1.3.5+ds1-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/r/runc/runc_1.3.5+ds1-1_amd64.deb"
+			],
+			"version": "1.3.5+ds1-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libseccomp2_2.6.0-2-p-b1_amd64",
+			"name": "libseccomp2",
+			"sha256": "05aa914d30e0f9f4f89ac0c39681b775f09f3abcdc167cf78548131df288e26a",
+			"source": "libseccomp",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libseccomp/libseccomp2_2.6.0-2+b1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libseccomp/libseccomp2_2.6.0-2+b1_amd64.deb"
+			],
+			"version": "2.6.0-2+b1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "sysvinit-utils_3.18-1_amd64",
+			"name": "sysvinit-utils",
+			"sha256": "a0c2a66f3a825dd417e998276268ef74dbff3796525bbb708566cdb0114174f9",
+			"source": "sysvinit",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/sysvinit/sysvinit-utils_3.18-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/sysvinit/sysvinit-utils_3.18-1_amd64.deb"
+			],
+			"version": "3.18-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "iptables_1.8.13-1_amd64",
+			"name": "iptables",
+			"sha256": "188a26c3ae2a431018ab769897f82c1ac40a25d902186f17d31f00d103a78f71",
+			"source": "iptables",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/iptables_1.8.13-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/iptables_1.8.13-1_amd64.deb"
+			],
+			"version": "1.8.13-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libnftnl11_1.3.1-1-p-b1_amd64",
+			"name": "libnftnl11",
+			"sha256": "c231311c16e950185e2a741b360a7f155925680feadd42aa6e4aa6d434d5bc5d",
+			"source": "libnftnl",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnftnl/libnftnl11_1.3.1-1+b1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnftnl/libnftnl11_1.3.1-1+b1_amd64.deb"
+			],
+			"version": "1.3.1-1+b1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libnfnetlink0_1.0.2-3-p-b2_amd64",
+			"name": "libnfnetlink0",
+			"sha256": "f5b00d0540b8f7472708dd0479dde86015908a3213e82585df1bdccd3bdbf474",
+			"source": "libnfnetlink",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnfnetlink/libnfnetlink0_1.0.2-3+b2_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnfnetlink/libnfnetlink0_1.0.2-3+b2_amd64.deb"
+			],
+			"version": "1.0.2-3+b2"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libnetfilter-conntrack3_1.1.1-1_amd64",
+			"name": "libnetfilter-conntrack3",
+			"sha256": "c6a6a4e5182fd698bba97e33ce3185c96fad641658941a2f39892dbbe50be9bc",
+			"source": "libnetfilter-conntrack",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnetfilter-conntrack/libnetfilter-conntrack3_1.1.1-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnetfilter-conntrack/libnetfilter-conntrack3_1.1.1-1_amd64.deb"
+			],
+			"version": "1.1.1-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "netbase_6.5_amd64",
+			"name": "netbase",
+			"sha256": "76bafa92947ebd37b0a6f9ec6570412041f56edebc1c66d323731216d318471e",
+			"source": "netbase",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/n/netbase/netbase_6.5_all.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/n/netbase/netbase_6.5_all.deb"
+			],
+			"version": "6.5"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libip6tc2_1.8.13-1_amd64",
+			"name": "libip6tc2",
+			"sha256": "3f32b64dc89ea0b128621157cc932b3f3a6cbe63b9445179a7ba4fa3b6828900",
+			"source": "iptables",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/libip6tc2_1.8.13-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/libip6tc2_1.8.13-1_amd64.deb"
+			],
+			"version": "1.8.13-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libip4tc2_1.8.13-1_amd64",
+			"name": "libip4tc2",
+			"sha256": "c69832cdf76b6a20d2883e034282455bacb23cfc502f26252de267f8c8d4f6bb",
+			"source": "iptables",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/libip4tc2_1.8.13-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/libip4tc2_1.8.13-1_amd64.deb"
+			],
+			"version": "1.8.13-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "containerd_2.1.6-p-ds1-1_amd64",
+			"name": "containerd",
+			"sha256": "b00ec02713540be67a38fb5d4a2229c7d473fbf257648fc2c1fc73f1a9bde359",
+			"source": "containerd",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/c/containerd/containerd_2.1.6+ds1-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/c/containerd/containerd_2.1.6+ds1-1_amd64.deb"
+			],
+			"version": "2.1.6+ds1-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "adduser_3.155_amd64",
+			"name": "adduser",
+			"sha256": "4383442115c475ee6c6075004e692687358d11aedc0c3e3bd8fc2d03ccf37909",
+			"source": "adduser",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/a/adduser/adduser_3.155_all.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/a/adduser/adduser_3.155_all.deb"
+			],
+			"version": "3.155"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "passwd_1-4.19.3-2_amd64",
+			"name": "passwd",
+			"sha256": "7bd3fb5a911ba72b68953a946f29fae4d76143f9c881fa45d33c2b832cf03b2d",
+			"source": "shadow",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/shadow/passwd_4.19.3-2_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/shadow/passwd_4.19.3-2_amd64.deb"
+			],
+			"version": "1:4.19.3-2"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libsemanage2_3.10-1_amd64",
+			"name": "libsemanage2",
+			"sha256": "30c49055cbd5ee0197ecf24f69c7231c09c08fec49cdb3691307f8c94852bdd0",
+			"source": "libsemanage",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsemanage/libsemanage2_3.10-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsemanage/libsemanage2_3.10-1_amd64.deb"
+			],
+			"version": "3.10-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libsepol2_3.10-1_amd64",
+			"name": "libsepol2",
+			"sha256": "54288f487a0ab7b283553f8183d67814d1e28ee0b4edfae2fb78dec20386bb9f",
+			"source": "libsepol",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsepol/libsepol2_3.10-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsepol/libsepol2_3.10-1_amd64.deb"
+			],
+			"version": "3.10-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libsemanage-common_3.10-1_amd64",
+			"name": "libsemanage-common",
+			"sha256": "2ceb2d8d8e991f4d23f819958ed26d5d0065a82379509c93bcb3b02354983173",
+			"source": "libsemanage",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsemanage/libsemanage-common_3.10-1_all.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsemanage/libsemanage-common_3.10-1_all.deb"
+			],
+			"version": "3.10-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "login.defs_1-4.19.3-2_amd64",
+			"name": "login.defs",
+			"sha256": "269a181b30c1cf86c8111a506b31ea35f80427825dc74b8fc6e8d95cfce3b1d7",
+			"source": "shadow",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/shadow/login.defs_4.19.3-2_all.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/shadow/login.defs_4.19.3-2_all.deb"
+			],
+			"version": "1:4.19.3-2"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "base-passwd_3.6.8_amd64",
+			"name": "base-passwd",
+			"sha256": "bbebf5418ec31b14825a47c313f969f43714e9e069e5beea8811db2fe946eff3",
+			"source": "base-passwd",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/b/base-passwd/base-passwd_3.6.8_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/b/base-passwd/base-passwd_3.6.8_amd64.deb"
+			],
+			"version": "3.6.8"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libdebconfclient0_0.282-p-b3_amd64",
+			"name": "libdebconfclient0",
+			"sha256": "6bc133010badc06e8a312f6b8c64c686012854c7973d61c6a4f70995ada85f3e",
+			"source": "cdebconf",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/c/cdebconf/libdebconfclient0_0.282+b3_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/c/cdebconf/libdebconfclient0_0.282+b3_amd64.deb"
+			],
+			"version": "0.282+b3"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "docker-cli_28.5.2-p-dfsg4-1_amd64",
+			"name": "docker-cli",
+			"sha256": "1f9aa185f153de8df02fd87875c144a59429a13f7a077c6595f5a6a38cf5e1ad",
+			"source": "docker.io",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker.io/docker-cli_28.5.2+dfsg4-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker.io/docker-cli_28.5.2+dfsg4-1_amd64.deb"
+			],
+			"version": "28.5.2+dfsg4-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "docker-buildx_0.29.1-p-ds1-3_amd64",
+			"name": "docker-buildx",
+			"sha256": "96ccc8b566ea458771ba9cfef21840b5b591e8c7cf95cdf345b1eaa4b017a06b",
+			"source": "docker-buildx",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker-buildx/docker-buildx_0.29.1+ds1-3_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker-buildx/docker-buildx_0.29.1+ds1-3_amd64.deb"
+			],
+			"version": "0.29.1+ds1-3"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
 					"key": "libc6_2.42-15_amd64",
 					"name": "libc6",
 					"version": "2.42-15"
@@ -5822,19 +6379,6 @@
 		{
 			"arch": "amd64",
 			"dependencies": [],
-			"key": "netbase_6.5_amd64",
-			"name": "netbase",
-			"sha256": "76bafa92947ebd37b0a6f9ec6570412041f56edebc1c66d323731216d318471e",
-			"source": "netbase",
-			"urls": [
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/n/netbase/netbase_6.5_all.deb",
-				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/n/netbase/netbase_6.5_all.deb"
-			],
-			"version": "6.5"
-		},
-		{
-			"arch": "amd64",
-			"dependencies": [],
 			"key": "media-types_14.0.0_amd64",
 			"name": "media-types",
 			"sha256": "c835983e7cfeac12fc5db143d5de009444e800ddc40eeb439fb556a6b9e99243",
@@ -5935,19 +6479,6 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/m/man-db/man-db_2.13.1-1_amd64.deb"
 			],
 			"version": "2.13.1-1"
-		},
-		{
-			"arch": "amd64",
-			"dependencies": [],
-			"key": "libseccomp2_2.6.0-2-p-b1_amd64",
-			"name": "libseccomp2",
-			"sha256": "05aa914d30e0f9f4f89ac0c39681b775f09f3abcdc167cf78548131df288e26a",
-			"source": "libseccomp",
-			"urls": [
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libseccomp/libseccomp2_2.6.0-2+b1_amd64.deb",
-				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libseccomp/libseccomp2_2.6.0-2+b1_amd64.deb"
-			],
-			"version": "2.6.0-2+b1"
 		},
 		{
 			"arch": "amd64",
@@ -11463,6 +11994,563 @@
 			"arch": "arm64",
 			"dependencies": [
 				{
+					"key": "tini-static_0.19.0-6-p-b2_arm64",
+					"name": "tini-static",
+					"version": "0.19.0-6+b2"
+				},
+				{
+					"key": "runc_1.3.5-p-ds1-1_arm64",
+					"name": "runc",
+					"version": "1.3.5+ds1-1"
+				},
+				{
+					"key": "libseccomp2_2.6.0-2-p-b1_arm64",
+					"name": "libseccomp2",
+					"version": "2.6.0-2+b1"
+				},
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "sysvinit-utils_3.18-1_arm64",
+					"name": "sysvinit-utils",
+					"version": "3.18-1"
+				},
+				{
+					"key": "iptables_1.8.13-1_arm64",
+					"name": "iptables",
+					"version": "1.8.13-1"
+				},
+				{
+					"key": "libnftnl11_1.3.1-1-p-b1_arm64",
+					"name": "libnftnl11",
+					"version": "1.3.1-1+b1"
+				},
+				{
+					"key": "libmnl0_1.0.5-3-p-b2_arm64",
+					"name": "libmnl0",
+					"version": "1.0.5-3+b2"
+				},
+				{
+					"key": "libnfnetlink0_1.0.2-3-p-b2_arm64",
+					"name": "libnfnetlink0",
+					"version": "1.0.2-3+b2"
+				},
+				{
+					"key": "libnetfilter-conntrack3_1.1.1-1_arm64",
+					"name": "libnetfilter-conntrack3",
+					"version": "1.1.1-1"
+				},
+				{
+					"key": "netbase_6.5_arm64",
+					"name": "netbase",
+					"version": "6.5"
+				},
+				{
+					"key": "libxtables12_1.8.13-1_arm64",
+					"name": "libxtables12",
+					"version": "1.8.13-1"
+				},
+				{
+					"key": "libip6tc2_1.8.13-1_arm64",
+					"name": "libip6tc2",
+					"version": "1.8.13-1"
+				},
+				{
+					"key": "libip4tc2_1.8.13-1_arm64",
+					"name": "libip4tc2",
+					"version": "1.8.13-1"
+				},
+				{
+					"key": "containerd_2.1.6-p-ds1-1_arm64",
+					"name": "containerd",
+					"version": "2.1.6+ds1-1"
+				},
+				{
+					"key": "adduser_3.155_arm64",
+					"name": "adduser",
+					"version": "3.155"
+				},
+				{
+					"key": "passwd_1-4.19.3-2_arm64",
+					"name": "passwd",
+					"version": "1:4.19.3-2"
+				},
+				{
+					"key": "libsemanage2_3.10-1_arm64",
+					"name": "libsemanage2",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libsepol2_3.10-1_arm64",
+					"name": "libsepol2",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libselinux1_3.10-1_arm64",
+					"name": "libselinux1",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_arm64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libbz2-1.0_1.0.8-6-p-b2_arm64",
+					"name": "libbz2-1.0",
+					"version": "1.0.8-6+b2"
+				},
+				{
+					"key": "libaudit1_1-4.1.2-1-p-b1_arm64",
+					"name": "libaudit1",
+					"version": "1:4.1.2-1+b1"
+				},
+				{
+					"key": "libcap-ng0_0.9.3-1_arm64",
+					"name": "libcap-ng0",
+					"version": "0.9.3-1"
+				},
+				{
+					"key": "libaudit-common_1-4.1.2-1_arm64",
+					"name": "libaudit-common",
+					"version": "1:4.1.2-1"
+				},
+				{
+					"key": "libsemanage-common_3.10-1_arm64",
+					"name": "libsemanage-common",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpam0g_1.7.0-5-p-b2_arm64",
+					"name": "libpam0g",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "debconf_1.5.92_arm64",
+					"name": "debconf",
+					"version": "1.5.92"
+				},
+				{
+					"key": "libcrypt1_1-4.5.1-1-p-b1_arm64",
+					"name": "libcrypt1",
+					"version": "1:4.5.1-1+b1"
+				},
+				{
+					"key": "libbsd0_0.12.2-2-p-b2_arm64",
+					"name": "libbsd0",
+					"version": "0.12.2-2+b2"
+				},
+				{
+					"key": "libmd0_1.1.0-2-p-b2_arm64",
+					"name": "libmd0",
+					"version": "1.1.0-2+b2"
+				},
+				{
+					"key": "libattr1_1-2.5.2-4_arm64",
+					"name": "libattr1",
+					"version": "1:2.5.2-4"
+				},
+				{
+					"key": "libacl1_2.3.2-3_arm64",
+					"name": "libacl1",
+					"version": "2.3.2-3"
+				},
+				{
+					"key": "login.defs_1-4.19.3-2_arm64",
+					"name": "login.defs",
+					"version": "1:4.19.3-2"
+				},
+				{
+					"key": "libpam-modules_1.7.0-5-p-b2_arm64",
+					"name": "libpam-modules",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "libpam-modules-bin_1.7.0-5-p-b2_arm64",
+					"name": "libpam-modules-bin",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "libsystemd0_260.1-1_arm64",
+					"name": "libsystemd0",
+					"version": "260.1-1"
+				},
+				{
+					"key": "libdb5.3t64_5.3.28-p-dfsg2-11-p-b1_arm64",
+					"name": "libdb5.3t64",
+					"version": "5.3.28+dfsg2-11+b1"
+				},
+				{
+					"key": "base-passwd_3.6.8-p-b1_arm64",
+					"name": "base-passwd",
+					"version": "3.6.8+b1"
+				},
+				{
+					"key": "libdebconfclient0_0.282-p-b3_arm64",
+					"name": "libdebconfclient0",
+					"version": "0.282+b3"
+				}
+			],
+			"key": "docker.io_28.5.2-p-dfsg4-1_arm64",
+			"name": "docker.io",
+			"sha256": "beba683da59c1991efbe7b501c2d930f4478552f69629a42bca6127e7d8820fb",
+			"source": "docker.io",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker.io/docker.io_28.5.2+dfsg4-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker.io/docker.io_28.5.2+dfsg4-1_arm64.deb"
+			],
+			"version": "28.5.2+dfsg4-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "tini-static_0.19.0-6-p-b2_arm64",
+			"name": "tini-static",
+			"sha256": "9943ed5ae140f58c568f0380419fbd52c35e57b283c58e361d3912b9a7c7bc86",
+			"source": "tini",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/t/tini/tini-static_0.19.0-6+b2_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/t/tini/tini-static_0.19.0-6+b2_arm64.deb"
+			],
+			"version": "0.19.0-6+b2"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "runc_1.3.5-p-ds1-1_arm64",
+			"name": "runc",
+			"sha256": "4f2e848b5a04509bc3f60a0f5ae8d02da914b6fafe31a899066459255644d9a5",
+			"source": "runc",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/r/runc/runc_1.3.5+ds1-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/r/runc/runc_1.3.5+ds1-1_arm64.deb"
+			],
+			"version": "1.3.5+ds1-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libseccomp2_2.6.0-2-p-b1_arm64",
+			"name": "libseccomp2",
+			"sha256": "e1e2b1aaf4df07ce39cf86edc8cce9c7647267534f00da3f08459fbabe197729",
+			"source": "libseccomp",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libseccomp/libseccomp2_2.6.0-2+b1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libseccomp/libseccomp2_2.6.0-2+b1_arm64.deb"
+			],
+			"version": "2.6.0-2+b1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "sysvinit-utils_3.18-1_arm64",
+			"name": "sysvinit-utils",
+			"sha256": "eff5de69c0029cf4ef33fd6d1b951c9821f7888d9fc62504f472cbd1b604809a",
+			"source": "sysvinit",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/sysvinit/sysvinit-utils_3.18-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/sysvinit/sysvinit-utils_3.18-1_arm64.deb"
+			],
+			"version": "3.18-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "iptables_1.8.13-1_arm64",
+			"name": "iptables",
+			"sha256": "9baad8460eb9e4b90e0a6e873ae3675e4c7a4f1f9d0d45d742af8944e2c2272c",
+			"source": "iptables",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/iptables_1.8.13-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/iptables_1.8.13-1_arm64.deb"
+			],
+			"version": "1.8.13-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libnftnl11_1.3.1-1-p-b1_arm64",
+			"name": "libnftnl11",
+			"sha256": "49dd393a46764c77212240f55d30b84af1d02d3240ec8e337a9fdde0f227bc48",
+			"source": "libnftnl",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnftnl/libnftnl11_1.3.1-1+b1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnftnl/libnftnl11_1.3.1-1+b1_arm64.deb"
+			],
+			"version": "1.3.1-1+b1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libnfnetlink0_1.0.2-3-p-b2_arm64",
+			"name": "libnfnetlink0",
+			"sha256": "133895f98f6f8a24f56fae910a2f23bb0b5850f33040164d12891f33c48b159f",
+			"source": "libnfnetlink",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnfnetlink/libnfnetlink0_1.0.2-3+b2_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnfnetlink/libnfnetlink0_1.0.2-3+b2_arm64.deb"
+			],
+			"version": "1.0.2-3+b2"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libnetfilter-conntrack3_1.1.1-1_arm64",
+			"name": "libnetfilter-conntrack3",
+			"sha256": "26a4090d263b347a5171d97c989c7c8a16c2ca4704899719a4f76d352759a2ec",
+			"source": "libnetfilter-conntrack",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnetfilter-conntrack/libnetfilter-conntrack3_1.1.1-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libn/libnetfilter-conntrack/libnetfilter-conntrack3_1.1.1-1_arm64.deb"
+			],
+			"version": "1.1.1-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "netbase_6.5_arm64",
+			"name": "netbase",
+			"sha256": "76bafa92947ebd37b0a6f9ec6570412041f56edebc1c66d323731216d318471e",
+			"source": "netbase",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/n/netbase/netbase_6.5_all.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/n/netbase/netbase_6.5_all.deb"
+			],
+			"version": "6.5"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libip6tc2_1.8.13-1_arm64",
+			"name": "libip6tc2",
+			"sha256": "fb6640c260bf24e30fe99f8df6ef15d99f60b305caafc1d7c37ca3c8658a1b31",
+			"source": "iptables",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/libip6tc2_1.8.13-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/libip6tc2_1.8.13-1_arm64.deb"
+			],
+			"version": "1.8.13-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libip4tc2_1.8.13-1_arm64",
+			"name": "libip4tc2",
+			"sha256": "cfacb2f29bad371f8454f8015283dc132867c5d3c5f1221cd8eb49ec05c04a9c",
+			"source": "iptables",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/libip4tc2_1.8.13-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/i/iptables/libip4tc2_1.8.13-1_arm64.deb"
+			],
+			"version": "1.8.13-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "containerd_2.1.6-p-ds1-1_arm64",
+			"name": "containerd",
+			"sha256": "d7ef1091578a717825630a13e1afd33cdbf217229e67ae22aa0d5237e23b655e",
+			"source": "containerd",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/c/containerd/containerd_2.1.6+ds1-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/c/containerd/containerd_2.1.6+ds1-1_arm64.deb"
+			],
+			"version": "2.1.6+ds1-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "adduser_3.155_arm64",
+			"name": "adduser",
+			"sha256": "4383442115c475ee6c6075004e692687358d11aedc0c3e3bd8fc2d03ccf37909",
+			"source": "adduser",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/a/adduser/adduser_3.155_all.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/a/adduser/adduser_3.155_all.deb"
+			],
+			"version": "3.155"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "passwd_1-4.19.3-2_arm64",
+			"name": "passwd",
+			"sha256": "de45c42b869191e0d1d6639989e62980052a77a449e77855b08a4012b2aa6baf",
+			"source": "shadow",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/shadow/passwd_4.19.3-2_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/shadow/passwd_4.19.3-2_arm64.deb"
+			],
+			"version": "1:4.19.3-2"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libsemanage2_3.10-1_arm64",
+			"name": "libsemanage2",
+			"sha256": "fb59678e247a98eeded73893e705bf6ac3350476c69963e5bd2c9cd63f651be9",
+			"source": "libsemanage",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsemanage/libsemanage2_3.10-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsemanage/libsemanage2_3.10-1_arm64.deb"
+			],
+			"version": "3.10-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libsepol2_3.10-1_arm64",
+			"name": "libsepol2",
+			"sha256": "00f555f9840319beece6e36298d1d42294e24dc673d65c5c53379a916d4719e7",
+			"source": "libsepol",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsepol/libsepol2_3.10-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsepol/libsepol2_3.10-1_arm64.deb"
+			],
+			"version": "3.10-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libsemanage-common_3.10-1_arm64",
+			"name": "libsemanage-common",
+			"sha256": "2ceb2d8d8e991f4d23f819958ed26d5d0065a82379509c93bcb3b02354983173",
+			"source": "libsemanage",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsemanage/libsemanage-common_3.10-1_all.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libsemanage/libsemanage-common_3.10-1_all.deb"
+			],
+			"version": "3.10-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "login.defs_1-4.19.3-2_arm64",
+			"name": "login.defs",
+			"sha256": "269a181b30c1cf86c8111a506b31ea35f80427825dc74b8fc6e8d95cfce3b1d7",
+			"source": "shadow",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/shadow/login.defs_4.19.3-2_all.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/shadow/login.defs_4.19.3-2_all.deb"
+			],
+			"version": "1:4.19.3-2"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "base-passwd_3.6.8-p-b1_arm64",
+			"name": "base-passwd",
+			"sha256": "49d364984cc6cedaa905803a8da3756d9ed73779663e8d0b2324e5122fea0b4e",
+			"source": "base-passwd",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/b/base-passwd/base-passwd_3.6.8+b1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/b/base-passwd/base-passwd_3.6.8+b1_arm64.deb"
+			],
+			"version": "3.6.8+b1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libdebconfclient0_0.282-p-b3_arm64",
+			"name": "libdebconfclient0",
+			"sha256": "9dd7dcfe9ff2dd73e57ddcc179143d201fda0ac4ec6c02f0e60fdc06ec0ee531",
+			"source": "cdebconf",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/c/cdebconf/libdebconfclient0_0.282+b3_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/c/cdebconf/libdebconfclient0_0.282+b3_arm64.deb"
+			],
+			"version": "0.282+b3"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "docker-cli_28.5.2-p-dfsg4-1_arm64",
+			"name": "docker-cli",
+			"sha256": "1da396113b1a4c64d26427e31ef0d5e69e6d73893f553de04c8980915ed85e2b",
+			"source": "docker.io",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker.io/docker-cli_28.5.2+dfsg4-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker.io/docker-cli_28.5.2+dfsg4-1_arm64.deb"
+			],
+			"version": "28.5.2+dfsg4-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "docker-buildx_0.29.1-p-ds1-3_arm64",
+			"name": "docker-buildx",
+			"sha256": "2b9adad0f7555940bc5085b83dedc9246f1e63b217781ddcb7a65875d5bb04ed",
+			"source": "docker-buildx",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker-buildx/docker-buildx_0.29.1+ds1-3_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/d/docker-buildx/docker-buildx_0.29.1+ds1-3_arm64.deb"
+			],
+			"version": "0.29.1+ds1-3"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
 					"key": "libc6_2.42-15_arm64",
 					"name": "libc6",
 					"version": "2.42-15"
@@ -11818,19 +12906,6 @@
 		{
 			"arch": "arm64",
 			"dependencies": [],
-			"key": "netbase_6.5_arm64",
-			"name": "netbase",
-			"sha256": "76bafa92947ebd37b0a6f9ec6570412041f56edebc1c66d323731216d318471e",
-			"source": "netbase",
-			"urls": [
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/n/netbase/netbase_6.5_all.deb",
-				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/n/netbase/netbase_6.5_all.deb"
-			],
-			"version": "6.5"
-		},
-		{
-			"arch": "arm64",
-			"dependencies": [],
 			"key": "media-types_14.0.0_arm64",
 			"name": "media-types",
 			"sha256": "c835983e7cfeac12fc5db143d5de009444e800ddc40eeb439fb556a6b9e99243",
@@ -11931,19 +13006,6 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/m/man-db/man-db_2.13.1-1+b1_arm64.deb"
 			],
 			"version": "2.13.1-1+b1"
-		},
-		{
-			"arch": "arm64",
-			"dependencies": [],
-			"key": "libseccomp2_2.6.0-2-p-b1_arm64",
-			"name": "libseccomp2",
-			"sha256": "e1e2b1aaf4df07ce39cf86edc8cce9c7647267534f00da3f08459fbabe197729",
-			"source": "libseccomp",
-			"urls": [
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libseccomp/libseccomp2_2.6.0-2+b1_arm64.deb",
-				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libs/libseccomp/libseccomp2_2.6.0-2+b1_arm64.deb"
-			],
-			"version": "2.6.0-2+b1"
 		},
 		{
 			"arch": "arm64",

@@ -22,6 +22,11 @@ WORKSTATION_IGNORE_CVES = [
     # The Python interpreter in this image is not invoked on
     # network-supplied data; it's a fish dependency.
     "CVE-2026-4786",
+    # docker-cli 28.5.2+dfsg4-1 — two High CVEs unfixed in sid as of
+    # the snapshot date. Re-evaluate when Debian ships a patched build;
+    # _stale_ignores test will tell us when these stop matching.
+    "CVE-2026-33997",
+    "CVE-2026-34040",
 ]
 
 # linux-libc-dev ships kernel headers (interfaces, ioctl numbers, struct
@@ -185,6 +190,13 @@ tar(
         # Enable exe-setup oneshot.
         "./etc/systemd/system/multi-user.target.wants type=dir uid=0 gid=0 mode=0755",
         "./etc/systemd/system/multi-user.target.wants/exe-setup.service type=link uid=0 gid=0 link=/etc/systemd/system/exe-setup.service",
+        # Enable docker (and its containerd dep). Both ship in
+        # /usr/lib/systemd/system/ from their respective .debs;
+        # postinst would normally drop the wants symlink, we don't run
+        # postinst, so bake it.
+        "./etc/systemd/system/multi-user.target.wants/docker.service type=link uid=0 gid=0 link=/usr/lib/systemd/system/docker.service",
+        "./etc/systemd/system/sockets.target.wants/docker.socket type=link uid=0 gid=0 link=/usr/lib/systemd/system/docker.socket",
+        "./etc/systemd/system/multi-user.target.wants/containerd.service type=link uid=0 gid=0 link=/usr/lib/systemd/system/containerd.service",
     ] + [
         "./etc/systemd/system/{} type=link uid=0 gid=0 link=/dev/null".format(unit)
         for unit in _MASKED_UNITS
