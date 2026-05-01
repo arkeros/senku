@@ -47,6 +47,22 @@ packages:
   - openssh-client
   - gh
   - ripgrep
+  - less          # git's default pager
+  - neovim
+  - zoxide        # smarter cd
+  # Diagnosis / network tooling
+  - hostname
+  - iproute2      # `ip` command
+  - iputils-ping
+  - dnsutils      # dig, nslookup
+  - netcat-openbsd  # `nc`
+  # Process / disk inspection
+  - htop
+  - ncdu
+  - psmisc        # killall, pstree, fuser
+  - tree
+  # Session multiplexer
+  - tmux
   # The three tools this image is for
   - direnv
   - fish

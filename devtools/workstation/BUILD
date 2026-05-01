@@ -34,11 +34,13 @@ tar(
     name = "files_layer",
     srcs = [
         "files/etc/fish/conf.d/direnv.fish",
+        "files/etc/fish/conf.d/zoxide.fish",
         "files/etc/group",
         "files/etc/pam.d/other",
         "files/etc/pam.d/sudo",
         "files/etc/passwd",
         "files/etc/profile.d/direnv.sh",
+        "files/etc/profile.d/zoxide.sh",
         "files/etc/shadow",
         "files/etc/sudoers.d/exedev",
         "files/etc/systemd/system/exe-setup.service",
@@ -76,9 +78,11 @@ tar(
         # directly so shell scripts and Makefiles work.
         "./bin/sh type=link uid=0 gid=0 link=/bin/dash",
         "./usr/bin/awk type=link uid=0 gid=0 link=/usr/bin/mawk",
-        # direnv shell hooks, system-wide.
+        # direnv + zoxide shell hooks, system-wide.
         "./etc/profile.d/direnv.sh uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile.d/direnv.sh)",
         "./etc/fish/conf.d/direnv.fish uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/fish/conf.d/direnv.fish)",
+        "./etc/profile.d/zoxide.sh uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile.d/zoxide.sh)",
+        "./etc/fish/conf.d/zoxide.fish uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/fish/conf.d/zoxide.fish)",
     ],
 )
 
