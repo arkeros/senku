@@ -1,4 +1,5 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@package_metadata//:defs.bzl", "package_metadata")
 load("@rules_distroless//distroless:defs.bzl", "cacerts", "flatten")
 load("@rules_img//img:image.bzl", "image_index")
 load("@rules_img//img:push.bzl", "image_push")
@@ -139,6 +140,20 @@ tar(
     ],
 )
 
+# Out-of-band binary metadata. http_file targets carry no
+# PackageMetadataInfo, so the SBOM (and grype scan) would skip them
+# without these declarations. Versions are kept in sync with the
+# http_file URLs in //bazel/include:oci.MODULE.bazel.
+package_metadata(
+    name = "bazelisk_metadata",
+    purl = "pkg:github/bazelbuild/bazelisk@v1.29.0",
+)
+
+package_metadata(
+    name = "claude_metadata",
+    purl = "pkg:generic/claude@2.1.118?download_url=https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/2.1.118",
+)
+
 # Per-arch out-of-band binary layer: bazelisk + claude. Repos defined
 # in //bazel/include:oci.MODULE.bazel; sha256 pinned there.
 [
@@ -147,6 +162,10 @@ tar(
         srcs = [
             "@bazelisk_" + arch + "//file",
             "@claude_" + arch + "//file",
+        ],
+        applicable_licenses = [
+            ":bazelisk_metadata",
+            ":claude_metadata",
         ],
         compress = COMPRESSION,
         mtree = [
