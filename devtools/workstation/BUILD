@@ -3,6 +3,7 @@ load("@package_metadata//:defs.bzl", "package_metadata")
 load("@rules_distroless//distroless:defs.bzl", "cacerts", "flatten")
 load("@rules_img//img:image.bzl", "image_index")
 load("@rules_img//img:push.bzl", "image_push")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@tar.bzl", "tar")
 load("//oci:config.bzl", "OCI_REGISTRY", "OCI_REPOSITORY_PREFIX")
 load("//oci:oci_image.bzl", "oci_image")
@@ -297,6 +298,14 @@ image_push(
         "{{.STABLE_MONOREPO_SHORT_VERSION}}",
     ],
     tags = ["manual"],
+)
+
+# Wrapper for `ssh exe.dev ...` with the workstation image and
+# arkeros-senku tag baked in. `bazel run //devtools/workstation:exevm`
+# or copy/symlink the script onto your PATH.
+sh_binary(
+    name = "exevm",
+    srcs = ["exevm.sh"],
 )
 
 bzl_library(
