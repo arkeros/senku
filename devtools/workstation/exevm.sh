@@ -14,10 +14,6 @@ readonly REPO_URL="${WORKSTATION_REPO_URL:-https://arkeros-senku.int.exe.xyz/ark
 readonly REPO_DIR_ON_VM="senku"
 readonly RBE_LINE="common --config=rbe"
 
-# When invoked under `bazel run`, BUILD_WORKSPACE_DIRECTORY points at the
-# workspace root. Otherwise fall back to the git toplevel of the cwd.
-readonly LOCAL_WORKSPACE="${BUILD_WORKSPACE_DIRECTORY:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
-
 usage() {
     cat <<EOF
 exevm — manage exe.dev VMs running senku/workstation
@@ -35,8 +31,8 @@ Env:
   WORKSTATION_IMAGE      Override image (default: ${IMAGE})
   WORKSTATION_REPO_URL   Override clone-on-boot repo (default: ${REPO_URL})
                          Set empty to skip cloning.
-  WORKSTATION_NO_BAZELRC Set to skip copying \$LOCAL_WORKSPACE/.bazelrc.user
-                         to the VM and appending --config=rbe.
+  WORKSTATION_NO_BAZELRC Set to skip writing --config=rbe into
+                         the VM's .bazelrc.user.
 EOF
 }
 
@@ -58,25 +54,20 @@ wait_for_clone() {
     done
 }
 
-# Copy laptop's .bazelrc.user into the freshly-cloned senku checkout
-# on the VM, then append --config=rbe so bazel uses the BuildBuddy
-# RBE platform automatically. Skipped if WORKSTATION_NO_BAZELRC is set.
+# Append `common --config=rbe` to the cloned workspace's .bazelrc.user
+# so the first `bazel test //...` on the VM uses the BuildBuddy RBE
+# platform — same toolchain as CI, same cache namespace.
+# Idempotent. Skipped if WORKSTATION_NO_BAZELRC is set.
 seed_bazelrc() {
     local name="$1"
     if [ -n "${WORKSTATION_NO_BAZELRC:-}" ]; then
         return 0
     fi
-    if [ -z "${LOCAL_WORKSPACE}" ] || [ ! -f "${LOCAL_WORKSPACE}/.bazelrc.user" ]; then
-        echo "exevm: no local .bazelrc.user found at ${LOCAL_WORKSPACE:-(unknown workspace)}; skipping seed" >&2
-        return 0
-    fi
-    scp -q -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR \
-        "${LOCAL_WORKSPACE}/.bazelrc.user" \
-        "${name}.exe.xyz:${REPO_DIR_ON_VM}/.bazelrc.user"
-    # Idempotent append: only add the RBE line if not already present.
     ssh -o LogLevel=ERROR "${name}.exe.xyz" \
-        "grep -qxF '${RBE_LINE}' ${REPO_DIR_ON_VM}/.bazelrc.user || echo '${RBE_LINE}' >> ${REPO_DIR_ON_VM}/.bazelrc.user"
-    echo "exevm: seeded ${name}:~/${REPO_DIR_ON_VM}/.bazelrc.user" >&2
+        "touch ${REPO_DIR_ON_VM}/.bazelrc.user && \
+         grep -qxF '${RBE_LINE}' ${REPO_DIR_ON_VM}/.bazelrc.user || \
+         echo '${RBE_LINE}' >> ${REPO_DIR_ON_VM}/.bazelrc.user"
+    echo "exevm: ${name}:~/${REPO_DIR_ON_VM}/.bazelrc.user → '${RBE_LINE}'" >&2
 }
 
 cmd_new() {
