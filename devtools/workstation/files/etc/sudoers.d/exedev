@@ -1,0 +1,2 @@
+exedev ALL=(ALL) NOPASSWD:ALL
+Defaults:exedev verifypw=any

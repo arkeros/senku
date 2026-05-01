@@ -1,0 +1,12 @@
+root:x:0:
+daemon:x:1:
+bin:x:2:
+sys:x:3:
+adm:x:4:
+tty:x:5:
+disk:x:6:
+shadow:x:42:
+sudo:x:27:exedev
+messagebus:x:101:
+exedev:x:1000:
+nogroup:x:65534:

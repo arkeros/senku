@@ -1,0 +1,35 @@
+#  Anytime this file is changed, the lockfile needs to be regenerated:
+#
+#     bazel run @workstation//:lock
+#
+#  Tracks Debian unstable on the same snapshot timestamp as
+#  //oci/distroless:debian.yaml so the workstation image and the distroless
+#  bases share a consistent libc6 / openssl / etc. across the monorepo.
+version: 1
+sources:
+  - channel: unstable main contrib
+    urls:
+      - https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z
+      - https://snapshot.debian.org/archive/debian/20260501T000000Z
+archs:
+  - amd64
+  - arm64
+packages:
+  # Tier 0 — required for the image to function as an exe.dev VM
+  - systemd
+  - systemd-sysv
+  - sudo
+  - ca-certificates
+  - dbus-user-session
+  - bash
+  # Tier 1 — out-of-band install plumbing (curl/jq used by setup scripts and
+  # by the bundled agent installers)
+  - curl
+  - jq
+  # Developer baseline — git over ssh needs openssh-client (sshd itself is
+  # masked; exe.dev's shelley handles inbound)
+  - git
+  - openssh-client
+  # The three tools this image is for
+  - direnv
+  - fish
