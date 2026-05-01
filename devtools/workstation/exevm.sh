@@ -18,6 +18,44 @@ readonly RBE_LINE="common --config=rbe"
 # workspace root. Otherwise fall back to the git toplevel of the cwd.
 readonly LOCAL_WORKSPACE="${BUILD_WORKSPACE_DIRECTORY:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
 
+# Resolve a floating tag (typically :latest) to an immutable form so VMs
+# created at different times don't drift. Prefers a CalVer-shaped tag
+# (2026.18.45[-sha]) pointing at the same digest as :latest because
+# that's human-readable; falls back to @sha256:... pinning when no
+# CalVer tag matches. Pass-through for already-pinned refs and on any
+# crane failure (missing binary, no auth, no network).
+resolve_immutable_image() {
+    local image="$1"
+    case "$image" in
+        *@sha256:*) echo "$image"; return ;;
+    esac
+    if ! command -v crane >/dev/null 2>&1; then
+        echo "$image"
+        return
+    fi
+    local repo="${image%:*}"
+    local digest
+    if ! digest=$(crane digest "$image" 2>/dev/null); then
+        echo "$image"
+        return
+    fi
+    local match
+    match=$(crane ls "$repo" 2>/dev/null |
+        grep -E '^[0-9]{4}\.[0-9]+\.[0-9]+(-[a-f0-9]+)?$' |
+        sort -Vr |
+        while read -r tag; do
+            if [ "$(crane digest "${repo}:${tag}" 2>/dev/null)" = "$digest" ]; then
+                echo "${repo}:${tag}"
+                break
+            fi
+        done)
+    if [ -n "$match" ]; then
+        echo "$match"
+    else
+        echo "${repo}@${digest}"
+    fi
+}
+
 usage() {
     cat <<EOF
 exevm — manage exe.dev VMs running senku/workstation
@@ -85,7 +123,12 @@ seed_bazelrc() {
 
 cmd_new() {
     local name="${1:-}"
-    local new_args=(--image="$IMAGE" --tag="$TAG")
+    local resolved
+    resolved=$(resolve_immutable_image "$IMAGE")
+    if [ "$resolved" != "$IMAGE" ]; then
+        echo "exevm: pinning $IMAGE → $resolved" >&2
+    fi
+    local new_args=(--image="$resolved" --tag="$TAG")
     if [ -n "$name" ]; then
         new_args+=(--name="$name")
         shift
