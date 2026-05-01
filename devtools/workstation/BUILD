@@ -40,6 +40,7 @@ tar(
         "files/etc/pam.d/other",
         "files/etc/pam.d/sudo",
         "files/etc/passwd",
+        "files/etc/profile",
         "files/etc/profile.d/direnv.sh",
         "files/etc/profile.d/zoxide.sh",
         "files/etc/shadow",
@@ -84,6 +85,10 @@ tar(
         "./usr/bin/awk type=link uid=0 gid=0 link=/usr/bin/mawk",
         "./usr/bin/which type=link uid=0 gid=0 link=/usr/bin/which.gnu",
         "./usr/bin/nc type=link uid=0 gid=0 link=/usr/bin/nc.openbsd",
+        # /etc/profile — base-files normally ships this, but rules_distroless
+        # extraction skips it. Without it, login shells don't source
+        # /etc/profile.d, so hooks below never load.
+        "./etc/profile uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile)",
         # direnv + zoxide shell hooks, system-wide.
         "./etc/profile.d/direnv.sh uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile.d/direnv.sh)",
         "./etc/fish/conf.d/direnv.fish uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/fish/conf.d/direnv.fish)",
