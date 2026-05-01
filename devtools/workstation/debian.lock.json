@@ -1143,7 +1143,28 @@
 		},
 		{
 			"arch": "amd64",
-			"dependencies": [],
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
 			"key": "mawk_1.3.4.20260302-1_amd64",
 			"name": "mawk",
 			"sha256": "baad854d05bf8be4683341ad7dce35606f2853bb6ae16422d118e970046c2332",
@@ -1289,6 +1310,380 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/a/acl/libacl1_2.3.2-3_amd64.deb"
 			],
 			"version": "2.3.2-3"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "debianutils_5.23.2_amd64",
+					"name": "debianutils",
+					"version": "5.23.2"
+				},
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "dash_0.5.12-12_amd64",
+			"name": "dash",
+			"sha256": "a8902cb6d8650134764a25fb80aec8589d858ef71ece1680a62e84816c37bb04",
+			"source": "dash",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/d/dash/dash_0.5.12-12_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/d/dash/dash_0.5.12-12_amd64.deb"
+			],
+			"version": "0.5.12-12"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "diffutils_1-3.12-1_amd64",
+			"name": "diffutils",
+			"sha256": "681796e743a07d6eac76eb05f0862dc2f7bc5061c7cd46c1e2cb595c8d9cf6c2",
+			"source": "diffutils",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/d/diffutils/diffutils_3.12-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/d/diffutils/diffutils_3.12-1_amd64.deb"
+			],
+			"version": "1:3.12-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libselinux1_3.10-1_amd64",
+					"name": "libselinux1",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_amd64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "findutils_4.10.0-4_amd64",
+			"name": "findutils",
+			"sha256": "e720a50c600a8dcc4bd0a24e326473fc500eb072e75ac4cb9e4ce7cf8e7a7bd4",
+			"source": "findutils",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/f/findutils/findutils_4.10.0-4_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/f/findutils/findutils_4.10.0-4_amd64.deb"
+			],
+			"version": "4.10.0-4"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_amd64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "grep_3.12-1_amd64",
+			"name": "grep",
+			"sha256": "f118247556ec1e8958c9abf2b9164713201bf74b83787cc23b94b88115dcc7a2",
+			"source": "grep",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/g/grep/grep_3.12-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/grep/grep_3.12-1_amd64.deb"
+			],
+			"version": "3.12-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "gzip_1.13-1_amd64",
+			"name": "gzip",
+			"sha256": "c98b1130f08ef6ac3932972c56be84cfc308ce1afa37105cb06aaf47ced2d078",
+			"source": "gzip",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/g/gzip/gzip_1.13-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/gzip/gzip_1.13-1_amd64.deb"
+			],
+			"version": "1.13-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "ncurses-base_6.6-p-20251231-1_amd64",
+			"name": "ncurses-base",
+			"sha256": "bdb96ba736d5301f7c05e7aa51aad96d88ddeaac0028e9276f22eb62d24f73cd",
+			"source": "ncurses",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/n/ncurses/ncurses-base_6.6+20251231-1_all.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/n/ncurses/ncurses-base_6.6+20251231-1_all.deb"
+			],
+			"version": "6.6+20251231-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libtinfo6_6.6-p-20251231-1-p-b1_amd64",
+					"name": "libtinfo6",
+					"version": "6.6+20251231-1+b1"
+				},
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "ncurses-bin_6.6-p-20251231-1-p-b1_amd64",
+			"name": "ncurses-bin",
+			"sha256": "923a8b8d6d09696b40ec44da4d73cf69bfbc494e9888b8399bcedbe493e90802",
+			"source": "ncurses",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/n/ncurses/ncurses-bin_6.6+20251231-1+b1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/n/ncurses/ncurses-bin_6.6+20251231-1+b1_amd64.deb"
+			],
+			"version": "6.6+20251231-1+b1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libselinux1_3.10-1_amd64",
+					"name": "libselinux1",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_amd64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "libacl1_2.3.2-3_amd64",
+					"name": "libacl1",
+					"version": "2.3.2-3"
+				}
+			],
+			"key": "sed_4.9-3_amd64",
+			"name": "sed",
+			"sha256": "04998e405e5967c4ac599c5e1cce1a31b5441097b478143823ea87a01e879d89",
+			"source": "sed",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/sed/sed_4.9-3_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/sed/sed_4.9-3_amd64.deb"
+			],
+			"version": "4.9-3"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libselinux1_3.10-1_amd64",
+					"name": "libselinux1",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_amd64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "libacl1_2.3.2-3_amd64",
+					"name": "libacl1",
+					"version": "2.3.2-3"
+				}
+			],
+			"key": "tar_1.35-p-dfsg-4_amd64",
+			"name": "tar",
+			"sha256": "8b8a35da39c1a8f3e35f705a37b73f010cd671a149b70d6c6102871387d3b99d",
+			"source": "tar",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/t/tar/tar_1.35+dfsg-4_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/t/tar/tar_1.35+dfsg-4_amd64.deb"
+			],
+			"version": "1.35+dfsg-4"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "gnu-which_2.21-p-dfsg-5_amd64",
+			"name": "gnu-which",
+			"sha256": "9b74eb1eb656eaca5b3c8fe64ea92cd64da7b66930e7161267cba16ae7ca29f2",
+			"source": "gnu-which",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/g/gnu-which/gnu-which_2.21+dfsg-5_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/gnu-which/gnu-which_2.21+dfsg-5_amd64.deb"
+			],
+			"version": "2.21+dfsg-5"
 		},
 		{
 			"arch": "amd64",
@@ -2472,6 +2867,79 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libm/libmd/libmd0_1.1.0-2+b2_amd64.deb"
 			],
 			"version": "1.1.0-2+b2"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "gh_2.46.0-4_amd64",
+			"name": "gh",
+			"sha256": "d138cac193eda194a4a236b97444227c93800fcf658b89ac6d4ec150fe4002e6",
+			"source": "gh",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/g/gh/gh_2.46.0-4_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/gh/gh_2.46.0-4_amd64.deb"
+			],
+			"version": "2.46.0-4"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_amd64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "ripgrep_15.1.0-1-p-b1_amd64",
+			"name": "ripgrep",
+			"sha256": "51d803381ad6b1689d5bff5f2d83cb27c602e3515b9c754bcb3d6ceaedf2311a",
+			"source": "rust-ripgrep",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/r/rust-ripgrep/ripgrep_15.1.0-1+b1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/r/rust-ripgrep/ripgrep_15.1.0-1+b1_amd64.deb"
+			],
+			"version": "15.1.0-1+b1"
 		},
 		{
 			"arch": "amd64",
@@ -4245,7 +4713,28 @@
 		},
 		{
 			"arch": "arm64",
-			"dependencies": [],
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
 			"key": "mawk_1.3.4.20260302-1_arm64",
 			"name": "mawk",
 			"sha256": "1432ed713469aad2fe56bdf0f37723e323fe8bb8bed0cd29602a91b0eb9a91e4",
@@ -4391,6 +4880,380 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/a/acl/libacl1_2.3.2-3_arm64.deb"
 			],
 			"version": "2.3.2-3"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "debianutils_5.23.2-p-b1_arm64",
+					"name": "debianutils",
+					"version": "5.23.2+b1"
+				},
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "dash_0.5.12-12-p-b1_arm64",
+			"name": "dash",
+			"sha256": "162f2e04e74793fd1512e426b7d5f03b202fc8069959143f0bd8e55c61b90128",
+			"source": "dash",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/d/dash/dash_0.5.12-12+b1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/d/dash/dash_0.5.12-12+b1_arm64.deb"
+			],
+			"version": "0.5.12-12+b1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "diffutils_1-3.12-1-p-b1_arm64",
+			"name": "diffutils",
+			"sha256": "fdb09c89f7a618de193404389058cb4aa2f96ff2483bca87f4aa7b9cdb0c1bc3",
+			"source": "diffutils",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/d/diffutils/diffutils_3.12-1+b1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/d/diffutils/diffutils_3.12-1+b1_arm64.deb"
+			],
+			"version": "1:3.12-1+b1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libselinux1_3.10-1_arm64",
+					"name": "libselinux1",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_arm64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "findutils_4.10.0-4_arm64",
+			"name": "findutils",
+			"sha256": "87202d9c40d5a5395a0acb13aefe70ce63080194491d2df0f7684d5476127403",
+			"source": "findutils",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/f/findutils/findutils_4.10.0-4_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/f/findutils/findutils_4.10.0-4_arm64.deb"
+			],
+			"version": "4.10.0-4"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_arm64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "grep_3.12-1-p-b1_arm64",
+			"name": "grep",
+			"sha256": "34f9a489d4cb19698521af3ebffc39da74da14ae9ba3feccde64e4868d301999",
+			"source": "grep",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/g/grep/grep_3.12-1+b1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/grep/grep_3.12-1+b1_arm64.deb"
+			],
+			"version": "3.12-1+b1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "gzip_1.13-1-p-b1_arm64",
+			"name": "gzip",
+			"sha256": "93e32bfa38a80c732fe9cf735f7732099dcd9c502dc2caeb1d5d3e80782eb478",
+			"source": "gzip",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/g/gzip/gzip_1.13-1+b1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/gzip/gzip_1.13-1+b1_arm64.deb"
+			],
+			"version": "1.13-1+b1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "ncurses-base_6.6-p-20251231-1_arm64",
+			"name": "ncurses-base",
+			"sha256": "bdb96ba736d5301f7c05e7aa51aad96d88ddeaac0028e9276f22eb62d24f73cd",
+			"source": "ncurses",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/n/ncurses/ncurses-base_6.6+20251231-1_all.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/n/ncurses/ncurses-base_6.6+20251231-1_all.deb"
+			],
+			"version": "6.6+20251231-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libtinfo6_6.6-p-20251231-1-p-b1_arm64",
+					"name": "libtinfo6",
+					"version": "6.6+20251231-1+b1"
+				},
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "ncurses-bin_6.6-p-20251231-1-p-b1_arm64",
+			"name": "ncurses-bin",
+			"sha256": "2fc1c2c7c30421d285e9a900f921c8a7ed6f15b82479a00d05684206e90b8b37",
+			"source": "ncurses",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/n/ncurses/ncurses-bin_6.6+20251231-1+b1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/n/ncurses/ncurses-bin_6.6+20251231-1+b1_arm64.deb"
+			],
+			"version": "6.6+20251231-1+b1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libselinux1_3.10-1_arm64",
+					"name": "libselinux1",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_arm64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "libacl1_2.3.2-3_arm64",
+					"name": "libacl1",
+					"version": "2.3.2-3"
+				}
+			],
+			"key": "sed_4.9-3_arm64",
+			"name": "sed",
+			"sha256": "8637cfc7ccb30c56970af22c0cd911153c9f4ae848daeade050ac16a1e3b9675",
+			"source": "sed",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/sed/sed_4.9-3_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/sed/sed_4.9-3_arm64.deb"
+			],
+			"version": "4.9-3"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libselinux1_3.10-1_arm64",
+					"name": "libselinux1",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_arm64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "libacl1_2.3.2-3_arm64",
+					"name": "libacl1",
+					"version": "2.3.2-3"
+				}
+			],
+			"key": "tar_1.35-p-dfsg-4_arm64",
+			"name": "tar",
+			"sha256": "e19a4c79a655c464f4e99d8032db9800533f66f3b22864ce12c4ae25685bedea",
+			"source": "tar",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/t/tar/tar_1.35+dfsg-4_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/t/tar/tar_1.35+dfsg-4_arm64.deb"
+			],
+			"version": "1.35+dfsg-4"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "gnu-which_2.21-p-dfsg-5-p-b2_arm64",
+			"name": "gnu-which",
+			"sha256": "8546e68c4a20ba3995819122bbfb37ba744a78e37c288075a0f451a7edc2b63b",
+			"source": "gnu-which",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/g/gnu-which/gnu-which_2.21+dfsg-5+b2_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/gnu-which/gnu-which_2.21+dfsg-5+b2_arm64.deb"
+			],
+			"version": "2.21+dfsg-5+b2"
 		},
 		{
 			"arch": "arm64",
@@ -5574,6 +6437,79 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libm/libmd/libmd0_1.1.0-2+b2_arm64.deb"
 			],
 			"version": "1.1.0-2+b2"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "gh_2.46.0-4_arm64",
+			"name": "gh",
+			"sha256": "06f815b3a15c6ebe1bb6110d9eb3c9b69ec1853719f6494ef4933be1d68431ac",
+			"source": "gh",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/g/gh/gh_2.46.0-4_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/gh/gh_2.46.0-4_arm64.deb"
+			],
+			"version": "2.46.0-4"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_arm64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "ripgrep_15.1.0-1-p-b1_arm64",
+			"name": "ripgrep",
+			"sha256": "4b99e3ac11de8f31bf32f43d128c6df7b0cbc5f74a67900a4da825890e24b172",
+			"source": "rust-ripgrep",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/r/rust-ripgrep/ripgrep_15.1.0-1+b1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/r/rust-ripgrep/ripgrep_15.1.0-1+b1_arm64.deb"
+			],
+			"version": "15.1.0-1+b1"
 		},
 		{
 			"arch": "arm64",

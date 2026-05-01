@@ -23,6 +23,20 @@ packages:
   - dbus-user-session
   - bash
   - coreutils
+  # Debian's "Essential: yes" closure that we don't get for free — apt
+  # postinst scripts don't run under rules_distroless, so packages
+  # normally assumed-installed need to be listed.
+  - dash
+  - diffutils
+  - findutils
+  - grep
+  - gzip
+  - mawk
+  - ncurses-base
+  - ncurses-bin
+  - sed
+  - tar
+  - which
   # Tier 1 — out-of-band install plumbing (curl/jq used by setup scripts and
   # by the bundled agent installers)
   - curl
@@ -31,6 +45,8 @@ packages:
   # masked; exe.dev's shelley handles inbound)
   - git
   - openssh-client
+  - gh
+  - ripgrep
   # The three tools this image is for
   - direnv
   - fish
