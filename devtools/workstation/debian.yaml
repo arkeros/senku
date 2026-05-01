@@ -37,6 +37,7 @@ packages:
   - sed
   - tar
   - which
+  - libc-bin       # provides getent, ldconfig, locale
   # Tier 1 — out-of-band install plumbing (curl/jq used by setup scripts and
   # by the bundled agent installers)
   - curl

@@ -58,6 +58,7 @@ WORKSTATION_PACKAGES = [
     "libbrotli1",
     "libbsd0",
     "libbz2-1.0",
+    "libc-bin",
     "libc-gconv-modules-extra",
     "libc6",
     "libcap-ng0",

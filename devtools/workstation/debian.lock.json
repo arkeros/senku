@@ -1689,6 +1689,40 @@
 			"arch": "amd64",
 			"dependencies": [
 				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "libc-bin_2.42-15_amd64",
+			"name": "libc-bin",
+			"sha256": "3b65406d7d6ca84d826f82496778a99b0d396f099e91dcf31edde3963306c87a",
+			"source": "glibc",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/g/glibc/libc-bin_2.42-15_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/glibc/libc-bin_2.42-15_amd64.deb"
+			],
+			"version": "2.42-15"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
 					"key": "zlib1g_1-1.3.dfsg-p-really1.3.2-3_amd64",
 					"name": "zlib1g",
 					"version": "1:1.3.dfsg+really1.3.2-3"
@@ -6463,6 +6497,40 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/gnu-which/gnu-which_2.21+dfsg-5+b2_arm64.deb"
 			],
 			"version": "2.21+dfsg-5+b2"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				}
+			],
+			"key": "libc-bin_2.42-15_arm64",
+			"name": "libc-bin",
+			"sha256": "0df5cea74b849c78dd040c216376f8d767920adde18c418d2a3bb5c9c4eb19d5",
+			"source": "glibc",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/g/glibc/libc-bin_2.42-15_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/g/glibc/libc-bin_2.42-15_arm64.deb"
+			],
+			"version": "2.42-15"
 		},
 		{
 			"arch": "arm64",
