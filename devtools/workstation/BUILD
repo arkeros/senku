@@ -83,6 +83,7 @@ tar(
         "files/etc/passwd",
         "files/etc/profile",
         "files/etc/profile.d/direnv.sh",
+        "files/etc/profile.d/docker.sh",
         "files/etc/profile.d/zoxide.sh",
         "files/etc/shadow",
         "files/etc/sudoers.d/exedev",
@@ -152,6 +153,11 @@ tar(
         # content store (faster, OCI-spec-clean digest) instead of
         # falling back to `docker load`.
         "./etc/docker/daemon.json uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/docker/daemon.json)",
+        # DOCKER_HOST — daemon listens at /run/docker.sock, but the CLI's
+        # default /var/run/docker.sock relies on a /var/run -> /run
+        # symlink that systemd-tmpfiles isn't reliably setting up here.
+        # Set the env var directly.
+        "./etc/profile.d/docker.sh uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile.d/docker.sh)",
         # direnv + zoxide shell hooks, system-wide.
         "./etc/profile.d/direnv.sh uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile.d/direnv.sh)",
         "./etc/fish/conf.d/direnv.fish uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/fish/conf.d/direnv.fish)",
