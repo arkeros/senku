@@ -65,6 +65,9 @@ packages:
   - tree
   # Session multiplexer
   - tmux
+  # C toolchain — bazel's cc_autoconf needs gcc on PATH even for builds
+  # that don't compile C themselves; cgo / rules_go assume it exists.
+  - build-essential
   # The three tools this image is for
   - direnv
   - fish

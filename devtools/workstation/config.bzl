@@ -1,23 +1,35 @@
-"""Workstation image config: arch list and resolved package set.
+"""Workstation image config: arch list and resolved per-arch package set.
 
 The package list mirrors `debian.lock.json`; regenerate after every
-`bazel run @workstation//:lock`. Listing here is verbose but explicit —
-gives reviewers a one-place diff of every package landing in the image.
+`bazel run @workstation//:lock`. Listed explicitly so PR review sees
+every package landing in the rootfs.
+
+The closure splits into a shared core (228 packages identical between
+amd64 and arm64) and a small set of arch-specific toolchain packages
+that ship under arch-mangled names (e.g. `gcc-x86-64-linux-gnu` vs
+`gcc-aarch64-linux-gnu`). `WORKSTATION_PACKAGES_BY_ARCH` is the only
+symbol BUILD consumes; the split is an implementation detail kept
+out of the call site.
 """
 
 WORKSTATION_ARCHITECTURES = ["amd64", "arm64"]
 
-# All packages from debian.lock.json (direct + transitive). Used to build
-# per-arch flatten layers. Keep alphabetized.
-WORKSTATION_PACKAGES = [
+# Shared core — packages identical across architectures. Keep alphabetized.
+_SHARED = [
     "base-files",
     "bash",
     "bind9-dnsutils",
     "bind9-host",
     "bind9-libs",
+    "binutils",
+    "binutils-common",
     "bsdextrautils",
+    "build-essential",
+    "bzip2",
     "ca-certificates",
     "coreutils",
+    "cpp",
+    "cpp-15",
     "curl",
     "dash",
     "dbus",
@@ -30,9 +42,16 @@ WORKSTATION_PACKAGES = [
     "debianutils",
     "diffutils",
     "direnv",
+    "dpkg",
+    "dpkg-dev",
     "findutils",
     "fish",
     "fish-common",
+    "g++",
+    "g++-15",
+    "gcc",
+    "gcc-15",
+    "gcc-15-base",
     "gcc-16-base",
     "gh",
     "git",
@@ -40,6 +59,7 @@ WORKSTATION_PACKAGES = [
     "gnu-which",
     "grep",
     "groff-base",
+    "guile-3.0-libs",
     "gzip",
     "hostname",
     "htop",
@@ -50,27 +70,36 @@ WORKSTATION_PACKAGES = [
     "less",
     "libacl1",
     "libapparmor1",
+    "libasan8",
+    "libatomic1",
     "libattr1",
     "libaudit-common",
     "libaudit1",
+    "libbinutils",
     "libblkid1",
     "libbpf1",
     "libbrotli1",
     "libbsd0",
     "libbz2-1.0",
     "libc-bin",
+    "libc-dev-bin",
     "libc-gconv-modules-extra",
     "libc6",
+    "libc6-dev",
     "libcap-ng0",
     "libcap2",
     "libcap2-bin",
     "libcbor0.10",
+    "libcc1-0",
     "libcom-err2",
     "libcrypt1",
+    "libctf-nobfd0",
+    "libctf0",
     "libcurl3t64-gnutls",
     "libcurl4t64",
     "libdb5.3t64",
     "libdbus-1-3",
+    "libdpkg-perl",
     "libedit2",
     "libelf1t64",
     "liberror-perl",
@@ -79,14 +108,22 @@ WORKSTATION_PACKAGES = [
     "libffi8",
     "libfido2-1",
     "libfstrm0",
+    "libgc1",
+    "libgcc-15-dev",
     "libgcc-s1",
     "libgdbm-compat4t64",
     "libgdbm6t64",
     "libgmp10",
     "libgnutls30t64",
+    "libgomp1",
+    "libgprofng0",
     "libgssapi-krb5-2",
     "libhogweed6t64",
+    "libhwasan0",
     "libidn2-0",
+    "libisl23",
+    "libitm1",
+    "libjansson4",
     "libjemalloc2",
     "libjq1",
     "libjson-c5",
@@ -96,6 +133,7 @@ WORKSTATION_PACKAGES = [
     "libkrb5support0",
     "libldap2",
     "liblmdb0",
+    "liblsan0",
     "libluajit-5.1-2",
     "libluajit-5.1-common",
     "liblzma5",
@@ -103,6 +141,8 @@ WORKSTATION_PACKAGES = [
     "libmd0",
     "libmnl0",
     "libmount1",
+    "libmpc3",
+    "libmpfr6",
     "libncursesw6",
     "libnettle8t64",
     "libnghttp2-14",
@@ -132,10 +172,12 @@ WORKSTATION_PACKAGES = [
     "libsasl2-modules-db",
     "libseccomp2",
     "libselinux1",
+    "libsframe3",
     "libsmartcols1",
     "libsqlite3-0",
     "libssh2-1t64",
     "libssl3t64",
+    "libstdc++-15-dev",
     "libstdc++6",
     "libsystemd-shared",
     "libsystemd0",
@@ -144,6 +186,8 @@ WORKSTATION_PACKAGES = [
     "libtirpc-common",
     "libtirpc3t64",
     "libtree-sitter0.25",
+    "libtsan2",
+    "libubsan1",
     "libuchardet0",
     "libudev1",
     "libunibilium4",
@@ -156,8 +200,11 @@ WORKSTATION_PACKAGES = [
     "libxml2-16",
     "libxtables12",
     "libzstd1",
+    "linux-libc-dev",
     "lua-lpeg",
     "lua-luv",
+    "make",
+    "make-guile",
     "man-db",
     "mawk",
     "media-types",
@@ -172,6 +219,7 @@ WORKSTATION_PACKAGES = [
     "openssh-client",
     "openssl",
     "openssl-provider-legacy",
+    "patch",
     "perl",
     "perl-base",
     "perl-modules-5.40",
@@ -183,6 +231,7 @@ WORKSTATION_PACKAGES = [
     "python3.13-minimal",
     "readline-common",
     "ripgrep",
+    "rpcsvc-proto",
     "sed",
     "sudo",
     "systemd",
@@ -192,6 +241,36 @@ WORKSTATION_PACKAGES = [
     "tree",
     "tzdata",
     "util-linux",
+    "xz-utils",
     "zlib1g",
     "zoxide",
 ]
+
+# Arch-specific toolchain packages (build-essential pulls these via
+# its arch-mangled deps). libquadmath0 is x86-only.
+_TOOLCHAIN_BY_ARCH = {
+    "amd64": [
+        "binutils-x86-64-linux-gnu",
+        "cpp-15-x86-64-linux-gnu",
+        "cpp-x86-64-linux-gnu",
+        "g++-15-x86-64-linux-gnu",
+        "g++-x86-64-linux-gnu",
+        "gcc-15-x86-64-linux-gnu",
+        "gcc-x86-64-linux-gnu",
+        "libquadmath0",
+    ],
+    "arm64": [
+        "binutils-aarch64-linux-gnu",
+        "cpp-15-aarch64-linux-gnu",
+        "cpp-aarch64-linux-gnu",
+        "g++-15-aarch64-linux-gnu",
+        "g++-aarch64-linux-gnu",
+        "gcc-15-aarch64-linux-gnu",
+        "gcc-aarch64-linux-gnu",
+    ],
+}
+
+WORKSTATION_PACKAGES_BY_ARCH = {
+    arch: _SHARED + extras
+    for arch, extras in _TOOLCHAIN_BY_ARCH.items()
+}

@@ -8,7 +8,7 @@ load("//oci:config.bzl", "OCI_REGISTRY", "OCI_REPOSITORY_PREFIX")
 load("//oci:oci_image.bzl", "oci_image")
 load("//oci/distroless:platforms.bzl", "ARCHITECTURE_PLATFORMS")
 load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
-load(":config.bzl", "WORKSTATION_ARCHITECTURES", "WORKSTATION_PACKAGES")
+load(":config.bzl", "WORKSTATION_ARCHITECTURES", "WORKSTATION_PACKAGES_BY_ARCH")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,6 +20,16 @@ WORKSTATION_IGNORE_CVES = [
     # The Python interpreter in this image is not invoked on
     # network-supplied data; it's a fish dependency.
     "CVE-2026-4786",
+    # linux-libc-dev — pulled transitively by libc6-dev (build-essential).
+    # Grype matches kernel CVEs against the headers; the headers themselves
+    # are inert C definitions and can't be exploited. The actual kernel
+    # is provided by the exe.dev host, not by this image.
+    "CVE-2013-7445",
+    "CVE-2019-19449",
+    "CVE-2019-19814",
+    "CVE-2021-3847",
+    "CVE-2021-3864",
+    "CVE-2024-21803",
 ]
 
 exports_files([
@@ -204,7 +214,7 @@ package_metadata(
         deduplicate = True,
         tars = [
             "@workstation//{}/{}".format(pkg, arch)
-            for pkg in WORKSTATION_PACKAGES
+            for pkg in WORKSTATION_PACKAGES_BY_ARCH[arch]
         ],
     )
     for arch in WORKSTATION_ARCHITECTURES
