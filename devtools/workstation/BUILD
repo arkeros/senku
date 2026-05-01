@@ -6,6 +6,7 @@ load("@rules_img//img:push.bzl", "image_push")
 load("@tar.bzl", "tar")
 load("//oci:config.bzl", "OCI_REGISTRY", "OCI_REPOSITORY_PREFIX")
 load("//oci:oci_image.bzl", "oci_image")
+load("//oci:vex.bzl", "vex_document", "vex_statement")
 load("//oci/distroless:platforms.bzl", "ARCHITECTURE_PLATFORMS")
 load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
 load(":config.bzl", "WORKSTATION_ARCHITECTURES", "WORKSTATION_PACKAGES_BY_ARCH")
@@ -20,17 +21,40 @@ WORKSTATION_IGNORE_CVES = [
     # The Python interpreter in this image is not invoked on
     # network-supplied data; it's a fish dependency.
     "CVE-2026-4786",
-    # linux-libc-dev — pulled transitively by libc6-dev (build-essential).
-    # Grype matches kernel CVEs against the headers; the headers themselves
-    # are inert C definitions and can't be exploited. The actual kernel
-    # is provided by the exe.dev host, not by this image.
-    "CVE-2013-7445",
-    "CVE-2019-19449",
-    "CVE-2019-19814",
-    "CVE-2021-3847",
-    "CVE-2021-3864",
-    "CVE-2024-21803",
 ]
+
+# linux-libc-dev ships kernel headers (interfaces, ioctl numbers, struct
+# definitions). It's pulled transitively via libc6-dev as part of
+# build-essential. Grype matches Linux-kernel CVEs against the headers'
+# version, but the headers don't contain the vulnerable kernel code —
+# they're compile-time data. The actual kernel is provided by exe.dev's
+# hypervisor, not by this image.
+_LINUX_LIBC_DEV_VEX = [
+    vex_statement(
+        expires = "2026-07-30",
+        impact_statement = "linux-libc-dev ships only kernel headers; no kernel code runs from this image.",
+        justification = "vulnerable_code_not_present",
+        products = ["pkg:oci/workstation"],
+        status = "not_affected",
+        vulnerability = cve,
+    )
+    for cve in [
+        "CVE-2013-7445",
+        "CVE-2019-19449",
+        "CVE-2019-19814",
+        "CVE-2021-3847",
+        "CVE-2021-3864",
+        "CVE-2024-21803",
+    ]
+]
+
+vex_document(
+    name = "vex",
+    author = "rafael@arquero.cat",
+    id = "https://github.com/arkeros/senku/blob/main/devtools/workstation/BUILD",
+    statements = _LINUX_LIBC_DEV_VEX,
+    timestamp = "2026-05-01T00:00:00Z",
+)
 
 exports_files([
     "debian.yaml",
@@ -242,6 +266,7 @@ package_metadata(
         ],
         platform = ARCHITECTURE_PLATFORMS[arch],
         user = "0",
+        vex = [":vex"],
         working_dir = "/",
     )
     for arch in WORKSTATION_ARCHITECTURES
