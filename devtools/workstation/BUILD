@@ -150,6 +150,9 @@ tar(
         },
         cmd = ["/usr/local/bin/init"],
         ignore_cves = WORKSTATION_IGNORE_CVES + DEBIAN_WONTFIX_CVES,
+        # exe.dev's shelley reads this to choose the SSH login user;
+        # the image itself runs as root (needed for systemd PID 1).
+        labels = {"exe.dev/login-user": "exedev"},
         layers = [
             ":apt_layer_" + arch,
             ":binaries_layer_" + arch,

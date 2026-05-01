@@ -22,6 +22,7 @@ packages:
   - ca-certificates
   - dbus-user-session
   - bash
+  - coreutils
   # Tier 1 — out-of-band install plumbing (curl/jq used by setup scripts and
   # by the bundled agent installers)
   - curl
