@@ -124,14 +124,25 @@ tar(
         "./usr/share/terminfo/g/ghostty type=link uid=0 gid=0 link=../x/xterm-ghostty",
         # update-alternatives wires these via postinst, which we don't
         # run. Bake the symlinks directly. Crucially, write to
-        # ./usr/bin/* and not ./bin/* — base-files ships /bin as a
-        # symlink to usr/bin (Debian 13 usrmerge), and putting any
-        # file at ./bin/* in a later tar layer materializes /bin as
-        # a real directory and breaks /bin/bash, /bin/cat, etc.
+        # ./usr/bin/* and ./usr/sbin/* (not ./bin/*, ./sbin/*) —
+        # base-files ships /bin and /sbin as symlinks to /usr/bin and
+        # /usr/sbin (Debian 13 usrmerge), and putting any file at the
+        # short paths in a later tar layer materializes them as real
+        # directories and breaks /bin/bash, /sbin/init, etc.
         "./usr/bin/sh type=link uid=0 gid=0 link=/usr/bin/dash",
         "./usr/bin/awk type=link uid=0 gid=0 link=/usr/bin/mawk",
         "./usr/bin/which type=link uid=0 gid=0 link=/usr/bin/which.gnu",
         "./usr/bin/nc type=link uid=0 gid=0 link=/usr/bin/nc.openbsd",
+        # iptables: dockerd execs `iptables` to set up its bridge NAT
+        # chain at startup. Without these alternatives symlinks the
+        # daemon refuses to start. Pointing at -nft (the modern
+        # default in Debian) rather than -legacy.
+        "./usr/sbin/iptables type=link uid=0 gid=0 link=/usr/sbin/iptables-nft",
+        "./usr/sbin/iptables-restore type=link uid=0 gid=0 link=/usr/sbin/iptables-nft-restore",
+        "./usr/sbin/iptables-save type=link uid=0 gid=0 link=/usr/sbin/iptables-nft-save",
+        "./usr/sbin/ip6tables type=link uid=0 gid=0 link=/usr/sbin/ip6tables-nft",
+        "./usr/sbin/ip6tables-restore type=link uid=0 gid=0 link=/usr/sbin/ip6tables-nft-restore",
+        "./usr/sbin/ip6tables-save type=link uid=0 gid=0 link=/usr/sbin/ip6tables-nft-save",
         # /etc/profile — base-files normally ships this, but rules_distroless
         # extraction skips it. Without it, login shells don't source
         # /etc/profile.d, so hooks below never load.
