@@ -34,6 +34,8 @@ tar(
     name = "files_layer",
     srcs = [
         "files/etc/group",
+        "files/etc/pam.d/other",
+        "files/etc/pam.d/sudo",
         "files/etc/passwd",
         "files/etc/shadow",
         "files/etc/sudoers.d/exedev",
@@ -53,6 +55,11 @@ tar(
         # exedev: passwordless sudo (drop-in, mode 0440 — sudo refuses
         # otherwise).
         "./etc/sudoers.d/exedev uid=0 gid=0 mode=0440 type=file content=$(execpath files/etc/sudoers.d/exedev)",
+        # PAM: minimal sudo config + deny-by-default fallback. See the
+        # comments in each file for why we hand-roll instead of using
+        # libpam-runtime's templates.
+        "./etc/pam.d/sudo uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/pam.d/sudo)",
+        "./etc/pam.d/other uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/pam.d/other)",
         # Home dir owned by the user. .bashrc / dotfiles get seeded later
         # (or by exe.dev's first-boot setup script).
         "./home type=dir uid=0 gid=0 mode=0755",
@@ -78,6 +85,7 @@ _MASKED_UNITS = [
     "ldconfig.service",
     "systemd-firstboot.service",
     "systemd-modules-load.service",
+    "systemd-network-generator.service",
     "systemd-networkd.service",
     "systemd-random-seed.service",
     "systemd-resolved.service",

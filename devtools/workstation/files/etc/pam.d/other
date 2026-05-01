@@ -1,0 +1,7 @@
+# Fallback for any PAM service without a dedicated config file.
+# Deny by default so nothing accidentally authenticates against an
+# unconfigured stack.
+auth		required	pam_deny.so
+account		required	pam_deny.so
+password	required	pam_deny.so
+session		required	pam_deny.so

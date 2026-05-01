@@ -1,0 +1,8 @@
+#%PAM-1.0
+# Self-contained on purpose: libpam-runtime's postinst (which would
+# generate /etc/pam.d/common-*) never runs in this rules_distroless
+# build. Auth/session checks are no-ops because sudoers.d/exedev
+# already grants NOPASSWD ALL.
+auth		required	pam_permit.so
+account		required	pam_permit.so
+session		required	pam_permit.so
