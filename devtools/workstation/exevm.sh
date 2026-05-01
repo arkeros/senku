@@ -11,6 +11,12 @@ set -euo pipefail
 readonly IMAGE="${WORKSTATION_IMAGE:-ghcr.io/arkeros/senku/workstation:latest}"
 readonly TAG="arkeros-senku"
 readonly REPO_URL="${WORKSTATION_REPO_URL:-https://arkeros-senku.int.exe.xyz/arkeros/senku.git}"
+readonly REPO_DIR_ON_VM="senku"
+readonly RBE_LINE="common --config=rbe"
+
+# When invoked under `bazel run`, BUILD_WORKSPACE_DIRECTORY points at the
+# workspace root. Otherwise fall back to the git toplevel of the cwd.
+readonly LOCAL_WORKSPACE="${BUILD_WORKSPACE_DIRECTORY:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
 
 usage() {
     cat <<EOF
@@ -26,26 +32,81 @@ Commands:
   url <name>   Print the HTTPS URL
 
 Env:
-  WORKSTATION_IMAGE     Override image (default: ${IMAGE})
-  WORKSTATION_REPO_URL  Override clone-on-boot repo (default: ${REPO_URL})
-                        Set empty to skip cloning.
+  WORKSTATION_IMAGE      Override image (default: ${IMAGE})
+  WORKSTATION_REPO_URL   Override clone-on-boot repo (default: ${REPO_URL})
+                         Set empty to skip cloning.
+  WORKSTATION_NO_BAZELRC Set to skip copying \$LOCAL_WORKSPACE/.bazelrc.user
+                         to the VM and appending --config=rbe.
 EOF
+}
+
+# Wait until <vm>.exe.xyz accepts ssh and the senku checkout exists.
+# Returns the vm name (so it composes with the ssh exe.dev new JSON).
+wait_for_clone() {
+    local name="$1"
+    local tries=0
+    while ! ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new \
+                -o LogLevel=ERROR \
+                "${name}.exe.xyz" \
+                test -d "${REPO_DIR_ON_VM}/.git" 2>/dev/null; do
+        tries=$((tries + 1))
+        if [ "$tries" -gt 60 ]; then
+            echo "exevm: timed out waiting for clone on ${name}" >&2
+            return 1
+        fi
+        sleep 2
+    done
+}
+
+# Copy laptop's .bazelrc.user into the freshly-cloned senku checkout
+# on the VM, then append --config=rbe so bazel uses the BuildBuddy
+# RBE platform automatically. Skipped if WORKSTATION_NO_BAZELRC is set.
+seed_bazelrc() {
+    local name="$1"
+    if [ -n "${WORKSTATION_NO_BAZELRC:-}" ]; then
+        return 0
+    fi
+    if [ -z "${LOCAL_WORKSPACE}" ] || [ ! -f "${LOCAL_WORKSPACE}/.bazelrc.user" ]; then
+        echo "exevm: no local .bazelrc.user found at ${LOCAL_WORKSPACE:-(unknown workspace)}; skipping seed" >&2
+        return 0
+    fi
+    scp -q -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR \
+        "${LOCAL_WORKSPACE}/.bazelrc.user" \
+        "${name}.exe.xyz:${REPO_DIR_ON_VM}/.bazelrc.user"
+    # Idempotent append: only add the RBE line if not already present.
+    ssh -o LogLevel=ERROR "${name}.exe.xyz" \
+        "grep -qxF '${RBE_LINE}' ${REPO_DIR_ON_VM}/.bazelrc.user || echo '${RBE_LINE}' >> ${REPO_DIR_ON_VM}/.bazelrc.user"
+    echo "exevm: seeded ${name}:~/${REPO_DIR_ON_VM}/.bazelrc.user" >&2
 }
 
 cmd_new() {
     local name="${1:-}"
-    local args=(--image="$IMAGE" --tag="$TAG")
+    local new_args=(--image="$IMAGE" --tag="$TAG")
     if [ -n "$name" ]; then
-        args+=(--name="$name")
+        new_args+=(--name="$name")
         shift
     fi
+
+    local response
     if [ -n "$REPO_URL" ]; then
-        # Pipe a setup script via stdin. exe-setup.service runs it once
-        # at first boot as the exedev user (passwordless sudo if needed).
-        printf '#!/bin/sh\nset -eu\ncd /home/exedev\ngit clone --depth=1 %q senku\n' "$REPO_URL" |
-            ssh exe.dev new "${args[@]}" --setup-script=/dev/stdin "$@"
+        response=$(printf '#!/bin/sh\nset -eu\ncd /home/exedev\ngit clone --depth=1 %q %s\n' \
+                            "$REPO_URL" "$REPO_DIR_ON_VM" |
+            ssh exe.dev new "${new_args[@]}" --setup-script=/dev/stdin --json "$@")
     else
-        ssh exe.dev new "${args[@]}" "$@"
+        response=$(ssh exe.dev new "${new_args[@]}" --json "$@")
+    fi
+    echo "$response"
+
+    # Resolve the actual VM name (auto-generated if --name omitted).
+    local vm
+    vm=$(jq -r '.vm_name' <<<"$response")
+    if [ -z "$vm" ] || [ "$vm" = "null" ]; then
+        echo "exevm: could not parse vm_name from response; skipping post-create steps" >&2
+        return 0
+    fi
+
+    if [ -n "$REPO_URL" ]; then
+        wait_for_clone "$vm" && seed_bazelrc "$vm"
     fi
 }
 
