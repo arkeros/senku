@@ -14,6 +14,10 @@ readonly REPO_URL="${WORKSTATION_REPO_URL:-https://arkeros-senku.int.exe.xyz/ark
 readonly REPO_DIR_ON_VM="senku"
 readonly RBE_LINE="common --config=rbe"
 
+# When invoked under `bazel run`, BUILD_WORKSPACE_DIRECTORY points at the
+# workspace root. Otherwise fall back to the git toplevel of the cwd.
+readonly LOCAL_WORKSPACE="${BUILD_WORKSPACE_DIRECTORY:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
+
 usage() {
     cat <<EOF
 exevm — manage exe.dev VMs running senku/workstation
@@ -31,8 +35,8 @@ Env:
   WORKSTATION_IMAGE      Override image (default: ${IMAGE})
   WORKSTATION_REPO_URL   Override clone-on-boot repo (default: ${REPO_URL})
                          Set empty to skip cloning.
-  WORKSTATION_NO_BAZELRC Set to skip writing --config=rbe into
-                         the VM's .bazelrc.user.
+  WORKSTATION_NO_BAZELRC Set to skip writing --config=rbe and
+                         copying the local .bazelrc.user.
 EOF
 }
 
@@ -54,14 +58,23 @@ wait_for_clone() {
     done
 }
 
-# Append `common --config=rbe` to the cloned workspace's .bazelrc.user
-# so the first `bazel test //...` on the VM uses the BuildBuddy RBE
-# platform — same toolchain as CI, same cache namespace.
-# Idempotent. Skipped if WORKSTATION_NO_BAZELRC is set.
+# Seed the cloned workspace's .bazelrc.user:
+#   - If $LOCAL_WORKSPACE/.bazelrc.user exists locally (it holds the
+#     BuildBuddy API key), scp it onto the VM first.
+#   - Always append `common --config=rbe` so `bazel test //...` uses
+#     the BuildBuddy RBE platform — same toolchain as CI, same cache
+#     namespace. Idempotent.
+# Skipped entirely if WORKSTATION_NO_BAZELRC is set.
 seed_bazelrc() {
     local name="$1"
     if [ -n "${WORKSTATION_NO_BAZELRC:-}" ]; then
         return 0
+    fi
+    if [ -n "${LOCAL_WORKSPACE}" ] && [ -f "${LOCAL_WORKSPACE}/.bazelrc.user" ]; then
+        scp -q -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR \
+            "${LOCAL_WORKSPACE}/.bazelrc.user" \
+            "${name}.exe.xyz:${REPO_DIR_ON_VM}/.bazelrc.user"
+        echo "exevm: scp'd ${LOCAL_WORKSPACE}/.bazelrc.user → ${name}:~/${REPO_DIR_ON_VM}/.bazelrc.user" >&2
     fi
     ssh -o LogLevel=ERROR "${name}.exe.xyz" \
         "touch ${REPO_DIR_ON_VM}/.bazelrc.user && \
