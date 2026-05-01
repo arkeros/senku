@@ -74,6 +74,7 @@ exports_files([
 tar(
     name = "files_layer",
     srcs = [
+        "files/etc/docker/daemon.json",
         "files/etc/fish/conf.d/direnv.fish",
         "files/etc/fish/conf.d/zoxide.fish",
         "files/etc/group",
@@ -135,6 +136,11 @@ tar(
         # extraction skips it. Without it, login shells don't source
         # /etc/profile.d, so hooks below never load.
         "./etc/profile uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile)",
+        # Docker daemon config — enable the containerd snapshotter so
+        # rules_img's image_load can push directly into containerd's
+        # content store (faster, OCI-spec-clean digest) instead of
+        # falling back to `docker load`.
+        "./etc/docker/daemon.json uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/docker/daemon.json)",
         # direnv + zoxide shell hooks, system-wide.
         "./etc/profile.d/direnv.sh uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile.d/direnv.sh)",
         "./etc/fish/conf.d/direnv.fish uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/fish/conf.d/direnv.fish)",
