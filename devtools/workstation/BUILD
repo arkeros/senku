@@ -185,7 +185,11 @@ image_push(
     registry = OCI_REGISTRY,
     repository = OCI_REPOSITORY_PREFIX + "/workstation",
     stamp = "force",
-    tag_list = ["latest"],
+    tag_list = [
+        "latest",
+        "{{.STABLE_MONOREPO_IMAGE_TAG_VERSION}}",
+        "{{.STABLE_MONOREPO_SHORT_VERSION}}",
+    ],
     tags = ["manual"],
 )
 
