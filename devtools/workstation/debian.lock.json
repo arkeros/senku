@@ -1655,6 +1655,161 @@
 			"arch": "amd64",
 			"dependencies": [
 				{
+					"key": "libuuid1_2.42-5_amd64",
+					"name": "libuuid1",
+					"version": "2.42-5"
+				},
+				{
+					"key": "libc6_2.42-15_amd64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_amd64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_amd64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_amd64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "libudev1_260.1-1_amd64",
+					"name": "libudev1",
+					"version": "260.1-1"
+				},
+				{
+					"key": "libtinfo6_6.6-p-20251231-1-p-b1_amd64",
+					"name": "libtinfo6",
+					"version": "6.6+20251231-1+b1"
+				},
+				{
+					"key": "libsystemd0_260.1-1_amd64",
+					"name": "libsystemd0",
+					"version": "260.1-1"
+				},
+				{
+					"key": "libsmartcols1_2.42-5_amd64",
+					"name": "libsmartcols1",
+					"version": "2.42-5"
+				},
+				{
+					"key": "libselinux1_3.10-1_amd64",
+					"name": "libselinux1",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_amd64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libpam0g_1.7.0-5-p-b2_amd64",
+					"name": "libpam0g",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "debconf_1.5.92_amd64",
+					"name": "debconf",
+					"version": "1.5.92"
+				},
+				{
+					"key": "libaudit1_1-4.1.2-1-p-b1_amd64",
+					"name": "libaudit1",
+					"version": "1:4.1.2-1+b1"
+				},
+				{
+					"key": "libcap-ng0_0.9.3-1_amd64",
+					"name": "libcap-ng0",
+					"version": "0.9.3-1"
+				},
+				{
+					"key": "libaudit-common_1-4.1.2-1_amd64",
+					"name": "libaudit-common",
+					"version": "1:4.1.2-1"
+				},
+				{
+					"key": "libmount1_2.42-5_amd64",
+					"name": "libmount1",
+					"version": "2.42-5"
+				},
+				{
+					"key": "libblkid1_2.42-5_amd64",
+					"name": "libblkid1",
+					"version": "2.42-5"
+				},
+				{
+					"key": "libcrypt1_1-4.5.1-1-p-b1_amd64",
+					"name": "libcrypt1",
+					"version": "1:4.5.1-1+b1"
+				},
+				{
+					"key": "libpam-runtime_1.7.0-5_amd64",
+					"name": "libpam-runtime",
+					"version": "1.7.0-5"
+				},
+				{
+					"key": "libpam-modules_1.7.0-5-p-b2_amd64",
+					"name": "libpam-modules",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "libpam-modules-bin_1.7.0-5-p-b2_amd64",
+					"name": "libpam-modules-bin",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "libdb5.3t64_5.3.28-p-dfsg2-11-p-b1_amd64",
+					"name": "libdb5.3t64",
+					"version": "5.3.28+dfsg2-11+b1"
+				}
+			],
+			"key": "util-linux_2.42-5_amd64",
+			"name": "util-linux",
+			"sha256": "e2c74ba9b67b0da4d0cbefe1908688998966295e2d06a7c3db5dde7a18e5ae68",
+			"source": "util-linux",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/util-linux_2.42-5_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/util-linux_2.42-5_amd64.deb"
+			],
+			"version": "2.42-5"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libuuid1_2.42-5_amd64",
+			"name": "libuuid1",
+			"sha256": "7055f91b158c17f41c8a89593bd66472a311a0d3f6e28030932e1938c5fabbc7",
+			"source": "util-linux",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/libuuid1_2.42-5_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/libuuid1_2.42-5_amd64.deb"
+			],
+			"version": "2.42-5"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [],
+			"key": "libudev1_260.1-1_amd64",
+			"name": "libudev1",
+			"sha256": "5a92ee5fb35ebc0f2167b368b9c262d35f1ff29bf2f05c8a40bd62d23024f191",
+			"source": "systemd",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/systemd/libudev1_260.1-1_amd64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/systemd/libudev1_260.1-1_amd64.deb"
+			],
+			"version": "260.1-1"
+		},
+		{
+			"arch": "amd64",
+			"dependencies": [
+				{
 					"key": "libc6_2.42-15_amd64",
 					"name": "libc6",
 					"version": "2.42-15"
@@ -2836,19 +2991,6 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libf/libfido2/libfido2-1_1.17.0-1_amd64.deb"
 			],
 			"version": "1.17.0-1"
-		},
-		{
-			"arch": "amd64",
-			"dependencies": [],
-			"key": "libudev1_260.1-1_amd64",
-			"name": "libudev1",
-			"sha256": "5a92ee5fb35ebc0f2167b368b9c262d35f1ff29bf2f05c8a40bd62d23024f191",
-			"source": "systemd",
-			"urls": [
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/systemd/libudev1_260.1-1_amd64.deb",
-				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/systemd/libudev1_260.1-1_amd64.deb"
-			],
-			"version": "260.1-1"
 		},
 		{
 			"arch": "amd64",
@@ -4552,19 +4694,6 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/p/python3.13/libpython3.13-stdlib_3.13.12-1_amd64.deb"
 			],
 			"version": "3.13.12-1"
-		},
-		{
-			"arch": "amd64",
-			"dependencies": [],
-			"key": "libuuid1_2.42-5_amd64",
-			"name": "libuuid1",
-			"sha256": "7055f91b158c17f41c8a89593bd66472a311a0d3f6e28030932e1938c5fabbc7",
-			"source": "util-linux",
-			"urls": [
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/libuuid1_2.42-5_amd64.deb",
-				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/libuuid1_2.42-5_amd64.deb"
-			],
-			"version": "2.42-5"
 		},
 		{
 			"arch": "amd64",
@@ -6468,6 +6597,161 @@
 			"arch": "arm64",
 			"dependencies": [
 				{
+					"key": "libuuid1_2.42-5_arm64",
+					"name": "libuuid1",
+					"version": "2.42-5"
+				},
+				{
+					"key": "libc6_2.42-15_arm64",
+					"name": "libc6",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libc-gconv-modules-extra_2.42-15_arm64",
+					"name": "libc-gconv-modules-extra",
+					"version": "2.42-15"
+				},
+				{
+					"key": "libgcc-s1_16-20260425-1_arm64",
+					"name": "libgcc-s1",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "gcc-16-base_16-20260425-1_arm64",
+					"name": "gcc-16-base",
+					"version": "16-20260425-1"
+				},
+				{
+					"key": "libudev1_260.1-1_arm64",
+					"name": "libudev1",
+					"version": "260.1-1"
+				},
+				{
+					"key": "libtinfo6_6.6-p-20251231-1-p-b1_arm64",
+					"name": "libtinfo6",
+					"version": "6.6+20251231-1+b1"
+				},
+				{
+					"key": "libsystemd0_260.1-1_arm64",
+					"name": "libsystemd0",
+					"version": "260.1-1"
+				},
+				{
+					"key": "libsmartcols1_2.42-5_arm64",
+					"name": "libsmartcols1",
+					"version": "2.42-5"
+				},
+				{
+					"key": "libselinux1_3.10-1_arm64",
+					"name": "libselinux1",
+					"version": "3.10-1"
+				},
+				{
+					"key": "libpcre2-8-0_10.46-1-p-b2_arm64",
+					"name": "libpcre2-8-0",
+					"version": "10.46-1+b2"
+				},
+				{
+					"key": "libpam0g_1.7.0-5-p-b2_arm64",
+					"name": "libpam0g",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "debconf_1.5.92_arm64",
+					"name": "debconf",
+					"version": "1.5.92"
+				},
+				{
+					"key": "libaudit1_1-4.1.2-1-p-b1_arm64",
+					"name": "libaudit1",
+					"version": "1:4.1.2-1+b1"
+				},
+				{
+					"key": "libcap-ng0_0.9.3-1_arm64",
+					"name": "libcap-ng0",
+					"version": "0.9.3-1"
+				},
+				{
+					"key": "libaudit-common_1-4.1.2-1_arm64",
+					"name": "libaudit-common",
+					"version": "1:4.1.2-1"
+				},
+				{
+					"key": "libmount1_2.42-5_arm64",
+					"name": "libmount1",
+					"version": "2.42-5"
+				},
+				{
+					"key": "libblkid1_2.42-5_arm64",
+					"name": "libblkid1",
+					"version": "2.42-5"
+				},
+				{
+					"key": "libcrypt1_1-4.5.1-1-p-b1_arm64",
+					"name": "libcrypt1",
+					"version": "1:4.5.1-1+b1"
+				},
+				{
+					"key": "libpam-runtime_1.7.0-5_arm64",
+					"name": "libpam-runtime",
+					"version": "1.7.0-5"
+				},
+				{
+					"key": "libpam-modules_1.7.0-5-p-b2_arm64",
+					"name": "libpam-modules",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "libpam-modules-bin_1.7.0-5-p-b2_arm64",
+					"name": "libpam-modules-bin",
+					"version": "1.7.0-5+b2"
+				},
+				{
+					"key": "libdb5.3t64_5.3.28-p-dfsg2-11-p-b1_arm64",
+					"name": "libdb5.3t64",
+					"version": "5.3.28+dfsg2-11+b1"
+				}
+			],
+			"key": "util-linux_2.42-5_arm64",
+			"name": "util-linux",
+			"sha256": "a04e113bd467a315992c19d0075c3e23acf2d2bd26783d44e9cf79543c05a3a4",
+			"source": "util-linux",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/util-linux_2.42-5_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/util-linux_2.42-5_arm64.deb"
+			],
+			"version": "2.42-5"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libuuid1_2.42-5_arm64",
+			"name": "libuuid1",
+			"sha256": "576c6451bed291194b21a9f9994c5df241fe216d8067fdedef5d7f9d8b511281",
+			"source": "util-linux",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/libuuid1_2.42-5_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/libuuid1_2.42-5_arm64.deb"
+			],
+			"version": "2.42-5"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [],
+			"key": "libudev1_260.1-1_arm64",
+			"name": "libudev1",
+			"sha256": "a0c6cb5dd5e648d74613148a26180740d68b135dbbf3874ad4ebf55faf7bf18a",
+			"source": "systemd",
+			"urls": [
+				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/systemd/libudev1_260.1-1_arm64.deb",
+				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/systemd/libudev1_260.1-1_arm64.deb"
+			],
+			"version": "260.1-1"
+		},
+		{
+			"arch": "arm64",
+			"dependencies": [
+				{
 					"key": "libc6_2.42-15_arm64",
 					"name": "libc6",
 					"version": "2.42-15"
@@ -7649,19 +7933,6 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/libf/libfido2/libfido2-1_1.17.0-1_arm64.deb"
 			],
 			"version": "1.17.0-1"
-		},
-		{
-			"arch": "arm64",
-			"dependencies": [],
-			"key": "libudev1_260.1-1_arm64",
-			"name": "libudev1",
-			"sha256": "a0c6cb5dd5e648d74613148a26180740d68b135dbbf3874ad4ebf55faf7bf18a",
-			"source": "systemd",
-			"urls": [
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/s/systemd/libudev1_260.1-1_arm64.deb",
-				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/s/systemd/libudev1_260.1-1_arm64.deb"
-			],
-			"version": "260.1-1"
 		},
 		{
 			"arch": "arm64",
@@ -9365,19 +9636,6 @@
 				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/p/python3.13/libpython3.13-stdlib_3.13.12-1_arm64.deb"
 			],
 			"version": "3.13.12-1"
-		},
-		{
-			"arch": "arm64",
-			"dependencies": [],
-			"key": "libuuid1_2.42-5_arm64",
-			"name": "libuuid1",
-			"sha256": "576c6451bed291194b21a9f9994c5df241fe216d8067fdedef5d7f9d8b511281",
-			"source": "util-linux",
-			"urls": [
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/libuuid1_2.42-5_arm64.deb",
-				"https://snapshot.debian.org/archive/debian/20260501T000000Z/pool/main/u/util-linux/libuuid1_2.42-5_arm64.deb"
-			],
-			"version": "2.42-5"
 		},
 		{
 			"arch": "arm64",

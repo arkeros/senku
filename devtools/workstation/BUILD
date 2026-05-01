@@ -75,12 +75,15 @@ tar(
         "./etc/systemd/system/shelley.socket uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/systemd/system/shelley.socket)",
         "./usr/local/bin/init uid=0 gid=0 mode=0755 type=file content=$(execpath files/usr/local/bin/init)",
         # update-alternatives wires these via postinst, which we don't
-        # run. Bake the symlinks directly so shell scripts and tools
-        # find their canonical names.
-        "./bin/sh type=link uid=0 gid=0 link=/bin/dash",
+        # run. Bake the symlinks directly. Crucially, write to
+        # ./usr/bin/* and not ./bin/* — base-files ships /bin as a
+        # symlink to usr/bin (Debian 13 usrmerge), and putting any
+        # file at ./bin/* in a later tar layer materializes /bin as
+        # a real directory and breaks /bin/bash, /bin/cat, etc.
+        "./usr/bin/sh type=link uid=0 gid=0 link=/usr/bin/dash",
         "./usr/bin/awk type=link uid=0 gid=0 link=/usr/bin/mawk",
         "./usr/bin/which type=link uid=0 gid=0 link=/usr/bin/which.gnu",
-        "./bin/nc type=link uid=0 gid=0 link=/bin/nc.openbsd",
+        "./usr/bin/nc type=link uid=0 gid=0 link=/usr/bin/nc.openbsd",
         # direnv + zoxide shell hooks, system-wide.
         "./etc/profile.d/direnv.sh uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile.d/direnv.sh)",
         "./etc/fish/conf.d/direnv.fish uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/fish/conf.d/direnv.fish)",

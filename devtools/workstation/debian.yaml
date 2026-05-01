@@ -36,6 +36,7 @@ packages:
   - ncurses-bin
   - sed
   - tar
+  - util-linux     # provides su, login, mountpoint, more, etc.
   - which
   - libc-bin       # provides getent, ldconfig, locale
   # Tier 1 — out-of-band install plumbing (curl/jq used by setup scripts and

@@ -191,6 +191,7 @@ WORKSTATION_PACKAGES = [
     "tmux",
     "tree",
     "tzdata",
+    "util-linux",
     "zlib1g",
     "zoxide",
 ]
