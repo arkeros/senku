@@ -12,7 +12,13 @@ readonly IMAGE="${WORKSTATION_IMAGE:-ghcr.io/arkeros/senku/workstation:latest}"
 readonly TAG="arkeros-senku"
 readonly REPO_URL="${WORKSTATION_REPO_URL:-https://arkeros-senku.int.exe.xyz/arkeros/senku.git}"
 readonly REPO_DIR_ON_VM="senku"
-readonly RBE_LINE="common --config=rbe"
+readonly SEED_BAZELRC_LINES=(
+    "common --config=rbe"
+    # Build Without the Bytes: skip downloading intermediate outputs over
+    # residential links. `toplevel` keeps locally-usable artifacts for the
+    # targets the user explicitly built/tested.
+    "common --remote_download_outputs=toplevel"
+)
 
 # When invoked under `bazel run`, BUILD_WORKSPACE_DIRECTORY points at the
 # workspace root. Otherwise fall back to the git toplevel of the cwd.
@@ -99,9 +105,8 @@ wait_for_clone() {
 # Seed the cloned workspace's .bazelrc.user:
 #   - If $LOCAL_WORKSPACE/.bazelrc.user exists locally (it holds the
 #     BuildBuddy API key), scp it onto the VM first.
-#   - Always append `common --config=rbe` so `bazel test //...` uses
-#     the BuildBuddy RBE platform — same toolchain as CI, same cache
-#     namespace. Idempotent.
+#   - Append each line in SEED_BAZELRC_LINES so `bazel test //...` uses
+#     RBE and Build-Without-the-Bytes by default. Idempotent.
 # Skipped entirely if WORKSTATION_NO_BAZELRC is set.
 seed_bazelrc() {
     local name="$1"
@@ -114,11 +119,23 @@ seed_bazelrc() {
             "${name}.exe.xyz:${REPO_DIR_ON_VM}/.bazelrc.user"
         echo "exevm: scp'd ${LOCAL_WORKSPACE}/.bazelrc.user → ${name}:~/${REPO_DIR_ON_VM}/.bazelrc.user" >&2
     fi
+    local line
+    for line in "${SEED_BAZELRC_LINES[@]}"; do
+        ssh -o LogLevel=ERROR "${name}.exe.xyz" \
+            "touch ${REPO_DIR_ON_VM}/.bazelrc.user && \
+             grep -qxF '${line}' ${REPO_DIR_ON_VM}/.bazelrc.user || \
+             echo '${line}' >> ${REPO_DIR_ON_VM}/.bazelrc.user"
+        echo "exevm: ${name}:~/${REPO_DIR_ON_VM}/.bazelrc.user → '${line}'" >&2
+    done
+}
+
+# Block on `bazel fetch //...` so cmd_new only returns once the VM is
+# ready to build — keeps the user from ssh-ing in and racing the warmup.
+warm_bazel() {
+    local name="$1"
+    echo "exevm: bazel fetch //... on ${name} (blocking)" >&2
     ssh -o LogLevel=ERROR "${name}.exe.xyz" \
-        "touch ${REPO_DIR_ON_VM}/.bazelrc.user && \
-         grep -qxF '${RBE_LINE}' ${REPO_DIR_ON_VM}/.bazelrc.user || \
-         echo '${RBE_LINE}' >> ${REPO_DIR_ON_VM}/.bazelrc.user"
-    echo "exevm: ${name}:~/${REPO_DIR_ON_VM}/.bazelrc.user → '${RBE_LINE}'" >&2
+        "cd ${REPO_DIR_ON_VM} && bazel fetch //..."
 }
 
 cmd_new() {
@@ -153,8 +170,10 @@ cmd_new() {
     fi
 
     if [ -n "$REPO_URL" ]; then
-        wait_for_clone "$vm" && seed_bazelrc "$vm"
+        wait_for_clone "$vm" && seed_bazelrc "$vm" && warm_bazel "$vm"
     fi
+
+    echo "exevm: open in Zed → zed://ssh/${vm}.exe.xyz/home/exedev/${REPO_DIR_ON_VM}" >&2
 }
 
 cmd_ls() {
