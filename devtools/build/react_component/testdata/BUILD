@@ -131,15 +131,20 @@ build_test(
     targets = [":i18n_testapp_i18n_manifest"],
 )
 
-# react_ssr_app smoke test — v1 skeleton: the macro validates inputs and
-# produces no targets, so loading this BUILD file exercises the validation
-# path. Subsequent roadmap steps will give the macro real outputs to assert
-# against (server bundle, devserver, OCI image).
+# react_ssr_app smoke fixture — exercises the server-bundle build today
+# (roadmap step 4). Devserver + OCI image targets get added under this
+# fixture in subsequent roadmap steps.
 react_ssr_app(
     name = "ssr_smoke",
+    testonly = True,
     browser_deps = [],
-    layout = ":Header",
+    layout = ":SsrPage",
     routes = [],
+)
+
+build_test(
+    name = "ssr_smoke_server_bundle_test",
+    targets = [":ssr_smoke_server_bundle"],
 )
 
 # react_ssr_component fixture: dual-compile a route component with
