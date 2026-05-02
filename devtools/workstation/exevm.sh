@@ -91,6 +91,8 @@ Env:
                          Set empty to skip cloning.
   WORKSTATION_NO_BAZELRC Set to skip writing --config=rbe and
                          copying the local .bazelrc.user.
+  WORKSTATION_NO_ZED     Set to skip opening Zed after \`new\`. The
+                         zed:// URL is still printed.
 EOF
 }
 
@@ -183,7 +185,15 @@ cmd_new() {
         wait_for_clone "$vm" && seed_bazelrc "$vm" && warm_bazel "$vm"
     fi
 
-    echo "exevm: open in Zed → zed://ssh/${vm}.exe.xyz/home/exedev/${REPO_DIR_ON_VM}" >&2
+    local zed_url="zed://ssh/${vm}.exe.xyz/home/exedev/${REPO_DIR_ON_VM}"
+    echo "exevm: open in Zed → ${zed_url}" >&2
+    if [ -z "${WORKSTATION_NO_ZED:-}" ]; then
+        if command -v open >/dev/null 2>&1; then
+            open "$zed_url"
+        elif command -v xdg-open >/dev/null 2>&1; then
+            xdg-open "$zed_url" >/dev/null 2>&1 &
+        fi
+    fi
 }
 
 cmd_ls() {
