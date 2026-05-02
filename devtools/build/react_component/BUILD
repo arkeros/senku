@@ -68,6 +68,16 @@ js_binary(
     entry_point = "react_app_codegen.mjs",
 )
 
+# SSR server-entry codegen: generates {name}_server.tsx (Hono +
+# createStaticHandler + renderToPipeableStream) from a route manifest.
+js_binary(
+    name = "react_ssr_app_codegen_bin",
+    data = [
+        "//:node_modules/ramda",
+    ],
+    entry_point = "react_ssr_app_codegen.mjs",
+)
+
 # PostCSS JIT props: tree-shakes unused Open Props custom properties
 js_binary(
     name = "postcss_jit_bin",
@@ -206,6 +216,8 @@ bzl_library(
     srcs = ["react_ssr_app.bzl"],
     deps = [
         ":asset_pipeline",
+        ":labels",
+        ":react_app_manifest",
         ":react_component",
         ":route_tree",
         ":runtime_config",
@@ -213,7 +225,6 @@ bzl_library(
         "@aspect_rules_esbuild//esbuild:defs",
         "@aspect_rules_js//js:defs",
         "@bazel_lib//lib:copy_to_directory",
-        "@bazel_skylib//rules:write_file",
     ],
 )
 
