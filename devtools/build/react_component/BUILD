@@ -205,9 +205,14 @@ bzl_library(
     name = "react_ssr_app",
     srcs = ["react_ssr_app.bzl"],
     deps = [
+        ":asset_pipeline",
         ":react_component",
+        ":route_tree",
         ":runtime_config",
+        ":stylex_css",
         "@aspect_rules_esbuild//esbuild:defs",
+        "@aspect_rules_js//js:defs",
+        "@bazel_lib//lib:copy_to_directory",
         "@bazel_skylib//rules:write_file",
     ],
 )
