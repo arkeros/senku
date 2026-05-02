@@ -22,6 +22,7 @@ import * as R from "ramda";
 const args = process.argv.slice(2);
 let manifestFile, outRouter, outMain;
 let i18nManifestImport, i18nRuntimeImport, i18nSourceLocale;
+let ssrClient = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--manifest") manifestFile = args[++i];
@@ -30,6 +31,7 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--i18n-manifest-import") i18nManifestImport = args[++i];
   else if (args[i] === "--i18n-runtime-import") i18nRuntimeImport = args[++i];
   else if (args[i] === "--i18n-source-locale") i18nSourceLocale = args[++i];
+  else if (args[i] === "--ssr-client") ssrClient = true;
 }
 
 if (!manifestFile || !outRouter || !outMain) {
@@ -109,6 +111,18 @@ const errorImportLines = Array.from(errorImports.values())
   )
   .join("\n");
 
+// Map an import path the manifest emitted (`./pages/Foo`) to the
+// extension-stripped module specifier the codegen should reference.
+// In SSR-client mode we point at the dual-compile's `.client.js`
+// so server-only `preload`/`meta` exports never reach the browser.
+const lazyImportPath = (path) => (ssrClient ? `${path}.client` : path);
+
+// .client.js ships without a sibling .client.d.ts. The ambient
+// declarations live in dual_compile_modules.d.ts (staged into the
+// generated package by react_ssr_app); ts_project picks it up
+// alongside the router source so `import("./X.client")` types as
+// `Promise<any>` instead of TS2307.
+
 // Generate lazy route objects recursively
 function generateRoute(route, indent) {
   const pad = " ".repeat(indent);
@@ -121,7 +135,9 @@ function generateRoute(route, indent) {
   }
 
   if (route.import) {
-    props.push(`lazy: () => import("${route.import}").then(m => ({ Component: m.${route.name} }))`);
+    props.push(
+      `lazy: () => import("${lazyImportPath(route.import)}").then(m => ({ Component: m.${route.name} }))`,
+    );
   }
 
   if (hasErrorRef(route)) {
@@ -151,23 +167,35 @@ const layoutErrorLine = hasErrorRef(layout)
 
 const errorImportsBlock = errorImportLines ? errorImportLines + "\n" : "";
 
+// Empty routes would otherwise emit `children: [\n,\n]` — a sparse
+// `undefined` slot tsc rejects as `undefined` in `RouteObject[]`.
+const childrenBlock = routeEntries.length > 0
+  ? `    children: [\n${routeEntries.join(",\n")},\n    ],`
+  : "    children: [],";
+
 // router.tsx — lazy imports for route components, static imports for error boundaries
 const routerCode = `import { createBrowserRouter } from "react-router";
 ${errorImportsBlock}
 export const router = createBrowserRouter([
   {
     path: "/",
-    lazy: () => import("${layout.import}").then(m => ({ Component: m.${layout.name} })),
-${layoutErrorLine}    children: [
-${routeEntries.join(",\n")},
-    ],
+    lazy: () => import("${lazyImportPath(layout.import)}").then(m => ({ Component: m.${layout.name} })),
+${layoutErrorLine}${childrenBlock}
   },
 ]);
 `;
 
-// main.tsx
+// main.tsx — SSR-client mode hydrates the server-rendered DOM
+// (hydrateRoot's second-arg form) instead of mounting a fresh root
+// (createRoot(...).render).
+const wrapMount = (children) =>
+  ssrClient
+    ? `hydrateRoot(document.getElementById("root")!, ${children});`
+    : `createRoot(document.getElementById("root")!).render(${children});`;
+const reactDomEntry = ssrClient ? "hydrateRoot" : "createRoot";
+
 const mainCode = i18nEnabled
-  ? `import { createRoot } from "react-dom/client";
+  ? `import { ${reactDomEntry} } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { router } from "${routerModuleName}";
 import { I18N_CATALOGS, type Locale } from "${i18nManifestImport}";
@@ -176,17 +204,15 @@ import { I18nProvider, pickLocale } from "${i18nRuntimeImport}";
 const SUPPORTED_LOCALES = Object.keys(I18N_CATALOGS) as Locale[];
 const locale = pickLocale(SUPPORTED_LOCALES, "${i18nSourceLocale}");
 
-createRoot(document.getElementById("root")!).render(
-  <I18nProvider locale={locale} catalog={I18N_CATALOGS[locale]}>
+${wrapMount(`<I18nProvider locale={locale} catalog={I18N_CATALOGS[locale]}>
     <RouterProvider router={router} />
-  </I18nProvider>,
-);
+  </I18nProvider>`)}
 `
-  : `import { createRoot } from "react-dom/client";
+  : `import { ${reactDomEntry} } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { router } from "${routerModuleName}";
 
-createRoot(document.getElementById("root")!).render(<RouterProvider router={router} />);
+${wrapMount("<RouterProvider router={router} />")}
 `;
 
 for (const f of [outRouter, outMain]) {

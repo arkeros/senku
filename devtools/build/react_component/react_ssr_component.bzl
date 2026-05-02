@@ -20,7 +20,7 @@ client bundle — would silently break the moment any of those imports
 had a side effect.
 """
 
-load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_run_binary")
 load(":react_component.bzl", "react_component")
 
 _BABEL_DATA = [
@@ -108,13 +108,15 @@ def react_ssr_component(name, srcs, deps = [], assets = [], i18n = [], **kwargs)
         client_outs.append(client_out)
         server_outs.append(server_out)
 
-    native.filegroup(
+    # `js_library` (rather than `filegroup`) so the dual outputs travel
+    # as JsInfo — esbuild's `deps` rejects targets that lack it.
+    js_library(
         name = name + "_client",
         srcs = client_outs,
         **forward_kwargs
     )
 
-    native.filegroup(
+    js_library(
         name = name + "_server",
         srcs = server_outs,
         **forward_kwargs

@@ -187,6 +187,7 @@ js_binary(
 exports_files(
     [
         "default.conf.tpl",
+        "dual_compile_modules.d.ts",
         "esbuild_react_dedup.config.mjs",
         "index.html.tpl",
     ],

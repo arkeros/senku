@@ -16,6 +16,7 @@ the codegen, `createStaticHandler`, preload/meta wiring, and the
 
 load("@aspect_rules_esbuild//esbuild:defs.bzl", "esbuild")
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary")
+load("@bazel_lib//lib:copy_file.bzl", "copy_file")
 load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
 load(":asset_pipeline.bzl", "asset_pipeline")
 load(":labels.bzl", "ts_dep")
@@ -182,6 +183,7 @@ def react_ssr_app(
 
     # 2. Codegen: turn the manifest into a `{name}_server.tsx` that wires
     # up createStaticHandler + renderToPipeableStream.
+    client_bundle_url = "/{}_client_bundle/{}_client_main.js".format(name, name)
     js_run_binary(
         name = name + "_server_codegen",
         srcs = [manifest_name + ".json"],
@@ -193,6 +195,8 @@ def react_ssr_app(
             "$(location {}_server.tsx)".format(name),
             "--app-title",
             name,
+            "--client-bundle-url",
+            client_bundle_url,
         ],
         tool = Label("//devtools/build/react_component:react_ssr_app_codegen_bin"),
         **forward_kwargs
@@ -221,6 +225,13 @@ def react_ssr_app(
 
     all_ts_targets = [ts_dep(c) for c in all_route_components]
 
+    # Per-route .client.js / .server.js outputs from react_ssr_component's
+    # dual-compile (filegroups). Server bundle imports `.server.js` paths
+    # (byte-identical to .js at this step but distinct for cache); client
+    # bundle's lazy imports point at `.client.js`.
+    all_server_filegroups = [c + "_server" for c in all_route_components]
+    all_client_filegroups = [c + "_client" for c in all_route_components]
+
     # 4. Bundle for Node. `platform = "node"` marks Node built-ins
     # (`node:fs`, etc.) external automatically; everything else (Hono,
     # react, react-dom/server, react-router, route components) is inlined
@@ -242,6 +253,92 @@ def react_ssr_app(
         ] + all_ts_targets + [
             "//:node_modules/hono",
             "//:node_modules/@hono/node-server",
+            "//:node_modules/react",
+            "//:node_modules/react-dom",
+            "//:node_modules/react-router",
+            "//:node_modules/@stylexjs/stylex",
+        ],
+        **forward_kwargs
+    )
+
+    # 5. Client codegen — same react_app_codegen as the SPA flow, with
+    # `--ssr-client`: lazy imports point at `./X.client` so esbuild
+    # picks up the dual-compile's stripped `.client.js`, and the entry
+    # uses `hydrateRoot` to attach to the SSR-emitted DOM.
+    js_run_binary(
+        name = name + "_client_codegen",
+        srcs = [manifest_name + ".json"],
+        outs = [name + "_client_router.tsx", name + "_client_main.tsx"],
+        args = [
+            "--manifest",
+            "$(location {}.json)".format(manifest_name),
+            "--out-router",
+            "$(location {}_client_router.tsx)".format(name),
+            "--out-main",
+            "$(location {}_client_main.tsx)".format(name),
+            "--ssr-client",
+        ],
+        tool = Label("//devtools/build/react_component:react_app_codegen_bin"),
+        **forward_kwargs
+    )
+
+    # 6. Type-check the generated client router + main. The `.client.js`
+    # outputs of dual-compile have no sibling `.d.ts`, so `import("./X
+    # .client")` would normally trip TS2307. We stage a copy of the
+    # ambient declarations file (`*.client` → `any`) into the package
+    # so ts_project picks it up alongside the router source.
+    copy_file(
+        name = name + "_dual_compile_modules_dts",
+        src = Label("//devtools/build/react_component:dual_compile_modules.d.ts"),
+        out = name + "_dual_compile_modules.d.ts",
+        **forward_kwargs
+    )
+
+    react_component(
+        name = name + "_client_router",
+        srcs = [
+            name + "_client_router.tsx",
+            name + "_dual_compile_modules.d.ts",
+        ],
+        _export_test = False,
+        deps = all_route_components + [
+            "//:node_modules/react-router",
+        ],
+        **forward_kwargs
+    )
+
+    react_component(
+        name = name + "_client_main",
+        srcs = [name + "_client_main.tsx"],
+        _export_test = False,
+        deps = [
+            ":" + name + "_client_router",
+            "//:node_modules/react-dom",
+            "//:node_modules/@types/react-dom",
+            "//:node_modules/react-router",
+        ],
+        **forward_kwargs
+    )
+
+    # 7. Client bundle — splitting on so each lazy route gets its own
+    # chunk and shared deps (react, react-dom, …) end up in a chunk that
+    # caches across deploys. `output_dir = True` produces a directory of
+    # `{name}_client_bundle/{name}_client_main.js` + sibling chunks; the
+    # server's Document references `<script type="module"
+    # src="/static/{name}_client_bundle/{name}_client_main.js">` (step 7
+    # only emits the entry tag — per-route modulepreload is on the
+    # backlog, see roadmap).
+    esbuild(
+        name = name + "_client_bundle",
+        entry_point = name + "_client_main.js",
+        target = "es2020",
+        splitting = True,
+        output_dir = True,
+        define = {"process.env.NODE_ENV": '"production"'},
+        config = Label("//devtools/build/react_component:esbuild_react_dedup.config"),
+        deps = [
+            ":" + name + "_client_main_ts",
+        ] + all_ts_targets + all_client_filegroups + [
             "//:node_modules/react",
             "//:node_modules/react-dom",
             "//:node_modules/react-router",
@@ -289,18 +386,23 @@ def react_ssr_app(
     # `PANELLET_STATIC_DIR`. CSS files land at the root (matching
     # `app.use("/*.css", ...)`); the assets TreeArtifact is renamed to
     # `assets/` so the pipeline's hashed filenames sit under `/assets/`
-    # in the URL space.
+    # in the URL space. The client bundle directory keeps its name so
+    # the codegen-emitted `<script src="/{name}_client_bundle/...">`
+    # resolves cleanly.
     copy_to_directory(
         name = name + "_static",
         srcs = [
             ":" + name + "_styles",
             ":" + normalize_css_target,
             ":" + name + "_assets",
+            ":" + name + "_client_bundle",
         ],
         root_paths = ["."],
         replace_prefixes = {
             name + "_assets_flat": "assets",
         },
+        # `.map` files are useful for error reporting but not required at
+        # runtime; keep them in dev (default), strip in step 13's OCI image.
         **forward_kwargs
     )
 

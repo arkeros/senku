@@ -146,6 +146,7 @@ build_test(
     name = "ssr_smoke_server_bundle_test",
     targets = [
         ":ssr_smoke_server_bundle",
+        ":ssr_smoke_client_bundle",
         ":ssr_smoke_styles",
         ":ssr_smoke_normalize_css",
         ":ssr_smoke_static",
