@@ -9,7 +9,12 @@
  *
  * Wires:
  *   - `createStaticHandler(routes)`     — runs the matched-route chain.
- *   - `renderToPipeableStream(...)`     — streams the React tree out.
+ *   - `renderToReadableStream(...)`     — streams the React tree as a
+ *     Web ReadableStream. We pick `react-dom/server.edge` (ESM-native,
+ *     Web streams) over `server.node` (CJS, Node streams) because Hono
+ *     wants a Web `Response` body and Node 22 has Web streams natively;
+ *     `server.node`'s CJS-into-ESM bundling otherwise drags in a
+ *     `createRequire` shim for `require("util")`.
  *   - Hono `serveStatic` for `/assets/*`, `/*.css`, and the client
  *     bundle's chunk directory (so the browser can fetch
  *     `<script type="module">` and lazy chunks emitted by react-router's
@@ -179,8 +184,7 @@ import type { ReactNode } from "react";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
-import { PassThrough, Readable } from "node:stream";
-import { renderToPipeableStream } from "react-dom/server";
+import { renderToReadableStream } from "react-dom/server.edge";
 import {
   createStaticHandler,
   createStaticRouter,
@@ -242,38 +246,29 @@ app.all("*", async (c) => {
 
   const router = createStaticRouter(handler.dataRoutes, context);
 
-  // PassThrough is a Duplex (Readable+Writable): renderToPipeableStream
-  // pipes React output into it (writable side); Readable.toWeb gives us
-  // a Web ReadableStream for the Response (readable side).
-  return await new Promise<Response>((resolveResponse, rejectResponse) => {
-    const passthrough = new PassThrough();
-    let didShellError = false;
-    const renderResult = renderToPipeableStream(
+  try {
+    // The Promise resolves at shell-ready; the rest streams as Suspense
+    // boundaries resolve. \`server.edge\`'s ReadableStream is Web-native,
+    // so it drops directly into Hono's Response with no Node-stream
+    // bridge.
+    const stream = await renderToReadableStream(
       <Document>
         <StaticRouterProvider router={router} context={context} />
       </Document>,
       {
-        onShellReady() {
-          renderResult.pipe(passthrough);
-          resolveResponse(
-            new Response(
-              Readable.toWeb(passthrough) as ReadableStream,
-              {
-                status: didShellError ? 500 : context.statusCode,
-                headers: { "Content-Type": "text/html; charset=utf-8" },
-              },
-            ),
-          );
-        },
-        onShellError(err) {
-          didShellError = true;
-          rejectResponse(err);
+        onError(err: unknown) {
+          // eslint-disable-next-line no-console
+          console.error("panellet SSR onError:", err);
         },
       },
     );
-  }).catch((err) => {
+    return new Response(stream, {
+      status: context.statusCode,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch (err) {
     // eslint-disable-next-line no-console
-    console.error("panellet SSR render error:", err);
+    console.error("panellet SSR shell error:", err);
     return new Response(
       "<!doctype html><h1>500 — render failed</h1>",
       {
@@ -281,7 +276,7 @@ app.all("*", async (c) => {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       },
     );
-  });
+  }
 });
 
 const port = Number.parseInt(process.env.PORT ?? "8080", 10);

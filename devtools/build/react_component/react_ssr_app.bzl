@@ -245,11 +245,7 @@ def react_ssr_app(
         format = "esm",
         bundle = True,
         define = {"process.env.NODE_ENV": '"production"'},
-        # Server-side config extends the shared react-dedup config with
-        # a `createRequire` banner: react-dom/server.node ships as CJS
-        # and calls `require("util")` at init, so bundled-into-ESM needs
-        # `require` defined.
-        config = Label("//devtools/build/react_component:esbuild_react_server.config"),
+        config = Label("//devtools/build/react_component:esbuild_react_dedup.config"),
         deps = [
             ":" + name + "_server_entry_ts",
         ] + all_ts_targets + [

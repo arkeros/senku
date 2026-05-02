@@ -13,14 +13,6 @@ copy_to_bin(
     srcs = ["esbuild_react_dedup.config.mjs"],
 )
 
-# Server-side variant: same react-dedup aliasing plus a `createRequire`
-# banner so bundled CJS (react-dom/server.node) can resolve Node
-# built-ins under ESM output. See the .mjs for rationale.
-copy_to_bin(
-    name = "esbuild_react_server.config",
-    srcs = ["esbuild_react_server.config.mjs"],
-)
-
 # Transpile script: runs @babel/core to produce .js + .js.map + .stylex.json
 js_binary(
     name = "stylex_transpile_bin",
