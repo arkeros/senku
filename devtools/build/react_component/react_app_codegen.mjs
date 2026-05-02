@@ -22,6 +22,7 @@ import * as R from "ramda";
 const args = process.argv.slice(2);
 let manifestFile, outRouter, outMain;
 let i18nManifestImport, i18nRuntimeImport, i18nSourceLocale;
+let ssrClient = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--manifest") manifestFile = args[++i];
@@ -30,6 +31,7 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--i18n-manifest-import") i18nManifestImport = args[++i];
   else if (args[i] === "--i18n-runtime-import") i18nRuntimeImport = args[++i];
   else if (args[i] === "--i18n-source-locale") i18nSourceLocale = args[++i];
+  else if (args[i] === "--ssr-client") ssrClient = true;
 }
 
 if (!manifestFile || !outRouter || !outMain) {
@@ -109,7 +111,30 @@ const errorImportLines = Array.from(errorImports.values())
   )
   .join("\n");
 
-// Generate lazy route objects recursively
+// Map an import path the manifest emitted (`./pages/Foo`) to the
+// extension-stripped module specifier the codegen should reference.
+// In SSR-client mode we point at the dual-compile's `.client.js`
+// so server-only `preload`/`meta` exports never reach the browser.
+const lazyImportPath = (path) => (ssrClient ? `${path}.client` : path);
+
+// .client.js ships without a sibling .client.d.ts. The ambient
+// declarations live in dual_compile_modules.d.ts (staged into the
+// generated package by react_ssr_app); ts_project picks it up
+// alongside the router source so `import("./X.client")` types as
+// `Promise<any>` instead of TS2307.
+
+// SSR-client mode and SPA mode both use `lazy:` — react-router's own
+// lazy mechanism — so esbuild emits one chunk per dynamic `import()`.
+// The hydration-mismatch problem `route.lazy` had on its own (chunk
+// loads async, RouterProvider renders fallback during the gap) is
+// solved upstream: the SSR server emits `<link rel="modulepreload">`
+// for the matched-chain chunks plus a `window.__panellet_preloads__`
+// list, and `client_main.tsx` top-level-awaits them before
+// `hydrateRoot`. By the time `route.lazy()` fires the chunks are in
+// the module cache and the promise resolves on the next microtask,
+// which is fast enough for hydration to match.
+
+// Generate route objects recursively
 function generateRoute(route, indent) {
   const pad = " ".repeat(indent);
   const props = [];
@@ -121,7 +146,9 @@ function generateRoute(route, indent) {
   }
 
   if (route.import) {
-    props.push(`lazy: () => import("${route.import}").then(m => ({ Component: m.${route.name} }))`);
+    props.push(
+      `lazy: () => import("${lazyImportPath(route.import)}").then(m => ({ Component: m.${route.name} }))`,
+    );
   }
 
   if (hasErrorRef(route)) {
@@ -151,23 +178,69 @@ const layoutErrorLine = hasErrorRef(layout)
 
 const errorImportsBlock = errorImportLines ? errorImportLines + "\n" : "";
 
-// router.tsx — lazy imports for route components, static imports for error boundaries
+// Empty routes would otherwise emit `children: [\n,\n]` — a sparse
+// `undefined` slot tsc rejects as `undefined` in `RouteObject[]`.
+const childrenBlock = routeEntries.length > 0
+  ? `    children: [\n${routeEntries.join(",\n")},\n    ],`
+  : "    children: [],";
+
+// In SSR-client mode, `window.__staticRouterHydrationData` carries the
+// server's already-resolved loaderData / actionData / errors. Passing
+// it to `createBrowserRouter` skips the "loading" state on first
+// render — without it, react-router treats the page as a fresh client
+// nav and the resulting tree mismatches the server-rendered HTML.
+const hydrationDataBlock = ssrClient
+  ? `, {
+  hydrationData: (window as unknown as {
+    __staticRouterHydrationData?: HydrationState;
+  }).__staticRouterHydrationData,
+}`
+  : "";
+const hydrationDataImport = ssrClient
+  ? "import type { HydrationState } from \"react-router\";\n"
+  : "";
+
+// router.tsx — error boundaries are statically imported regardless of
+// mode (a lazy boundary risks the same failure that triggered it).
 const routerCode = `import { createBrowserRouter } from "react-router";
-${errorImportsBlock}
+${hydrationDataImport}${errorImportsBlock}
 export const router = createBrowserRouter([
   {
     path: "/",
-    lazy: () => import("${layout.import}").then(m => ({ Component: m.${layout.name} })),
-${layoutErrorLine}    children: [
-${routeEntries.join(",\n")},
-    ],
+    lazy: () => import("${lazyImportPath(layout.import)}").then(m => ({ Component: m.${layout.name} })),
+${layoutErrorLine}${childrenBlock}
   },
-]);
+]${hydrationDataBlock});
 `;
 
-// main.tsx
+// main.tsx — SSR-client mode top-level-awaits
+// `window.__panellet_preloads__` (chunks the server emitted
+// modulepreload links for) so by the time `hydrateRoot` runs, every
+// `route.lazy()` import resolves from the module cache on the next
+// microtask. Without the await, react-router would render its
+// internal fallback during the lazy gap and React 19 would diff the
+// fallback against the server's resolved tree → hydration mismatch.
+// <StrictMode> wraps the app so dev-only effect double-invocation
+// surfaces accidental side effects in route components and hooks
+// (no-op in production).
+const reactDomEntry = ssrClient ? "hydrateRoot" : "createRoot";
+const wrapMount = (children) =>
+  ssrClient
+    ? `hydrateRoot(document.getElementById("root")!, <StrictMode>${children}</StrictMode>);`
+    : `createRoot(document.getElementById("root")!).render(<StrictMode>${children}</StrictMode>);`;
+
+const ssrPreloadAwait = ssrClient
+  ? `await Promise.all(
+  ((window as unknown as { __panellet_preloads__?: string[] }).__panellet_preloads__ ?? [])
+    .map((u) => import(/* @vite-ignore */ u)),
+);
+
+`
+  : "";
+
 const mainCode = i18nEnabled
-  ? `import { createRoot } from "react-dom/client";
+  ? `import { StrictMode } from "react";
+import { ${reactDomEntry} } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { router } from "${routerModuleName}";
 import { I18N_CATALOGS, type Locale } from "${i18nManifestImport}";
@@ -176,17 +249,16 @@ import { I18nProvider, pickLocale } from "${i18nRuntimeImport}";
 const SUPPORTED_LOCALES = Object.keys(I18N_CATALOGS) as Locale[];
 const locale = pickLocale(SUPPORTED_LOCALES, "${i18nSourceLocale}");
 
-createRoot(document.getElementById("root")!).render(
-  <I18nProvider locale={locale} catalog={I18N_CATALOGS[locale]}>
+${ssrPreloadAwait}${wrapMount(`<I18nProvider locale={locale} catalog={I18N_CATALOGS[locale]}>
     <RouterProvider router={router} />
-  </I18nProvider>,
-);
+  </I18nProvider>`)}
 `
-  : `import { createRoot } from "react-dom/client";
+  : `import { StrictMode } from "react";
+import { ${reactDomEntry} } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { router } from "${routerModuleName}";
 
-createRoot(document.getElementById("root")!).render(<RouterProvider router={router} />);
+${ssrPreloadAwait}${wrapMount("<RouterProvider router={router} />")}
 `;
 
 for (const f of [outRouter, outMain]) {
