@@ -141,6 +141,16 @@ seed_bazelrc() {
     done
 }
 
+# Authorize the cloned workspace's .envrc so direnv loads it in fresh
+# interactive shells (and `cd` into ~/senku). No-op if the workspace
+# has no .envrc.
+allow_direnv() {
+    local name="$1"
+    ssh -o LogLevel=ERROR "${name}.exe.xyz" \
+        "cd ${REPO_DIR_ON_VM} && { test ! -f .envrc || direnv allow .; }"
+    echo "exevm: direnv allow on ${name}:~/${REPO_DIR_ON_VM}" >&2
+}
+
 # Block on `bazel fetch //...` so cmd_new only returns once the VM is
 # ready to build — keeps the user from ssh-ing in and racing the warmup.
 warm_bazel() {
@@ -182,7 +192,7 @@ cmd_new() {
     fi
 
     if [ -n "$REPO_URL" ]; then
-        wait_for_clone "$vm" && seed_bazelrc "$vm" && warm_bazel "$vm"
+        wait_for_clone "$vm" && seed_bazelrc "$vm" && allow_direnv "$vm" && warm_bazel "$vm"
     fi
 
     local zed_url="zed://ssh/${vm}.exe.xyz/home/exedev/${REPO_DIR_ON_VM}"
