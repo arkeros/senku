@@ -1,6 +1,8 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_test")
+load("@bazel_lib//lib:copy_file.bzl", "copy_file")
 load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load(":react_component.bzl", "react_component")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -192,6 +194,32 @@ exports_files(
         "index.html.tpl",
     ],
     visibility = ["//visibility:public"],
+)
+
+# `react_ssr_devserver.tsx` is the static dev server every consuming
+# `react_ssr_app` runs (see `react_ssr_app.bzl`'s devserver target).
+# Compile it ONCE here and ship the resulting `.mjs` — consumers
+# `copy_file` the precompiled artifact, no per-app ts_project step.
+# Renamed from `.js` to `.mjs` so Node treats it as ESM without a
+# `package.json` marker.
+react_component(
+    name = "react_ssr_devserver_compiled",
+    srcs = ["react_ssr_devserver.tsx"],
+    _export_test = False,
+    deps = [
+        "//:node_modules/@hono/node-server",
+        "//:node_modules/@types/node",
+        "//:node_modules/@types/react-dom",
+        "//:node_modules/hono",
+        "//:node_modules/react-dom",
+        "//:node_modules/react-router",
+    ],
+)
+
+copy_file(
+    name = "react_ssr_devserver_mjs",
+    src = ":react_ssr_devserver.js",
+    out = "react_ssr_devserver.mjs",
 )
 
 bzl_library(
