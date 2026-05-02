@@ -4,6 +4,7 @@ load("//devtools/build/react_component:asset_library.bzl", "asset_library")
 load("//devtools/build/react_component:i18n_artifacts.bzl", "i18n_artifacts")
 load("//devtools/build/react_component:output_group_test.bzl", "require_output_group_test")
 load("//devtools/build/react_component:react_component.bzl", "react_component")
+load("//devtools/build/react_component:react_ssr_app.bzl", "react_ssr_app")
 
 hash_assets(
     name = "hashed",
@@ -127,4 +128,15 @@ i18n_artifacts(
 build_test(
     name = "i18n_artifacts_build_test",
     targets = [":i18n_testapp_i18n_manifest"],
+)
+
+# react_ssr_app smoke test — v1 skeleton: the macro validates inputs and
+# produces no targets, so loading this BUILD file exercises the validation
+# path. Subsequent roadmap steps will give the macro real outputs to assert
+# against (server bundle, devserver, OCI image).
+react_ssr_app(
+    name = "ssr_smoke",
+    browser_deps = [],
+    layout = ":Header",
+    routes = [],
 )

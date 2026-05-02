@@ -177,6 +177,14 @@ bzl_library(
 )
 
 bzl_library(
+    name = "react_ssr_app",
+    srcs = ["react_ssr_app.bzl"],
+    deps = [
+        ":runtime_config",
+    ],
+)
+
+bzl_library(
     name = "react_static_layer",
     srcs = ["react_static_layer.bzl"],
     deps = [
