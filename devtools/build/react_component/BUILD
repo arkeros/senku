@@ -210,6 +210,15 @@ bzl_library(
 )
 
 bzl_library(
+    name = "react_ssr_component",
+    srcs = ["react_ssr_component.bzl"],
+    deps = [
+        ":react_component",
+        "@aspect_rules_js//js:defs",
+    ],
+)
+
+bzl_library(
     name = "react_static_layer",
     srcs = ["react_static_layer.bzl"],
     deps = [

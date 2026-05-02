@@ -5,6 +5,7 @@ load("//devtools/build/react_component:i18n_artifacts.bzl", "i18n_artifacts")
 load("//devtools/build/react_component:output_group_test.bzl", "require_output_group_test")
 load("//devtools/build/react_component:react_component.bzl", "react_component")
 load("//devtools/build/react_component:react_ssr_app.bzl", "react_ssr_app")
+load("//devtools/build/react_component:react_ssr_component.bzl", "react_ssr_component")
 
 hash_assets(
     name = "hashed",
@@ -139,4 +140,23 @@ react_ssr_app(
     browser_deps = [],
     layout = ":Header",
     routes = [],
+)
+
+# react_ssr_component fixture: dual-compile a route component with
+# `preload` and `meta` exports. Exercises that both .client.js and
+# .server.js outputs are produced and that downstream consumers can
+# reach them via the :SsrPage_client / :SsrPage_server filegroups.
+react_ssr_component(
+    name = "SsrPage",
+    testonly = True,
+    srcs = ["SsrPage.tsx"],
+)
+
+build_test(
+    name = "ssr_component_build_test",
+    targets = [
+        ":SsrPage",
+        ":SsrPage_client",
+        ":SsrPage_server",
+    ],
 )
