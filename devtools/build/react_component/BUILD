@@ -70,16 +70,6 @@ js_binary(
     entry_point = "react_app_codegen.mjs",
 )
 
-# SSR server-entry codegen: generates {name}_server.tsx (Hono +
-# createStaticHandler + renderToPipeableStream) from a route manifest.
-js_binary(
-    name = "react_ssr_app_codegen_bin",
-    data = [
-        "//:node_modules/ramda",
-    ],
-    entry_point = "react_ssr_app_codegen.mjs",
-)
-
 # PostCSS JIT props: tree-shakes unused Open Props custom properties
 js_binary(
     name = "postcss_jit_bin",
@@ -196,15 +186,17 @@ exports_files(
     visibility = ["//visibility:public"],
 )
 
-# `react_ssr_devserver.tsx` is the static dev server every consuming
-# `react_ssr_app` runs (see `react_ssr_app.bzl`'s devserver target).
-# Compile it ONCE here and ship the resulting `.mjs` — consumers
-# `copy_file` the precompiled artifact, no per-app ts_project step.
-# Renamed from `.js` to `.mjs` so Node treats it as ESM without a
-# `package.json` marker.
+# `react_ssr_server.tsx` is the static SSR server every consuming
+# `react_ssr_app` runs — same script for dev (via `:{name}_devserver`)
+# and prod (via `:{name}_server` → `image_from_binary` for the OCI
+# image). The mode is selected by which client URL flag is passed:
+# `--client-main-url` for unbundled-ESM dev, `--client-bundle-url` for
+# the esbuild-bundled prod client. Compile it ONCE here, ship the
+# resulting `.mjs`. Renamed from `.js` to `.mjs` so Node treats it as
+# ESM without a `package.json` marker.
 react_component(
-    name = "react_ssr_devserver_compiled",
-    srcs = ["react_ssr_devserver.tsx"],
+    name = "react_ssr_server_compiled",
+    srcs = ["react_ssr_server.tsx"],
     _export_test = False,
     deps = [
         "//:node_modules/@hono/node-server",
@@ -217,9 +209,9 @@ react_component(
 )
 
 copy_file(
-    name = "react_ssr_devserver_mjs",
-    src = ":react_ssr_devserver.js",
-    out = "react_ssr_devserver.mjs",
+    name = "react_ssr_server_mjs",
+    src = ":react_ssr_server.js",
+    out = "react_ssr_server.mjs",
 )
 
 bzl_library(

@@ -148,14 +148,14 @@ react_ssr_app(
 )
 
 build_test(
-    name = "ssr_smoke_server_bundle_test",
+    name = "ssr_smoke_targets_test",
     targets = [
-        ":ssr_smoke_server_bundle",
+        ":ssr_smoke_server",
+        ":ssr_smoke_devserver",
         ":ssr_smoke_client_bundle",
         ":ssr_smoke_styles",
         ":ssr_smoke_normalize_css",
         ":ssr_smoke_static",
-        ":ssr_smoke_devserver",
     ],
 )
 

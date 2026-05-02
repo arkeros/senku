@@ -1,10 +1,11 @@
 /// <reference types="node" />
 /**
- * SSR dev server for panellet's `react_ssr_app` (sibling to
- * `//devtools/build/js:devserver.mjs` for the SPA flow).
- *
- * Static, shared across every consuming app — the per-app shape lives
- * in two manifests this script reads at boot:
+ * SSR server for panellet's `react_ssr_app` (sibling to
+ * `//devtools/build/js:devserver.mjs` for the SPA flow). Same script
+ * runs in dev (via `bazel run :{name}_devserver`) and in prod (the
+ * binary `image_from_binary` ships into the OCI image as
+ * `:{name}_server`); the per-app shape lives entirely in the manifests
+ * this script reads at boot:
  *
  *   * `--route-manifest`         react_app_manifest output: layout +
  *                                 routes with import paths + export names.
@@ -13,20 +14,29 @@
  *                                 runfiles' node_modules); the script
  *                                 builds the createStaticHandler routes
  *                                 config from those modules' exports.
- *   * `--browser-deps-manifest`  one per browser_dep; same merging rules
- *                                 as `devserver.mjs` (esm / bundle /
- *                                 bundle-group).
+ *   * `--browser-deps-manifest`  one per browser_dep, dev-only; same
+ *                                 merging rules as `devserver.mjs`
+ *                                 (esm / bundle / bundle-group).
+ *
+ * Mode determination — exactly one of these flags is required, and the
+ * one that's set selects the rest of the behavior:
+ *
+ *   `--client-bundle-url <url>`  prod: reference esbuild's bundled
+ *                                 client at this URL. No importmap, no
+ *                                 /_components or /_modules handlers.
+ *   `--client-main-url <url>`    dev: reference the unbundled
+ *                                 `{name}_client_main.js` at this URL.
+ *                                 Adds importmap + /_modules + /_components
+ *                                 (raw runfiles serving).
  *
  * Compiled in @senku (`ts_project` → `.js`, copy_file → `.mjs`) and
  * shipped as a single `.mjs` consumers `copy_file` into their package
- * — no per-consumer ts_project compile, no per-app codegen. JSX is
- * preserved in source rather than compiled away into `createElement`
- * shorthand.
+ * — no per-consumer ts_project compile, no per-app codegen.
  *
- * Usage: node react_ssr_devserver.mjs
+ * Usage: node react_ssr_server.mjs
  *          --route-manifest <file.json>
  *          --static-dir <dir>
- *          --client-main-url <url>
+ *          (--client-bundle-url <url> | --client-main-url <url>)
  *          [--browser-deps-manifest <file.json> ...]
  *          [--app-title <string>]
  */
@@ -51,6 +61,7 @@ const ASSET_PATH_RE = /\.[a-z0-9]+$/i;
 const args = process.argv.slice(2);
 let routeManifestArg: string | null = null;
 let staticDirArg: string | null = null;
+let clientBundleUrl: string | null = null;
 let clientMainUrl: string | null = null;
 let appTitle = "panellet";
 const browserManifestArgs: string[] = [];
@@ -59,14 +70,25 @@ for (let i = 0; i < args.length; i++) {
   if (args[i] === "--route-manifest") routeManifestArg = args[++i];
   else if (args[i] === "--browser-deps-manifest") browserManifestArgs.push(args[++i]);
   else if (args[i] === "--static-dir") staticDirArg = args[++i];
+  else if (args[i] === "--client-bundle-url") clientBundleUrl = args[++i];
   else if (args[i] === "--client-main-url") clientMainUrl = args[++i];
   else if (args[i] === "--app-title") appTitle = args[++i];
 }
 
-if (!routeManifestArg || !staticDirArg || !clientMainUrl) {
+if (!routeManifestArg || !staticDirArg) {
   // eslint-disable-next-line no-console
   console.error(
-    "Usage: react_ssr_devserver.mjs --route-manifest <file> --static-dir <dir> --client-main-url <url> [--browser-deps-manifest <f> ...] [--app-title <s>]",
+    "Usage: react_ssr_server.mjs --route-manifest <file> --static-dir <dir> (--client-bundle-url <url> | --client-main-url <url>) [--browser-deps-manifest <f> ...] [--app-title <s>]",
+  );
+  process.exit(1);
+}
+
+const isDev = clientMainUrl != null && clientBundleUrl == null;
+const isProd = clientBundleUrl != null && clientMainUrl == null;
+if (isDev === isProd) {
+  // eslint-disable-next-line no-console
+  console.error(
+    "react_ssr_server: exactly one of --client-bundle-url (prod) or --client-main-url (dev) is required",
   );
   process.exit(1);
 }
@@ -217,11 +239,17 @@ function Document({
             __html: `window.__staticRouterHydrationData = ${hydrationData};`,
           }}
         />
-        <script
-          type="importmap"
-          dangerouslySetInnerHTML={{ __html: importMapJson }}
-        />
-        <script type="module" src={clientMainUrl!} />
+        {isDev ? (
+          <>
+            <script
+              type="importmap"
+              dangerouslySetInnerHTML={{ __html: importMapJson }}
+            />
+            <script type="module" src={clientMainUrl!} />
+          </>
+        ) : (
+          <script type="module" src={clientBundleUrl!} />
+        )}
       </body>
     </html>
   );
