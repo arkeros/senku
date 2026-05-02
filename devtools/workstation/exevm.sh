@@ -24,30 +24,39 @@ readonly SEED_BAZELRC_LINES=(
 # workspace root. Otherwise fall back to the git toplevel of the cwd.
 readonly LOCAL_WORKSPACE="${BUILD_WORKSPACE_DIRECTORY:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
 
-# Resolve a floating tag (typically :latest) to an immutable form so VMs
-# created at different times don't drift. Prefers a CalVer-shaped tag
-# (2026.18.45[-sha]) pointing at the same digest as :latest because
-# that's human-readable; falls back to @sha256:... pinning when no
-# CalVer tag matches. Pass-through for already-pinned refs and on any
-# crane failure (missing binary, no auth, no network).
+readonly CALVER_TAG_RE='^[0-9]{4}\.[0-9]+\.[0-9]+(-[a-f0-9]+)?$'
+
+# Resolve a floating tag (typically :latest) to a CalVer tag like
+# 2026.18.45[-sha] pointing at the same digest. CalVer is required:
+# exe.dev's data model stores only `repo + tag` and silently drops
+# `@sha256:` pins, so falling back to a digest would erase the version
+# from `exe.dev ls`. Pass-through if the input is already a CalVer tag
+# or an explicit `@sha256:` digest (caller opted in). Anything else
+# (crane missing, digest lookup fails, no CalVer match) is a hard error
+# — refuse to provision a VM whose pin we can't observe later.
 resolve_immutable_image() {
     local image="$1"
     case "$image" in
         *@sha256:*) echo "$image"; return ;;
     esac
-    if ! command -v crane >/dev/null 2>&1; then
+    local existing_tag="${image##*:}"
+    if [[ "$existing_tag" =~ $CALVER_TAG_RE ]]; then
         echo "$image"
         return
+    fi
+    if ! command -v crane >/dev/null 2>&1; then
+        echo "exevm: crane not found; cannot pin $image to a CalVer tag" >&2
+        return 1
     fi
     local repo="${image%:*}"
     local digest
     if ! digest=$(crane digest "$image" 2>/dev/null); then
-        echo "$image"
-        return
+        echo "exevm: crane digest failed for $image (auth/network?)" >&2
+        return 1
     fi
     local match
     match=$(crane ls "$repo" 2>/dev/null |
-        grep -E '^[0-9]{4}\.[0-9]+\.[0-9]+(-[a-f0-9]+)?$' |
+        grep -E "$CALVER_TAG_RE" |
         sort -Vr |
         while read -r tag; do
             if [ "$(crane digest "${repo}:${tag}" 2>/dev/null)" = "$digest" ]; then
@@ -55,11 +64,12 @@ resolve_immutable_image() {
                 break
             fi
         done)
-    if [ -n "$match" ]; then
-        echo "$match"
-    else
-        echo "${repo}@${digest}"
+    if [ -z "$match" ]; then
+        echo "exevm: no CalVer tag matches $image (digest=$digest)" >&2
+        echo "exevm: refusing to fall back to @sha256: pin (exe.dev drops digests in ls)" >&2
+        return 1
     fi
+    echo "$match"
 }
 
 usage() {
