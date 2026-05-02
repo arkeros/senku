@@ -25,6 +25,31 @@ js_binary(
     entry_point = "stylex_transpile.mjs",
 )
 
+# Dual-compile script: runs @babel/core with the strip-server-only-exports
+# plugin to produce {client.js, server.js} pairs for SSR route components.
+# Wired into the build pipeline by react_ssr_app's react_component extension
+# (roadmap step 3).
+js_binary(
+    name = "dual_compile_bin",
+    data = [
+        "//:node_modules/@babel/core",
+        "//:node_modules/@babel/preset-react",
+        "//:node_modules/@babel/preset-typescript",
+    ],
+    entry_point = "dual_compile.mjs",
+)
+
+js_test(
+    name = "dual_compile_test",
+    data = [
+        "dual_compile.mjs",
+        "//:node_modules/@babel/core",
+        "//:node_modules/@babel/preset-react",
+        "//:node_modules/@babel/preset-typescript",
+    ],
+    entry_point = "dual_compile_test.mjs",
+)
+
 # CSS collector: merges .stylex.json files into a single .css
 js_binary(
     name = "stylex_collect_css_bin",
