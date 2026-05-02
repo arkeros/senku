@@ -123,7 +123,37 @@ const lazyImportPath = (path) => (ssrClient ? `${path}.client` : path);
 // alongside the router source so `import("./X.client")` types as
 // `Promise<any>` instead of TS2307.
 
-// Generate lazy route objects recursively
+// In SSR-client mode, route components are wrapped in `React.lazy`
+// rather than `route.lazy`:
+//
+//   * `route.lazy` is react-router's own lazy mechanism and does NOT
+//     integrate with `<Suspense>` / React 19's progressive hydration —
+//     it renders a fallback synchronously while the chunk loads, which
+//     mismatches the server-rendered tree and leaves both DOMs side
+//     by side after hydration.
+//   * `React.lazy` + a `<Suspense>` boundary in client_main hooks into
+//     React 19's "hydrate-while-suspended" path: the server-rendered
+//     HTML stays in the DOM, the dynamic import resolves async, then
+//     React upgrades the boundary to interactive without re-mounting.
+//
+// The dynamic `import()` is preserved per route, so esbuild's
+// `splitting = True` still produces one chunk per `.client.js`.
+const lazyComponentVar = (path, name) =>
+  `__panellet_lazy__${path
+    .replace(/^\.\//, "")
+    .replace(/[^A-Za-z0-9_$]+/g, "_")}__${name}`;
+
+const lazyComponentDecls = ssrClient ? new Map() : null;
+const ensureLazyComponent = (path, name) => {
+  const key = `${path}\0${name}`;
+  let local = lazyComponentDecls.get(key);
+  if (local) return local;
+  local = lazyComponentVar(path, name);
+  lazyComponentDecls.set(key, { local, path, name });
+  return local;
+};
+
+// Generate route objects recursively
 function generateRoute(route, indent) {
   const pad = " ".repeat(indent);
   const props = [];
@@ -135,9 +165,17 @@ function generateRoute(route, indent) {
   }
 
   if (route.import) {
-    props.push(
-      `lazy: () => import("${lazyImportPath(route.import)}").then(m => ({ Component: m.${route.name} }))`,
-    );
+    if (ssrClient) {
+      const local = ensureLazyComponent(
+        lazyImportPath(route.import),
+        route.name,
+      );
+      props.push(`Component: ${local}`);
+    } else {
+      props.push(
+        `lazy: () => import("${lazyImportPath(route.import)}").then(m => ({ Component: m.${route.name} }))`,
+      );
+    }
   }
 
   if (hasErrorRef(route)) {
@@ -173,29 +211,80 @@ const childrenBlock = routeEntries.length > 0
   ? `    children: [\n${routeEntries.join(",\n")},\n    ],`
   : "    children: [],";
 
-// router.tsx — lazy imports for route components, static imports for error boundaries
-const routerCode = `import { createBrowserRouter } from "react-router";
-${errorImportsBlock}
-export const router = createBrowserRouter([
+// In SSR-client mode, `window.__staticRouterHydrationData` carries the
+// server's already-resolved loaderData / actionData / errors. Passing
+// it to `createBrowserRouter` skips the "loading" state on first
+// render — without it, react-router treats the page as a fresh client
+// nav and the resulting tree mismatches the server-rendered HTML.
+const hydrationDataBlock = ssrClient
+  ? `, {
+  hydrationData: (window as unknown as {
+    __staticRouterHydrationData?: HydrationState;
+  }).__staticRouterHydrationData,
+}`
+  : "";
+const hydrationDataImport = ssrClient
+  ? "import type { HydrationState } from \"react-router\";\n"
+  : "";
+
+// Layout participates in the same React.lazy + Suspense scheme as the
+// other routes; its chunk lazy-loads in parallel via the dynamic
+// `import()` esbuild splits out.
+const layoutLazyLocal = ssrClient
+  ? ensureLazyComponent(lazyImportPath(layout.import), layout.name)
+  : null;
+
+let lazyDeclsBlock = "";
+if (ssrClient) {
+  const lines = ["const __panellet_React_lazy__ = React.lazy;"];
+  for (const { local, path, name } of lazyComponentDecls.values()) {
+    lines.push(
+      `const ${local} = __panellet_React_lazy__(() => import("${path}").then((m) => ({ default: m.${name} })));`,
+    );
+  }
+  lazyDeclsBlock = lines.join("\n") + "\n\n";
+}
+
+const reactImport = ssrClient ? "import * as React from \"react\";\n" : "";
+
+const layoutEntry = ssrClient
+  ? `Component: ${layoutLazyLocal}`
+  : `lazy: () => import("${lazyImportPath(layout.import)}").then(m => ({ Component: m.${layout.name} }))`;
+
+// router.tsx — error boundaries are statically imported regardless of
+// mode (a lazy boundary risks the same failure that triggered it).
+const routerCode = `${reactImport}import { createBrowserRouter } from "react-router";
+${hydrationDataImport}${errorImportsBlock}
+${lazyDeclsBlock}export const router = createBrowserRouter([
   {
     path: "/",
-    lazy: () => import("${lazyImportPath(layout.import)}").then(m => ({ Component: m.${layout.name} })),
+    ${layoutEntry},
 ${layoutErrorLine}${childrenBlock}
   },
-]);
+]${hydrationDataBlock});
 `;
 
 // main.tsx — SSR-client mode hydrates the server-rendered DOM
 // (hydrateRoot's second-arg form) instead of mounting a fresh root
-// (createRoot(...).render).
-const wrapMount = (children) =>
-  ssrClient
-    ? `hydrateRoot(document.getElementById("root")!, ${children});`
-    : `createRoot(document.getElementById("root")!).render(${children});`;
+// (createRoot(...).render). The <Suspense> boundary is what makes
+// React.lazy + SSR hydration cooperate: server emits the resolved
+// HTML, client suspends while the chunk loads, React 19 holds the
+// SSR DOM in place, then swaps to interactive when the chunk
+// resolves — no double-render and no flicker.
 const reactDomEntry = ssrClient ? "hydrateRoot" : "createRoot";
 
+const wrapWithSuspense = (children) =>
+  ssrClient ? `<Suspense fallback={null}>${children}</Suspense>` : children;
+
+const wrapMount = (children) =>
+  ssrClient
+    ? `hydrateRoot(document.getElementById("root")!, ${wrapWithSuspense(children)});`
+    : `createRoot(document.getElementById("root")!).render(${children});`;
+
+const suspenseImport = ssrClient ? `import { Suspense } from "react";\n` : "";
+
 const mainCode = i18nEnabled
-  ? `import { ${reactDomEntry} } from "react-dom/client";
+  ? `${suspenseImport}import { ${reactDomEntry} } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { router } from "${routerModuleName}";
 import { I18N_CATALOGS, type Locale } from "${i18nManifestImport}";
@@ -208,7 +297,7 @@ ${wrapMount(`<I18nProvider locale={locale} catalog={I18N_CATALOGS[locale]}>
     <RouterProvider router={router} />
   </I18nProvider>`)}
 `
-  : `import { ${reactDomEntry} } from "react-dom/client";
+  : `${suspenseImport}import { ${reactDomEntry} } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { router } from "${routerModuleName}";
 

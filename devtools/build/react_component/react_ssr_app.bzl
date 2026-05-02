@@ -326,12 +326,18 @@ def react_ssr_app(
     # src="/static/{name}_client_bundle/{name}_client_main.js">` (step 7
     # only emits the entry tag — per-route modulepreload is on the
     # backlog, see roadmap).
+    #
+    # `minify = True` matters: without it, esbuild leaves dead branches
+    # like `if ("production" !== "production")` in place even though the
+    # `define` substitution rewrote the condition, and React's runtime
+    # then logs "DCE has not been applied" to DevTools.
     esbuild(
         name = name + "_client_bundle",
         entry_point = name + "_client_main.js",
         target = "es2020",
         splitting = True,
         output_dir = True,
+        minify = True,
         define = {"process.env.NODE_ENV": '"production"'},
         config = Label("//devtools/build/react_component:esbuild_react_dedup.config"),
         deps = [
