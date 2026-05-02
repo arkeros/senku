@@ -160,6 +160,16 @@ warm_bazel() {
         "cd ${REPO_DIR_ON_VM} && bazel fetch //..."
 }
 
+# Materialize //tools:dev — the lazy_bazel_env tool tree the .envrc
+# puts on PATH (go, gazelle, crane, jq, buildifier, etc.). Without
+# this, first interactive use of any dev tool blocks on a build.
+warm_dev_tools() {
+    local name="$1"
+    echo "exevm: bazel run //tools:dev on ${name} (blocking)" >&2
+    ssh -o LogLevel=ERROR "${name}.exe.xyz" \
+        "cd ${REPO_DIR_ON_VM} && bazel run //tools:dev"
+}
+
 cmd_new() {
     local name="${1:-}"
     local resolved
@@ -192,7 +202,8 @@ cmd_new() {
     fi
 
     if [ -n "$REPO_URL" ]; then
-        wait_for_clone "$vm" && seed_bazelrc "$vm" && allow_direnv "$vm" && warm_bazel "$vm"
+        wait_for_clone "$vm" && seed_bazelrc "$vm" && allow_direnv "$vm" && \
+            warm_bazel "$vm" && warm_dev_tools "$vm"
     fi
 
     local zed_url="zed://ssh/${vm}.exe.xyz/home/exedev/${REPO_DIR_ON_VM}"
