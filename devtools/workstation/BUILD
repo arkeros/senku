@@ -76,6 +76,7 @@ tar(
     srcs = [
         "files/etc/docker/daemon.json",
         "files/etc/fish/conf.d/direnv.fish",
+        "files/etc/fish/conf.d/docker.fish",
         "files/etc/fish/conf.d/zoxide.fish",
         "files/etc/group",
         "files/etc/pam.d/other",
@@ -156,8 +157,10 @@ tar(
         # DOCKER_HOST — daemon listens at /run/docker.sock, but the CLI's
         # default /var/run/docker.sock relies on a /var/run -> /run
         # symlink that systemd-tmpfiles isn't reliably setting up here.
-        # Set the env var directly.
+        # Set the env var directly. Two files because fish (the default
+        # login shell) doesn't read /etc/profile.d/*.sh.
         "./etc/profile.d/docker.sh uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile.d/docker.sh)",
+        "./etc/fish/conf.d/docker.fish uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/fish/conf.d/docker.fish)",
         # direnv + zoxide shell hooks, system-wide.
         "./etc/profile.d/direnv.sh uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/profile.d/direnv.sh)",
         "./etc/fish/conf.d/direnv.fish uid=0 gid=0 mode=0644 type=file content=$(execpath files/etc/fish/conf.d/direnv.fish)",
