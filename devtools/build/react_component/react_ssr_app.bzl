@@ -244,10 +244,12 @@ def react_ssr_app(
         target = _NODE_TARGET,
         format = "esm",
         bundle = True,
-        # Match react_app's "production-mode JS" choice so any react_dom
-        # NODE_ENV guards in our deps dead-code on the server too.
         define = {"process.env.NODE_ENV": '"production"'},
-        config = Label("//devtools/build/react_component:esbuild_react_dedup.config"),
+        # Server-side config extends the shared react-dedup config with
+        # a `createRequire` banner: react-dom/server.node ships as CJS
+        # and calls `require("util")` at init, so bundled-into-ESM needs
+        # `require` defined.
+        config = Label("//devtools/build/react_component:esbuild_react_server.config"),
         deps = [
             ":" + name + "_server_entry_ts",
         ] + all_ts_targets + [
