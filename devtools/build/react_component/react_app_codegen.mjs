@@ -245,7 +245,8 @@ if (ssrClient) {
   lazyDeclsBlock = lines.join("\n") + "\n\n";
 }
 
-const reactImport = ssrClient ? "import * as React from \"react\";\n" : "";
+// React.lazy lives in the router; main.tsx pulls Suspense + StrictMode.
+const routerReactImport = ssrClient ? "import * as React from \"react\";\n" : "";
 
 const layoutEntry = ssrClient
   ? `Component: ${layoutLazyLocal}`
@@ -253,7 +254,7 @@ const layoutEntry = ssrClient
 
 // router.tsx — error boundaries are statically imported regardless of
 // mode (a lazy boundary risks the same failure that triggered it).
-const routerCode = `${reactImport}import { createBrowserRouter } from "react-router";
+const routerCode = `${routerReactImport}import { createBrowserRouter } from "react-router";
 ${hydrationDataImport}${errorImportsBlock}
 ${lazyDeclsBlock}export const router = createBrowserRouter([
   {
@@ -271,20 +272,31 @@ ${layoutErrorLine}${childrenBlock}
 // HTML, client suspends while the chunk loads, React 19 holds the
 // SSR DOM in place, then swaps to interactive when the chunk
 // resolves — no double-render and no flicker.
+//
+// <StrictMode> wraps the app so dev-only double-effect-invocation
+// surfaces accidental side effects in route components and hooks.
+// Production render is unaffected (StrictMode is a no-op there).
+// The server entry wraps in StrictMode too, so hydration matches.
 const reactDomEntry = ssrClient ? "hydrateRoot" : "createRoot";
 
-const wrapWithSuspense = (children) =>
-  ssrClient ? `<Suspense fallback={null}>${children}</Suspense>` : children;
+const wrapWithStrict = (children) =>
+  ssrClient
+    ? `<StrictMode>
+    <Suspense fallback={null}>${children}</Suspense>
+  </StrictMode>`
+    : `<StrictMode>${children}</StrictMode>`;
 
 const wrapMount = (children) =>
   ssrClient
-    ? `hydrateRoot(document.getElementById("root")!, ${wrapWithSuspense(children)});`
-    : `createRoot(document.getElementById("root")!).render(${children});`;
+    ? `hydrateRoot(document.getElementById("root")!, ${wrapWithStrict(children)});`
+    : `createRoot(document.getElementById("root")!).render(${wrapWithStrict(children)});`;
 
-const suspenseImport = ssrClient ? `import { Suspense } from "react";\n` : "";
+const reactImport = ssrClient
+  ? `import { StrictMode, Suspense } from "react";\n`
+  : `import { StrictMode } from "react";\n`;
 
 const mainCode = i18nEnabled
-  ? `${suspenseImport}import { ${reactDomEntry} } from "react-dom/client";
+  ? `${reactImport}import { ${reactDomEntry} } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { router } from "${routerModuleName}";
 import { I18N_CATALOGS, type Locale } from "${i18nManifestImport}";
@@ -297,7 +309,7 @@ ${wrapMount(`<I18nProvider locale={locale} catalog={I18N_CATALOGS[locale]}>
     <RouterProvider router={router} />
   </I18nProvider>`)}
 `
-  : `${suspenseImport}import { ${reactDomEntry} } from "react-dom/client";
+  : `${reactImport}import { ${reactDomEntry} } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { router } from "${routerModuleName}";
 

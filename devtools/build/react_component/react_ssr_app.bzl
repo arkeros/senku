@@ -181,9 +181,22 @@ def react_ssr_app(
         **forward_kwargs
     )
 
-    # 2. Codegen: turn the manifest into a `{name}_server.tsx` that wires
-    # up createStaticHandler + renderToPipeableStream.
+    # 2. Codegen — runs twice, producing two distinct entries:
+    #    {name}_server.tsx     prod: serveStatic from PANELLET_STATIC_DIR
+    #                                + <script src={CLIENT_BUNDLE_URL}>
+    #    {name}_devserver.tsx  dev:  /_modules/* (manifest-driven import map)
+    #                                + /_components/* (raw .js from runfiles)
+    #                                + <script src=/_components/.../client_main.js>
+    #
+    # Two entries, two esbuild bundles, no env-branching: prod never
+    # ships dev's fs/manifest-parsing code, and each file stays focused
+    # on a single concern.
     client_bundle_url = "/{}_client_bundle/{}_client_main.js".format(name, name)
+    client_main_url = "/_components/{}/{}_client_main.js".format(
+        native.package_name(),
+        name,
+    )
+
     js_run_binary(
         name = name + "_server_codegen",
         srcs = [manifest_name + ".json"],
@@ -193,6 +206,8 @@ def react_ssr_app(
             "$(location {}.json)".format(manifest_name),
             "--out-server",
             "$(location {}_server.tsx)".format(name),
+            "--mode",
+            "prod",
             "--app-title",
             name,
             "--client-bundle-url",
@@ -202,9 +217,38 @@ def react_ssr_app(
         **forward_kwargs
     )
 
-    # 3. Type-check + transpile the entry. Deps include every route
+    js_run_binary(
+        name = name + "_devserver_codegen",
+        srcs = [manifest_name + ".json"],
+        outs = [name + "_devserver.tsx"],
+        args = [
+            "--manifest",
+            "$(location {}.json)".format(manifest_name),
+            "--out-server",
+            "$(location {}_devserver.tsx)".format(name),
+            "--mode",
+            "dev",
+            "--app-title",
+            name,
+            "--client-main-url",
+            client_main_url,
+        ],
+        tool = Label("//devtools/build/react_component:react_ssr_app_codegen_bin"),
+        **forward_kwargs
+    )
+
+    # 3. Type-check + transpile each entry. Deps include every route
     # component's _ts target so tsc resolves the static `import { Foo }
     # from "./.../Foo";` lines the codegen emits.
+    _entry_deps = all_route_components + [
+        "//:node_modules/hono",
+        "//:node_modules/@hono/node-server",
+        "//:node_modules/@types/node",
+        "//:node_modules/react-dom",
+        "//:node_modules/@types/react-dom",
+        "//:node_modules/react-router",
+    ]
+
     react_component(
         name = name + "_server_entry",
         srcs = [name + "_server.tsx"],
@@ -212,14 +256,15 @@ def react_ssr_app(
         # react_component itself adds //:node_modules/react and
         # //:node_modules/@types/react to ts_project's deps; listing them
         # here too triggers a duplicate-label error.
-        deps = all_route_components + [
-            "//:node_modules/hono",
-            "//:node_modules/@hono/node-server",
-            "//:node_modules/@types/node",
-            "//:node_modules/react-dom",
-            "//:node_modules/@types/react-dom",
-            "//:node_modules/react-router",
-        ],
+        deps = _entry_deps,
+        **forward_kwargs
+    )
+
+    react_component(
+        name = name + "_devserver_entry",
+        srcs = [name + "_devserver.tsx"],
+        _export_test = False,
+        deps = _entry_deps,
         **forward_kwargs
     )
 
@@ -237,6 +282,15 @@ def react_ssr_app(
     # react, react-dom/server, react-router, route components) is inlined
     # into the single output file. No `splitting` — the prod runtime is
     # `node /app/server.js` and we want one file in the OCI image layer.
+    _server_bundle_deps = [
+        "//:node_modules/hono",
+        "//:node_modules/@hono/node-server",
+        "//:node_modules/react",
+        "//:node_modules/react-dom",
+        "//:node_modules/react-router",
+        "//:node_modules/@stylexjs/stylex",
+    ]
+
     esbuild(
         name = name + "_server_bundle",
         entry_point = name + "_server.js",
@@ -246,18 +300,16 @@ def react_ssr_app(
         bundle = True,
         define = {"process.env.NODE_ENV": '"production"'},
         config = Label("//devtools/build/react_component:esbuild_react_dedup.config"),
-        deps = [
-            ":" + name + "_server_entry_ts",
-        ] + all_ts_targets + [
-            "//:node_modules/hono",
-            "//:node_modules/@hono/node-server",
-            "//:node_modules/react",
-            "//:node_modules/react-dom",
-            "//:node_modules/react-router",
-            "//:node_modules/@stylexjs/stylex",
-        ],
+        deps = [":" + name + "_server_entry_ts"] + all_ts_targets + _server_bundle_deps,
         **forward_kwargs
     )
+
+    # No dev-server bundle. The dev server runs Node directly on the
+    # ts_project-emitted `{name}_devserver.js`; npm deps resolve from
+    # runfiles' node_modules, and route components are available as
+    # ESM .js files for Node to import directly. An edit to one
+    # component is one ts_project action away from the next reload —
+    # no esbuild on save, no client bundling on save.
 
     # 5. Client codegen — same react_app_codegen as the SPA flow, with
     # `--ssr-client`: lazy imports point at `./X.client` so esbuild
@@ -410,29 +462,56 @@ def react_ssr_app(
         **forward_kwargs
     )
 
-    # 8. Devserver — the same bundled Hono server we ship in prod, with
-    # `PANELLET_STATIC_DIR` pointed at the runfiles static directory.
-    # `ibazel_notify_changes` tells ibazel to send a SIGINT/restart cycle
-    # to this binary on rebuild, so `ibazel run :{name}_devserver`
-    # gives a hot server-restart loop. Process restart (not a worker
-    # thread) keeps it dead simple; a worker-thread fast path is on the
-    # explicit "out of scope for v1" list in the roadmap.
+    # 8. Devserver — runs the dev-codegen entry's ts_project output as
+    # Node directly. Mirrors `//devtools/build/js:devserver.bzl`'s wiring:
+    # browser_deps' manifests + their materialized node_modules go into
+    # runfiles, the merged import map is built at server boot from those
+    # manifests (paths passed via PANELLET_BROWSER_DEPS_MANIFESTS), and
+    # raw `.client.js` from runfiles is served at `/_components/*`.
+    #
+    # No esbuild on save: edit a route component, ts_project re-emits
+    # one .js, ibazel restarts the server, browser refresh.
+    # `ibazel_notify_changes` triggers the restart cycle.
+    manifest_files = []
+    dep_data = []
+    for dep in browser_deps:
+        manifest_files.append(dep + ".json")
+        dep_data.append(dep)
+        dep_data.append(dep + ".json")
+        dep_data.append(dep + "_node_modules")
+
+    manifests_env = ":".join([
+        "$(rootpath {})".format(mf)
+        for mf in manifest_files
+    ])
+
     devserver_kwargs = {k: v for k, v in forward_kwargs.items() if k != "tags"}
     devserver_tags = list(forward_kwargs.get("tags", []))
     if "ibazel_notify_changes" not in devserver_tags:
         devserver_tags.append("ibazel_notify_changes")
+
     js_binary(
         name = name + "_devserver",
-        # Output file label of the esbuild rule; addressing the rule label
-        # itself (`:{name}_server_bundle`) hits both `.js` and `.js.map`,
-        # which js_binary rejects as "entry_point must be a single file".
-        entry_point = ":" + name + "_server_bundle.js",
+        # ts_project output filename; the codegen emits the entry as
+        # `{name}_devserver.tsx`, react_component's transpiler writes
+        # `{name}_devserver.js` next to it.
+        entry_point = ":" + name + "_devserver.js",
         data = [
-            ":" + name + "_server_bundle",
+            ":" + name + "_devserver_entry_ts",
+            ":" + name + "_client_router_ts",
+            ":" + name + "_client_main_ts",
             ":" + name + "_static",
+        ] + all_ts_targets + all_client_filegroups + dep_data + [
+            "//:node_modules/hono",
+            "//:node_modules/@hono/node-server",
+            "//:node_modules/react",
+            "//:node_modules/react-dom",
+            "//:node_modules/react-router",
+            "//:node_modules/@stylexjs/stylex",
         ],
         env = {
             "PANELLET_STATIC_DIR": "$(rootpath :{}_static)".format(name),
+            "PANELLET_BROWSER_DEPS_MANIFESTS": manifests_env,
         },
         tags = devserver_tags,
         **devserver_kwargs

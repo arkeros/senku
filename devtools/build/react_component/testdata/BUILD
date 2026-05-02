@@ -137,7 +137,12 @@ build_test(
 react_ssr_app(
     name = "ssr_smoke",
     testonly = True,
-    browser_deps = [],
+    browser_deps = [
+        "//:browser_modules/_react",
+        "//:browser_modules/react-router",
+        "//:browser_modules/cookie",
+        "//:browser_modules/set-cookie-parser",
+    ],
     layout = ":SsrPage",
     routes = [],
 )
