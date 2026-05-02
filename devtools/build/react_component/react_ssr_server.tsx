@@ -42,7 +42,7 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
-import { StrictMode, Suspense, type ComponentType, type ReactNode } from "react";
+import { StrictMode, type ComponentType, type ReactNode } from "react";
 import { renderToReadableStream } from "react-dom/server.edge";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
@@ -63,6 +63,7 @@ let routeManifestArg: string | null = null;
 let staticDirArg: string | null = null;
 let clientBundleUrl: string | null = null;
 let clientMainUrl: string | null = null;
+let chunksManifestArg: string | null = null;
 let appTitle = "panellet";
 const browserManifestArgs: string[] = [];
 
@@ -72,6 +73,7 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--static-dir") staticDirArg = args[++i];
   else if (args[i] === "--client-bundle-url") clientBundleUrl = args[++i];
   else if (args[i] === "--client-main-url") clientMainUrl = args[++i];
+  else if (args[i] === "--client-chunks-manifest") chunksManifestArg = args[++i];
   else if (args[i] === "--app-title") appTitle = args[++i];
 }
 
@@ -97,6 +99,15 @@ const runfiles = process.cwd();
 const routeManifestPath = resolve(runfiles, routeManifestArg);
 const routeManifestDir = dirname(routeManifestPath);
 const staticRoot = resolve(runfiles, staticDirArg);
+
+// `routeManifestDir` is `<runfiles>/<package>`. The bare path
+// `<package>/<file>` is what the chunks manifest keys (and what we
+// pass through `/_components/` in dev) — strip the runfiles prefix to
+// recover it.
+const routeManifestPackage =
+  routeManifestDir === runfiles
+    ? ""
+    : routeManifestDir.slice(runfiles.length + 1);
 
 // --- manifest types --------------------------------------------------------
 
@@ -165,6 +176,49 @@ for (const rel of browserManifestArgs) {
 
 const importMapJson = JSON.stringify(importMap);
 
+// --- chunks manifest (prod) / direct URL derivation (dev) -----------------
+//
+// `routeChunkUrls` maps a route's manifest `import` field (resolved to
+// a workspace-relative path) to the list of URLs the browser must load
+// before the route's `lazy()` call resolves — so that `route.lazy`
+// returns from cache and react-router doesn't render its internal
+// fallback during hydration. Server emits these as
+// `<link rel="modulepreload">` in the HTML head + inline
+// `window.__panellet_preloads__` for the client to top-level-await.
+const routeChunkUrls = new Map<string, string[]>();
+
+if (chunksManifestArg) {
+  // Prod: keys are the source paths esbuild's metafile recorded for
+  // each dynamic-import entry chunk (e.g.
+  // `<package>/Foo.client`); the post-process tool already prefixed
+  // each chunk URL with `/{name}_client_bundle/`.
+  const chunksPath = resolve(runfiles, chunksManifestArg);
+  const chunksManifest = JSON.parse(readFileSync(chunksPath, "utf-8")) as Record<string, string[]>;
+  for (const [src, urls] of Object.entries(chunksManifest)) {
+    routeChunkUrls.set(src, urls);
+  }
+}
+
+function preloadUrlsFor(importPath: string): string[] {
+  // Manifest's `import` is relative-from-manifest (`./Foo`); join it to
+  // the manifest's package path to get the workspace-relative key.
+  const cleaned = importPath.replace(/^\.\//, "");
+  const workspaceRelative = routeManifestPackage
+    ? `${routeManifestPackage}/${cleaned}`
+    : cleaned;
+  if (chunksManifestArg) {
+    // Prod: chunks manifest stores `<workspace>/<file>.client`.
+    const key = `${workspaceRelative}.client`;
+    return routeChunkUrls.get(key) ?? [];
+  }
+  // Dev: each route's `.client.js` is served raw under `/_components/`.
+  // The URL must match exactly what `route.lazy()`'s `import("./X.client")`
+  // resolves to in the browser (relative to client_main's URL, no `.js`
+  // extension) — otherwise the browser sees two different cache keys
+  // and the preload doesn't warm the lazy import.
+  return [`/_components/${workspaceRelative}.client`];
+}
+
 // --- route manifest → routes config (dynamic-imported components) ----------
 
 async function importComponent(relPath: string, exportName: string): Promise<ComponentType<unknown>> {
@@ -179,12 +233,21 @@ async function importComponent(relPath: string, exportName: string): Promise<Com
   return value as ComponentType<unknown>;
 }
 
+// Attach the manifest's `import` path to each route via `handle` so the
+// SSR catch-all can read it off `context.matches` and look up preload
+// URLs. react-router preserves arbitrary fields on `route.handle` and
+// surfaces them on each match.
+interface PanelletRouteHandle {
+  panelletImport: string;
+}
+
 async function realizeRoute(entry: RouteManifestEntry): Promise<RouteObject> {
   const out: Record<string, unknown> = entry.path === "/"
     ? { index: true }
     : { path: entry.path };
   if (entry.import && entry.name) {
     out.Component = await importComponent(entry.import, entry.name);
+    out.handle = { panelletImport: entry.import } satisfies PanelletRouteHandle;
   }
   if (entry.error_import && entry.error_name) {
     const Err = await importComponent(entry.error_import, entry.error_name);
@@ -203,6 +266,7 @@ const layoutEntry: RouteObject = await (async () => {
       routeManifest.layout.import!,
       routeManifest.layout.name!,
     ),
+    handle: { panelletImport: routeManifest.layout.import! } satisfies PanelletRouteHandle,
   };
   if (routeManifest.layout.error_import && routeManifest.layout.error_name) {
     const Err = await importComponent(
@@ -224,19 +288,29 @@ const handler = createStaticHandler([layoutEntry]);
 function Document({
   children,
   hydrationData,
-}: { children: ReactNode; hydrationData: string }) {
+  preloadUrls,
+}: {
+  children: ReactNode;
+  hydrationData: string;
+  preloadUrls: readonly string[];
+}) {
   return (
     <html>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{appTitle}</title>
+        {preloadUrls.map((url) => (
+          <link key={url} rel="modulepreload" href={url} />
+        ))}
       </head>
       <body>
         <div id="root">{children}</div>
         <script
           dangerouslySetInnerHTML={{
-            __html: `window.__staticRouterHydrationData = ${hydrationData};`,
+            __html:
+              `window.__staticRouterHydrationData = ${hydrationData};` +
+              `window.__panellet_preloads__ = ${JSON.stringify(preloadUrls)};`,
           }}
         />
         {isDev ? (
@@ -323,12 +397,24 @@ app.all("*", async (c) => {
       actionData: context.actionData,
       errors: context.errors,
     }).replace(/</g, "\\u003c");
+
+    // Walk the matched chain, collect each match's preload URLs.
+    // Dedupe + preserve order (parents before children) so the layout's
+    // chunks queue first.
+    const preloadSet = new Set<string>();
+    for (const m of context.matches) {
+      const handle = m.route.handle as PanelletRouteHandle | undefined;
+      if (!handle?.panelletImport) continue;
+      for (const url of preloadUrlsFor(handle.panelletImport)) {
+        preloadSet.add(url);
+      }
+    }
+    const preloadUrls = Array.from(preloadSet);
+
     const stream = await renderToReadableStream(
-      <Document hydrationData={hydrationData}>
+      <Document hydrationData={hydrationData} preloadUrls={preloadUrls}>
         <StrictMode>
-          <Suspense fallback={null}>
-            <StaticRouterProvider router={router} context={context} hydrate={false} />
-          </Suspense>
+          <StaticRouterProvider router={router} context={context} hydrate={false} />
         </StrictMode>
       </Document>,
       {

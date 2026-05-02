@@ -22,6 +22,7 @@ load(":asset_pipeline.bzl", "asset_pipeline")
 load(":labels.bzl", "ts_dep")
 load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
+load(":react_ssr_chunks_manifest.bzl", "react_ssr_chunks_manifest")
 load(":route_tree.bzl", "walk_route_tree")
 load(":runtime_config.bzl", "validate_runtime_config")
 load(":stylex_css.bzl", "stylex_css")
@@ -271,11 +272,18 @@ def react_ssr_app(
     esbuild(
         name = name + "_client_bundle",
         entry_point = name + "_client_main.js",
-        target = "es2020",
+        # `es2022` for top-level-await support (Chrome 89+, Firefox 89+,
+        # Safari 15+); the codegen-emitted main.tsx awaits
+        # `__panellet_preloads__` before `hydrateRoot`.
+        target = "es2022",
         splitting = True,
         output_dir = True,
         minify = True,
         define = {"process.env.NODE_ENV": '"production"'},
+        # `metafile = True` emits `{name}_client_bundle_metadata.json`
+        # alongside the chunks; the post-process step below derives the
+        # source-path → chunks manifest from it for modulepreload.
+        metafile = True,
         config = Label("//devtools/build/react_component:esbuild_react_dedup.config"),
         deps = [
             ":" + name + "_client_main_ts",
@@ -285,6 +293,21 @@ def react_ssr_app(
             "//:node_modules/react-router",
             "//:node_modules/@stylexjs/stylex",
         ],
+        **forward_kwargs
+    )
+
+    # 7b. Chunks manifest. Walks esbuild's metafile to record, for every
+    # output that's the entry of a dynamically-imported module (i.e. one
+    # of our route components), the transitive set of output chunks that
+    # need to load before it can run. The server (prod mode) consults
+    # this at request time to emit `<link rel="modulepreload">` for the
+    # matched routes' chunks, so `route.lazy()` resolves from cache
+    # rather than triggering a fallback render that would mismatch
+    # hydration.
+    react_ssr_chunks_manifest(
+        name = name + "_client_chunks",
+        bundle = ":" + name + "_client_bundle",
+        url_prefix = "/{}_client_bundle/".format(name),
         **forward_kwargs
     )
 
@@ -384,10 +407,12 @@ def react_ssr_app(
 
     # --- Prod server (the binary `image_from_binary` packages) -----
     #
-    # Uses the bundled client (`:{name}_client_bundle`) referenced by URL.
-    # No browser_deps manifests, no `/_modules/*` or `/_components/*`
-    # routes — the prod client is self-contained in the bundle, served
-    # straight from the static dir.
+    # Uses the bundled client (`:{name}_client_bundle`) referenced by URL,
+    # and the chunks manifest derived from esbuild's metafile to emit
+    # per-route `<link rel="modulepreload">` so `route.lazy()` resolves
+    # from cache on hydration. No browser_deps manifests, no
+    # `/_modules/*` or `/_components/*` routes — the prod client is
+    # self-contained in the bundle, served straight from the static dir.
     js_binary(
         name = name + "_server",
         entry_point = ":" + server_script,
@@ -398,11 +423,14 @@ def react_ssr_app(
             "$(rootpath :{}_static)".format(name),
             "--client-bundle-url",
             client_bundle_url,
+            "--client-chunks-manifest",
+            "$(rootpath :{}_client_chunks.json)".format(name),
             "--app-title",
             name,
         ],
         data = [
             ":" + manifest_name + ".json",
+            ":" + name + "_client_chunks.json",
             ":" + name + "_static",
         ] + all_ts_targets + _shared_npm_deps,
         **forward_kwargs

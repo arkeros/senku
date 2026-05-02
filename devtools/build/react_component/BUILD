@@ -70,6 +70,14 @@ js_binary(
     entry_point = "react_app_codegen.mjs",
 )
 
+# SSR client chunks manifest: post-processes esbuild's metafile into
+# {source-path → [chunk URLs]} so the SSR server can emit
+# `<link rel="modulepreload">` for the matched routes' chunks.
+js_binary(
+    name = "react_ssr_chunks_manifest_bin",
+    entry_point = "react_ssr_chunks_manifest.mjs",
+)
+
 # PostCSS JIT props: tree-shakes unused Open Props custom properties
 js_binary(
     name = "postcss_jit_bin",
@@ -240,11 +248,13 @@ bzl_library(
         ":labels",
         ":react_app_manifest",
         ":react_component",
+        ":react_ssr_chunks_manifest",
         ":route_tree",
         ":runtime_config",
         ":stylex_css",
         "@aspect_rules_esbuild//esbuild:defs",
         "@aspect_rules_js//js:defs",
+        "@bazel_lib//lib:copy_file",
         "@bazel_lib//lib:copy_to_directory",
     ],
 )
@@ -389,6 +399,11 @@ bzl_library(
 bzl_library(
     name = "labels",
     srcs = ["labels.bzl"],
+)
+
+bzl_library(
+    name = "react_ssr_chunks_manifest",
+    srcs = ["react_ssr_chunks_manifest.bzl"],
 )
 
 bzl_library(
