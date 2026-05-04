@@ -54,12 +54,32 @@ _LINUX_LIBC_DEV_VEX = [
     ]
 ]
 
+# libssh2-1t64 CVE-2026-7598 — integer overflow in userauth_password()
+# (client-side password auth). libssh2 enters the image as a transitive
+# dependency of curl and git, but the vulnerable path is unreachable in
+# workstation usage: curl is invoked only on http(s):// URLs (not
+# sftp://, scp://), git's ssh transport dispatches to OpenSSH rather
+# than libssh2, and even within libssh2 the bug requires password
+# authentication while the workstation uses keys. Debian itself flags
+# this as a no-dsa Minor issue.
+_LIBSSH2_VEX = [
+    vex_statement(
+        expires = "2026-07-30",
+        impact_statement = "userauth_password() is not reached: curl is not used for sftp/scp in workstation, git's ssh transport uses OpenSSH (not libssh2), and key-based auth bypasses the password code path.",
+        justification = "vulnerable_code_not_in_execute_path",
+        products = ["pkg:oci/workstation"],
+        status = "not_affected",
+        vulnerability = "CVE-2026-7598",
+    ),
+]
+
 vex_document(
     name = "vex",
     author = "rafael@arquero.cat",
     id = "https://github.com/arkeros/senku/blob/main/devtools/workstation/BUILD",
-    statements = _LINUX_LIBC_DEV_VEX,
-    timestamp = "2026-05-01T00:00:00Z",
+    statements = _LINUX_LIBC_DEV_VEX + _LIBSSH2_VEX,
+    timestamp = "2026-05-04T00:00:00Z",
+    version = 2,
 )
 
 exports_files([

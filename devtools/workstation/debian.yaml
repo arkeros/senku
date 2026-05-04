@@ -9,13 +9,12 @@ version: 1
 sources:
   - channel: unstable main contrib
     urls:
-      - https://snapshot-cloudflare.debian.org/archive/debian/20260501T000000Z
-      - https://snapshot.debian.org/archive/debian/20260501T000000Z
+      - https://snapshot-cloudflare.debian.org/archive/debian/20260504T025922Z
+      - https://snapshot.debian.org/archive/debian/20260504T025922Z
 archs:
   - amd64
   - arm64
 packages:
-  # Tier 0 — required for the image to function as an exe.dev VM
   - systemd
   - systemd-sysv
   - sudo
@@ -23,9 +22,6 @@ packages:
   - dbus-user-session
   - bash
   - coreutils
-  # Debian's "Essential: yes" closure that we don't get for free — apt
-  # postinst scripts don't run under rules_distroless, so packages
-  # normally assumed-installed need to be listed.
   - dash
   - diffutils
   - findutils
@@ -36,45 +32,31 @@ packages:
   - ncurses-bin
   - sed
   - tar
-  - util-linux     # provides su, login, mountpoint, more, etc.
+  - util-linux
   - which
-  - libc-bin       # provides getent, ldconfig, locale
-  # Tier 1 — out-of-band install plumbing (curl/jq used by setup scripts and
-  # by the bundled agent installers)
+  - libc-bin
   - curl
   - jq
-  # Developer baseline — git over ssh needs openssh-client (sshd itself is
-  # masked; exe.dev's shelley handles inbound)
   - git
   - openssh-client
   - gh
   - ripgrep
-  - less          # git's default pager
+  - less
   - neovim
-  - zoxide        # smarter cd
-  # Diagnosis / network tooling
+  - zoxide
   - hostname
-  - iproute2      # `ip` command
+  - iproute2
   - iputils-ping
-  - dnsutils      # dig, nslookup
-  - netcat-openbsd  # `nc`
-  # Process / disk inspection
+  - dnsutils
+  - netcat-openbsd
   - htop
   - ncdu
-  - psmisc        # killall, pstree, fuser
+  - psmisc
   - tree
-  # Session multiplexer
   - tmux
-  # C toolchain — bazel's cc_autoconf needs gcc on PATH even for builds
-  # that don't compile C themselves; cgo / rules_go assume it exists.
   - build-essential
-  # Container runtime — docker.io matches CI exactly (BuildBuddy
-  # executors run docker) and is the path of least surprise for
-  # rules_img / container_structure_test. docker-buildx covers the
-  # buildkit features rules_img can call into.
   - docker.io
   - docker-cli
   - docker-buildx
-  # The three tools this image is for
   - direnv
   - fish
