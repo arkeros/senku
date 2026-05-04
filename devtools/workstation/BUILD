@@ -64,7 +64,7 @@ _LINUX_LIBC_DEV_VEX = [
 # this as a no-dsa Minor issue.
 _LIBSSH2_VEX = [
     vex_statement(
-        expires = "2026-07-30",
+        expires = "2026-06-03",
         impact_statement = "userauth_password() is not reached: curl is not used for sftp/scp in workstation, git's ssh transport uses OpenSSH (not libssh2), and key-based auth bypasses the password code path.",
         justification = "vulnerable_code_not_in_execute_path",
         products = ["pkg:oci/workstation"],
