@@ -1,6 +1,8 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_test")
+load("@bazel_lib//lib:copy_file.bzl", "copy_file")
 load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load(":react_component.bzl", "react_component")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -25,6 +27,31 @@ js_binary(
     entry_point = "stylex_transpile.mjs",
 )
 
+# Dual-compile script: runs @babel/core with the strip-server-only-exports
+# plugin to produce {client.js, server.js} pairs for SSR route components.
+# Wired into the build pipeline by react_ssr_app's react_component extension
+# (roadmap step 3).
+js_binary(
+    name = "dual_compile_bin",
+    data = [
+        "//:node_modules/@babel/core",
+        "//:node_modules/@babel/preset-react",
+        "//:node_modules/@babel/preset-typescript",
+    ],
+    entry_point = "dual_compile.mjs",
+)
+
+js_test(
+    name = "dual_compile_test",
+    data = [
+        "dual_compile.mjs",
+        "//:node_modules/@babel/core",
+        "//:node_modules/@babel/preset-react",
+        "//:node_modules/@babel/preset-typescript",
+    ],
+    entry_point = "dual_compile_test.mjs",
+)
+
 # CSS collector: merges .stylex.json files into a single .css
 js_binary(
     name = "stylex_collect_css_bin",
@@ -41,6 +68,14 @@ js_binary(
         "//:node_modules/ramda",
     ],
     entry_point = "react_app_codegen.mjs",
+)
+
+# SSR client chunks manifest: post-processes esbuild's metafile into
+# {source-path → [chunk URLs]} so the SSR server can emit
+# `<link rel="modulepreload">` for the matched routes' chunks.
+js_binary(
+    name = "react_ssr_chunks_manifest_bin",
+    entry_point = "react_ssr_chunks_manifest.mjs",
 )
 
 # PostCSS JIT props: tree-shakes unused Open Props custom properties
@@ -152,10 +187,39 @@ js_binary(
 exports_files(
     [
         "default.conf.tpl",
+        "dual_compile_modules.d.ts",
         "esbuild_react_dedup.config.mjs",
         "index.html.tpl",
     ],
     visibility = ["//visibility:public"],
+)
+
+# `react_ssr_server.tsx` is the static SSR server every consuming
+# `react_ssr_app` runs — same script for dev (via `:{name}_devserver`)
+# and prod (via `:{name}_server` → `image_from_binary` for the OCI
+# image). The mode is selected by which client URL flag is passed:
+# `--client-main-url` for unbundled-ESM dev, `--client-bundle-url` for
+# the esbuild-bundled prod client. Compile it ONCE here, ship the
+# resulting `.mjs`. Renamed from `.js` to `.mjs` so Node treats it as
+# ESM without a `package.json` marker.
+react_component(
+    name = "react_ssr_server_compiled",
+    srcs = ["react_ssr_server.tsx"],
+    _export_test = False,
+    deps = [
+        "//:node_modules/@hono/node-server",
+        "//:node_modules/@types/node",
+        "//:node_modules/@types/react-dom",
+        "//:node_modules/hono",
+        "//:node_modules/react-dom",
+        "//:node_modules/react-router",
+    ],
+)
+
+copy_file(
+    name = "react_ssr_server_mjs",
+    src = ":react_ssr_server.js",
+    out = "react_ssr_server.mjs",
 )
 
 bzl_library(
@@ -173,6 +237,34 @@ bzl_library(
         "@aspect_rules_esbuild//esbuild:defs",
         "@aspect_rules_js//js:defs",
         "@bazel_lib//lib:expand_template",
+    ],
+)
+
+bzl_library(
+    name = "react_ssr_app",
+    srcs = ["react_ssr_app.bzl"],
+    deps = [
+        ":asset_pipeline",
+        ":labels",
+        ":react_app_manifest",
+        ":react_component",
+        ":react_ssr_chunks_manifest",
+        ":route_tree",
+        ":runtime_config",
+        ":stylex_css",
+        "@aspect_rules_esbuild//esbuild:defs",
+        "@aspect_rules_js//js:defs",
+        "@bazel_lib//lib:copy_file",
+        "@bazel_lib//lib:copy_to_directory",
+    ],
+)
+
+bzl_library(
+    name = "react_ssr_component",
+    srcs = ["react_ssr_component.bzl"],
+    deps = [
+        ":react_component",
+        "@aspect_rules_js//js:defs",
     ],
 )
 
@@ -307,6 +399,11 @@ bzl_library(
 bzl_library(
     name = "labels",
     srcs = ["labels.bzl"],
+)
+
+bzl_library(
+    name = "react_ssr_chunks_manifest",
+    srcs = ["react_ssr_chunks_manifest.bzl"],
 )
 
 bzl_library(
