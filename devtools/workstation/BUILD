@@ -73,13 +73,31 @@ _LIBSSH2_VEX = [
     ),
 ]
 
+# libxml2-16 CVE-2026-6732 — type confusion in XSD-validated documents
+# containing internal entity references; impact is a DoS crash, no RCE.
+# libxml2 enters the image only as a transitive dependency of
+# bind9-dnsutils (dig/host/nslookup/nsupdate). Those tools link libxml2
+# for XML *output* formatting (e.g. `dig +xml`); none of them invoke
+# the XSD schema validation code path that triggers the bug. Debian
+# flags this as no-dsa Minor and ships no fix in sid.
+_LIBXML2_VEX = [
+    vex_statement(
+        expires = "2026-06-06",
+        impact_statement = "bind9-dnsutils is the sole consumer of libxml2 in this image and uses it only for XML output formatting; xmlSchemaValidateDoc and the XSD-validation code path are never reached.",
+        justification = "vulnerable_code_not_in_execute_path",
+        products = ["pkg:oci/workstation"],
+        status = "not_affected",
+        vulnerability = "CVE-2026-6732",
+    ),
+]
+
 vex_document(
     name = "vex",
     author = "rafael@arquero.cat",
     id = "https://github.com/arkeros/senku/blob/main/devtools/workstation/BUILD",
-    statements = _LINUX_LIBC_DEV_VEX + _LIBSSH2_VEX,
-    timestamp = "2026-05-04T00:00:00Z",
-    version = 2,
+    statements = _LINUX_LIBC_DEV_VEX + _LIBSSH2_VEX + _LIBXML2_VEX,
+    timestamp = "2026-05-07T00:00:00Z",
+    version = 3,
 )
 
 exports_files([
