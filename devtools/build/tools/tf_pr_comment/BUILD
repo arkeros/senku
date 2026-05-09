@@ -8,7 +8,7 @@ go_library(
     ],
     importpath = "github.com/arkeros/senku/devtools/build/tools/tf_pr_comment",
     visibility = ["//visibility:private"],
-    deps = ["@com_github_google_go_github_v85//github"],
+    deps = ["@com_github_google_go_github_v86//github"],
 )
 
 go_binary(
@@ -24,5 +24,5 @@ go_test(
         "render_test.go",
     ],
     embed = [":tf_pr_comment_lib"],
-    deps = ["@com_github_google_go_github_v85//github"],
+    deps = ["@com_github_google_go_github_v86//github"],
 )
