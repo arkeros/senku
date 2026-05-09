@@ -2,11 +2,11 @@ load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@package_metadata//:defs.bzl", "package_metadata")
 load("@rules_distroless//distroless:defs.bzl", "cacerts", "flatten")
 load("@rules_img//img:image.bzl", "image_index")
-load("@rules_img//img:push.bzl", "image_push")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("@tar.bzl", "tar")
-load("//oci:config.bzl", "OCI_REGISTRY", "OCI_REPOSITORY_PREFIX")
+load("//oci:mirror_push.bzl", "mirror_push")
 load("//oci:oci_image.bzl", "oci_image")
+load("//oci:supply_chain.bzl", "image_sbom")
 load("//oci:vex.bzl", "vex_document", "vex_statement")
 load("//oci/distroless:platforms.bzl", "ARCHITECTURE_PLATFORMS")
 load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
@@ -362,12 +362,20 @@ image_index(
     ],
 )
 
-image_push(
-    name = "workstation_push",
+# Index-level SBOM, attested by mirror_push (per-arch CVE testing happens via
+# oci_image above; this is just the unified materials manifest for cosign).
+image_sbom(image = ":workstation")
+
+# `name = "workstation_mirror"`, not `"workstation"` — `:workstation` is
+# already taken by the `image_index` above. mirror_push's macro expansion
+# would not actually collide (it only emits `<name>_push`/`_sign`/...), but
+# gazelle's `check` does a literal-name scan of BUILD files without
+# expanding macros, so name reuse trips it.
+mirror_push(
+    name = "workstation_mirror",
     image = ":workstation",
-    registry = OCI_REGISTRY,
-    repository = OCI_REPOSITORY_PREFIX + "/workstation",
-    stamp = "force",
+    repository = "workstation",
+    sbom = ":workstation_sbom",
     tag_list = [
         "latest",
         "{{.STABLE_MONOREPO_IMAGE_TAG_VERSION}}",
