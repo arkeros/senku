@@ -335,6 +335,10 @@ package_metadata(
         # the image itself runs as root (needed for systemd PID 1).
         labels = {"exe.dev/login-user": "exedev"},
         layers = [
+            # See //oci/distroless/common:dpkg_status_d_dirs — parent dirs
+            # for the per-package /var/lib/dpkg/status.d/<pkg> entries that
+            # our package.BUILD.tmpl emits via dpkg_statusd.
+            "//oci/distroless/common:dpkg_status_d_dirs",
             ":apt_layer_" + arch,
             ":cacerts_" + arch,
             ":binaries_layer_" + arch,
