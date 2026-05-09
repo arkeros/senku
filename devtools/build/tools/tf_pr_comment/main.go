@@ -39,7 +39,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/go-github/v85/github"
+	"github.com/google/go-github/v86/github"
 )
 
 // defaultMaxBytes is GitHub's per-comment body limit minus headroom for
