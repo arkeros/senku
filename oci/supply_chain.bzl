@@ -45,12 +45,14 @@ def image_sbom(image):
     # name-equals-upstream qualifiers — package.go:492). Strip the prefix so
     # source==name packages (nginx, bash, busybox, sqlite3, ...) get the same
     # tracker coverage that `grype <image>` already gives consumers via
-    # /var/lib/dpkg/status.d.
+    # /var/lib/dpkg/status.d. Same shape applies to `wolfi/` namespaces
+    # introduced by `pkg:apk/wolfi/<name>` components from
+    # //oci/distroless/wolfi/...
     jq(
         name = base + "_sbom",
         srcs = [":" + base + "_sbom_predupe"],
         out = base + "_sbom.json",
-        filter = '.components |= (map(.name |= sub("^debian/"; "")) | unique_by(.purl))',
+        filter = '.components |= (map(.name |= sub("^(debian|wolfi)/"; "")) | unique_by(.purl))',
     )
 
 def image_supply_chain(image, fail_on_severity = "high", ignore_cves = None, vex = None, database = "@grype_database"):
