@@ -13,9 +13,17 @@
 // regardless of --keep. --keep is an explicit allow-list of path prefixes;
 // at least one is required.
 //
+// When --installed-db-at <path> is set, the `.PKGINFO` from the apk's control
+// segment is transformed into a single-package `/lib/apk/db/installed`-style
+// record and inserted at <path>, with parent directory entries synthesised
+// so syft's stereoscope image indexer sees the file. Senku ships at
+// `usr/lib/apk/db/installed` because senku images merge-usr to /usr/lib (/lib
+// is a symlink), matching the on-disk layout of Wolfi/Chainguard base images.
+//
 // Usage:
 //
 //	wolfi-apk-extract --in <apk> --out <tar> --keep <path> [--keep <path>]...
+//	                  [--installed-db-at <tar-path>]
 package main
 
 import (
@@ -27,6 +35,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -69,16 +78,21 @@ func keep(name string, allow []string) bool {
 	return false
 }
 
-func extract(r io.Reader, allow []string) ([]entry, error) {
+// extract walks every gzip-tar stream in r, returns entries matching one of
+// the --keep prefixes (post hidden/bookkeeping filter), and separately the
+// raw bytes of `.PKGINFO` if it appeared in any segment (used by the
+// installed-db synthesiser; not included in the returned entries).
+func extract(r io.Reader, allow []string) ([]entry, []byte, error) {
 	br := bufio.NewReader(r)
 	var out []entry
+	var pkginfo []byte
 	for {
 		gz, err := gzip.NewReader(br)
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("gzip reader: %w", err)
+			return nil, nil, fmt.Errorf("gzip reader: %w", err)
 		}
 		gz.Multistream(false)
 		tr := tar.NewReader(gz)
@@ -88,7 +102,16 @@ func extract(r io.Reader, allow []string) ([]entry, error) {
 				break
 			}
 			if err != nil {
-				return nil, fmt.Errorf("tar next: %w", err)
+				return nil, nil, fmt.Errorf("tar next: %w", err)
+			}
+			clean := strings.TrimPrefix(hdr.Name, "./")
+			if clean == ".PKGINFO" && hdr.Typeflag == tar.TypeReg {
+				body, err := io.ReadAll(tr)
+				if err != nil {
+					return nil, nil, fmt.Errorf("read .PKGINFO: %w", err)
+				}
+				pkginfo = body
+				continue
 			}
 			if !keep(hdr.Name, allow) {
 				continue
@@ -97,19 +120,135 @@ func extract(r io.Reader, allow []string) ([]entry, error) {
 			if hdr.Typeflag == tar.TypeReg {
 				body, err = io.ReadAll(tr)
 				if err != nil {
-					return nil, fmt.Errorf("read body %q: %w", hdr.Name, err)
+					return nil, nil, fmt.Errorf("read body %q: %w", hdr.Name, err)
 				}
 			}
 			out = append(out, entry{hdr: hdr, body: body})
 		}
 		if _, err := io.Copy(io.Discard, gz); err != nil {
-			return nil, fmt.Errorf("drain stream: %w", err)
+			return nil, nil, fmt.Errorf("drain stream: %w", err)
 		}
 		if err := gz.Close(); err != nil {
-			return nil, fmt.Errorf("gzip close: %w", err)
+			return nil, nil, fmt.Errorf("gzip close: %w", err)
 		}
 	}
-	return out, nil
+	return out, pkginfo, nil
+}
+
+// pkginfoToInstalledDB transforms a `.PKGINFO` body into the single-package
+// `/lib/apk/db/installed`-style record that syft's apk cataloger parses.
+// Output field order matches the canonical layout shipped by Wolfi's
+// apk-tools (P V A L T o m U D p c i t I k), trailing blank line included
+// so concatenation with additional packages stays well-formed.
+//
+// Field set is deliberately minimal — file lists (F/R/Z/a) and control-segment
+// checksum (C) are omitted; both are optional for cataloger detection and
+// emitting them faithfully requires hashing the apk's tar entries.
+// Re-add if syft's stereoscope path-attribution ever needs F/R coverage.
+func pkginfoToInstalledDB(pkginfo []byte) ([]byte, error) {
+	fields := map[string][]string{}
+	for _, line := range strings.Split(string(pkginfo), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		eq := strings.Index(line, "=")
+		if eq < 0 {
+			continue
+		}
+		k := strings.TrimSpace(line[:eq])
+		v := strings.TrimSpace(line[eq+1:])
+		fields[k] = append(fields[k], v)
+	}
+	one := func(k string) string {
+		if vs, ok := fields[k]; ok && len(vs) > 0 {
+			return vs[0]
+		}
+		return ""
+	}
+	joined := func(k string) string {
+		if vs, ok := fields[k]; ok {
+			return strings.Join(vs, " ")
+		}
+		return ""
+	}
+
+	if one("pkgname") == "" || one("pkgver") == "" {
+		return nil, fmt.Errorf(".PKGINFO missing required pkgname/pkgver")
+	}
+
+	var b strings.Builder
+	put := func(key, val string) {
+		// Empty optional fields are still emitted with empty value when
+		// real apk-tools emits them (notably U:); preserve that shape.
+		fmt.Fprintf(&b, "%s:%s\n", key, val)
+	}
+
+	put("P", one("pkgname"))
+	put("V", one("pkgver"))
+	put("A", one("arch"))
+	put("L", one("license"))
+	put("T", one("pkgdesc"))
+	put("o", one("origin"))
+	put("m", one("maintainer"))
+	put("U", one("url"))
+	if d := joined("depend"); d != "" {
+		put("D", d)
+	}
+	if p := joined("provides"); p != "" {
+		put("p", p)
+	}
+	if c := one("commit"); c != "" {
+		put("c", c)
+	}
+	put("i", "[]")
+	if t := one("builddate"); t != "" {
+		put("t", t)
+	}
+	if i := one("size"); i != "" {
+		put("I", i)
+	}
+	if k := one("provider_priority"); k != "" {
+		put("k", k)
+	}
+	b.WriteString("\n")
+	return []byte(b.String()), nil
+}
+
+// installedDBEntries returns the tar entries (parent directories + the
+// installed-db file itself) needed to land an installed-db record at path
+// in a layer that syft's stereoscope will index. Parent directory entries
+// are required — without them stereoscope treats the file as orphaned and
+// the apk cataloger reports zero packages on the assembled image (the same
+// failure mode //oci/distroless/common:dpkg_status_d_dirs exists to dodge).
+func installedDBEntries(installedAt string, body []byte) []entry {
+	clean := strings.TrimPrefix(installedAt, "./")
+	clean = strings.TrimRight(clean, "/")
+	if clean == "" {
+		return nil
+	}
+	var out []entry
+	parts := strings.Split(clean, "/")
+	for i := 1; i < len(parts); i++ {
+		dir := path.Join(parts[:i]...) + "/"
+		out = append(out, entry{
+			hdr: &tar.Header{
+				Name:     dir,
+				Mode:     0o755,
+				Typeflag: tar.TypeDir,
+			},
+		})
+	}
+	out = append(out, entry{
+		hdr: &tar.Header{
+			Name:     clean,
+			Mode:     0o644,
+			Size:     int64(len(body)),
+			Typeflag: tar.TypeReg,
+		},
+		body: body,
+	})
+	return out
 }
 
 func writeTar(w io.Writer, entries []entry) error {
@@ -145,7 +284,7 @@ func writeTar(w io.Writer, entries []entry) error {
 	return tw.Close()
 }
 
-func run(in, out string, allow []string) error {
+func run(in, out string, allow []string, installedAt string) error {
 	if len(allow) == 0 {
 		return errors.New("--keep is required (at least one path prefix)")
 	}
@@ -155,12 +294,23 @@ func run(in, out string, allow []string) error {
 	}
 	defer f.Close()
 
-	entries, err := extract(f, allow)
+	entries, pkginfo, err := extract(f, allow)
 	if err != nil {
 		return err
 	}
 	if len(entries) == 0 {
 		return fmt.Errorf("no entries matched --keep %v", allow)
+	}
+
+	if installedAt != "" {
+		if len(pkginfo) == 0 {
+			return errors.New("--installed-db-at set but .PKGINFO was not present in the apk")
+		}
+		record, err := pkginfoToInstalledDB(pkginfo)
+		if err != nil {
+			return err
+		}
+		entries = append(entries, installedDBEntries(installedAt, record)...)
 	}
 
 	o, err := os.Create(out)
@@ -174,15 +324,16 @@ func run(in, out string, allow []string) error {
 func main() {
 	in := flag.String("in", "", "input .apk path")
 	out := flag.String("out", "", "output .tar path")
+	installedAt := flag.String("installed-db-at", "", "tar-path at which to emit a synthesised /lib/apk/db/installed entry derived from the apk's .PKGINFO (e.g. usr/lib/apk/db/installed)")
 	var allow stringSlice
 	flag.Var(&allow, "keep", "path prefix to include (repeatable); at least one required")
 	flag.Parse()
 
 	if *in == "" || *out == "" {
-		fmt.Fprintln(os.Stderr, "usage: wolfi-apk-extract --in <apk> --out <tar> --keep <path>...")
+		fmt.Fprintln(os.Stderr, "usage: wolfi-apk-extract --in <apk> --out <tar> --keep <path>... [--installed-db-at <path>]")
 		os.Exit(2)
 	}
-	if err := run(*in, *out, allow); err != nil {
+	if err := run(*in, *out, allow, *installedAt); err != nil {
 		fmt.Fprintf(os.Stderr, "wolfi-apk-extract: %v\n", err)
 		os.Exit(1)
 	}
