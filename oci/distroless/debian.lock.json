@@ -185,63 +185,6 @@
 		},
 		{
 			"arch": "amd64",
-			"dependencies": [],
-			"key": "busybox-static_1-1.37.0-10.1_amd64",
-			"name": "busybox-static",
-			"sha256": "a11c07257c58830f2d8cd40c50730f061d29d412af5534b9d702f726b1be7d0f",
-			"source": "busybox",
-			"urls": [
-				"https://snapshot.debian.org/archive/debian/20260513T144308Z/pool/main/b/busybox/busybox-static_1.37.0-10.1_amd64.deb",
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260513T144308Z/pool/main/b/busybox/busybox-static_1.37.0-10.1_amd64.deb"
-			],
-			"version": "1:1.37.0-10.1"
-		},
-		{
-			"arch": "amd64",
-			"dependencies": [
-				{
-					"key": "libselinux1_3.10-1_amd64",
-					"name": "libselinux1",
-					"version": "3.10-1"
-				},
-				{
-					"key": "libpcre2-8-0_10.46-1-p-b2_amd64",
-					"name": "libpcre2-8-0",
-					"version": "10.46-1+b2"
-				},
-				{
-					"key": "libc6_2.42-16_amd64",
-					"name": "libc6",
-					"version": "2.42-16"
-				},
-				{
-					"key": "libc-gconv-modules-extra_2.42-16_amd64",
-					"name": "libc-gconv-modules-extra",
-					"version": "2.42-16"
-				},
-				{
-					"key": "libgcc-s1_16.1.0-1_amd64",
-					"name": "libgcc-s1",
-					"version": "16.1.0-1"
-				},
-				{
-					"key": "gcc-16-base_16.1.0-1_amd64",
-					"name": "gcc-16-base",
-					"version": "16.1.0-1"
-				}
-			],
-			"key": "rust-coreutils_0.8.0-1_amd64",
-			"name": "rust-coreutils",
-			"sha256": "2d0c71adeab9810e1773b9d69afd173d75fcbbde018910ab50cf8b3a58897c15",
-			"source": "rust-coreutils",
-			"urls": [
-				"https://snapshot.debian.org/archive/debian/20260513T144308Z/pool/main/r/rust-coreutils/rust-coreutils_0.8.0-1_amd64.deb",
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260513T144308Z/pool/main/r/rust-coreutils/rust-coreutils_0.8.0-1_amd64.deb"
-			],
-			"version": "0.8.0-1"
-		},
-		{
-			"arch": "amd64",
 			"dependencies": [
 				{
 					"key": "libpcre2-8-0_10.46-1-p-b2_amd64",
@@ -1807,63 +1750,6 @@
 				"https://snapshot-cloudflare.debian.org/archive/debian/20260513T144308Z/pool/main/m/media-types/media-types_14.0.0_all.deb"
 			],
 			"version": "14.0.0"
-		},
-		{
-			"arch": "arm64",
-			"dependencies": [],
-			"key": "busybox-static_1-1.37.0-10.1_arm64",
-			"name": "busybox-static",
-			"sha256": "0864df82bcca64d8a188b655ce6f7993a3effec0d4e71172473f00c9a053665a",
-			"source": "busybox",
-			"urls": [
-				"https://snapshot.debian.org/archive/debian/20260513T144308Z/pool/main/b/busybox/busybox-static_1.37.0-10.1_arm64.deb",
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260513T144308Z/pool/main/b/busybox/busybox-static_1.37.0-10.1_arm64.deb"
-			],
-			"version": "1:1.37.0-10.1"
-		},
-		{
-			"arch": "arm64",
-			"dependencies": [
-				{
-					"key": "libselinux1_3.10-1_arm64",
-					"name": "libselinux1",
-					"version": "3.10-1"
-				},
-				{
-					"key": "libpcre2-8-0_10.46-1-p-b2_arm64",
-					"name": "libpcre2-8-0",
-					"version": "10.46-1+b2"
-				},
-				{
-					"key": "libc6_2.42-16_arm64",
-					"name": "libc6",
-					"version": "2.42-16"
-				},
-				{
-					"key": "libc-gconv-modules-extra_2.42-16_arm64",
-					"name": "libc-gconv-modules-extra",
-					"version": "2.42-16"
-				},
-				{
-					"key": "libgcc-s1_16.1.0-1_arm64",
-					"name": "libgcc-s1",
-					"version": "16.1.0-1"
-				},
-				{
-					"key": "gcc-16-base_16.1.0-1_arm64",
-					"name": "gcc-16-base",
-					"version": "16.1.0-1"
-				}
-			],
-			"key": "rust-coreutils_0.8.0-1_arm64",
-			"name": "rust-coreutils",
-			"sha256": "579872d3d6fb99fc8737891c4921dfb5ff6f9d5ce630da8ed74cb1a48f50bf13",
-			"source": "rust-coreutils",
-			"urls": [
-				"https://snapshot.debian.org/archive/debian/20260513T144308Z/pool/main/r/rust-coreutils/rust-coreutils_0.8.0-1_arm64.deb",
-				"https://snapshot-cloudflare.debian.org/archive/debian/20260513T144308Z/pool/main/r/rust-coreutils/rust-coreutils_0.8.0-1_arm64.deb"
-			],
-			"version": "0.8.0-1"
 		},
 		{
 			"arch": "arm64",

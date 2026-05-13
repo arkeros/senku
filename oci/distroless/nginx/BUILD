@@ -8,7 +8,7 @@ load("//oci:mirror_push.bzl", "mirror_push")
 load("//oci:vex.bzl", "vex_document", "vex_statement")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
-load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEBUG_MODE")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEBUG_MODE")
 load(":config.bzl", "NGINX_ARCHITECTURES", "NGINX_DISTROS", "NGINX_LATEST_CHANNEL", "NGINX_TAGS", "NGINX_VERSIONS", "nginx_layers")
 
 NGINX_IGNORE_CVES = {
@@ -89,7 +89,6 @@ tar(
         name = "nginx_stable",
         architectures = NGINX_ARCHITECTURES[distro],
         base = "//oci/distroless/cc",
-        debug_ignore_cves = BUSYBOX_WONTFIX_CVES,
         debug_index_annotations = {
             "org.opencontainers.image.description": "Distroless nginx stable image (debug)",
             "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/nginx/BUILD",
@@ -119,7 +118,6 @@ tar(
         name = "nginx_mainline",
         architectures = NGINX_ARCHITECTURES[distro],
         base = "//oci/distroless/cc",
-        debug_ignore_cves = BUSYBOX_WONTFIX_CVES,
         debug_index_annotations = {
             "org.opencontainers.image.description": "Distroless nginx mainline image (debug)",
             "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/nginx/BUILD",

@@ -70,14 +70,11 @@ tar(
     ],
 )
 
-# Create symlinks for rust-coreutils (avoids GNU coreutils which pulls in libsystemd0)
-# rust-coreutils is a multicall binary at /bin/coreutils.
-#
-# `mkdir` is intentionally omitted: rust-coreutils 0.8.0-1 carries an
-# unfixed TOCTOU (CVE-2026-35352). Debug variants fall back to
-# /busybox/mkdir (different implementation, not affected); non-debug
-# images simply don't expose mkdir on PATH. Companion VEX in
-# //oci/distroless/bash:vex documents the non-reachability.
+# Symlinks for the coreutils-style command set under /usr/bin/<cmd>, all
+# resolving to /usr/bin/busybox (Wolfi `busybox-static`, statically linked,
+# no shared-lib deps). The same multicall binary powers the debug-image
+# toolbox at /busybox/<cmd> — same byte-identical layer, different symlink
+# trees per consumer.
 COREUTILS_COMMANDS = [
     "env",
     "uname",
@@ -116,7 +113,7 @@ COREUTILS_COMMANDS = [
 tar(
     name = "coreutils_links",
     mtree = [
-        "./usr/bin/{} type=link link=/bin/coreutils".format(cmd)
+        "./usr/bin/{} type=link link=/usr/bin/busybox".format(cmd)
         for cmd in COREUTILS_COMMANDS
     ],
 )

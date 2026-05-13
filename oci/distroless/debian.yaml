@@ -22,8 +22,6 @@ packages:
   - netbase
   - tzdata
   - media-types
-  - busybox-static
-  - rust-coreutils
   - libselinux1
   - libpcre2-8-0
   - libstdc++6
