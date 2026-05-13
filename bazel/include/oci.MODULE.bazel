@@ -78,6 +78,29 @@ use_repo(apt, "debian", "nginx_mainline", "nginx_stable", "workstation")
 
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 
+# Wolfi busybox-static. Statically linked multicall binary with zero shared-lib
+# deps — used by both bash production (as the source of /usr/bin/env and the
+# other COREUTILS_COMMANDS) and every `*_debug` image variant (toolbox at
+# /busybox/<cmd>). A `.apk` is three concatenated gzip-tar streams (signature,
+# control, data); //devtools/build/tools/wolfi-apk-extract walks all three and
+# pulls `usr/bin/busybox` into a deterministic tar.
+#
+# Wolfi version+epoch live in oci/distroless/wolfi/busybox-static/{amd64,arm64}/BUILD's
+# purl strings; refresh by curling the new .apk and updating sha256 + version.
+http_file(
+    name = "wolfi_busybox_static_amd64",
+    downloaded_file_path = "busybox-static-1.37.0-r57.apk",
+    sha256 = "d0e62a1060a6b614e9ba076038faa51a80f419c8ebccb7c1123868fbe8bfbff9",
+    urls = ["https://packages.wolfi.dev/os/x86_64/busybox-static-1.37.0-r57.apk"],
+)
+
+http_file(
+    name = "wolfi_busybox_static_arm64",
+    downloaded_file_path = "busybox-static-1.37.0-r57.apk",
+    sha256 = "1e96736584edc8b51ded79d3c7bef445d97c9b01c190b2cfc95c50e801533b44",
+    urls = ["https://packages.wolfi.dev/os/aarch64/busybox-static-1.37.0-r57.apk"],
+)
+
 # Out-of-band binaries baked into //devtools/workstation. Versions are
 # pinned; refresh by re-fetching:
 #
