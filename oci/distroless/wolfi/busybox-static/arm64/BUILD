@@ -14,7 +14,8 @@ genrule(
     name = "data",
     srcs = ["@wolfi_busybox_static_arm64//file"],
     outs = ["busybox-static.tar"],
-    cmd = "$(execpath //devtools/build/tools/wolfi-apk-extract) --in $< --out $@ --keep usr/bin/busybox",
+    # See sibling amd64/BUILD for the rationale on --installed-db-at.
+    cmd = "$(execpath //devtools/build/tools/wolfi-apk-extract) --in $< --out $@ --keep usr/bin/busybox --installed-db-at usr/lib/apk/db/installed",
     tools = ["//devtools/build/tools/wolfi-apk-extract"],
 )
 
