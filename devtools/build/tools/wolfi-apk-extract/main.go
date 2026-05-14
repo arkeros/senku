@@ -269,6 +269,12 @@ func writeTar(w io.Writer, entries []entry) error {
 		h.PAXRecords = nil
 		h.Xattrs = nil //nolint:staticcheck // SA1019: stdlib type still exposes the field.
 		h.Format = tar.FormatUSTAR
+		// Canonicalise on the `./`-prefixed form rules_distroless and tar.bzl
+		// emit. flatten()'s deduplicate=True compares names by string equality,
+		// so without this prefix our `usr/` and tar.bzl's `./usr/` both end up
+		// in the layer and dockerd rejects it as "duplicates of file paths not
+		// supported".
+		h.Name = "./" + strings.TrimPrefix(h.Name, "./")
 		if h.Typeflag != tar.TypeReg {
 			h.Size = 0
 		}

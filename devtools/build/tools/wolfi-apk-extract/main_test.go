@@ -270,7 +270,34 @@ func TestDeterministicOutput(t *testing.T) {
 		}
 		names = append(names, h.Name)
 	}
-	if strings.Join(names, ",") != "usr/bin/a,usr/bin/b" {
+	if strings.Join(names, ",") != "./usr/bin/a,./usr/bin/b" {
 		t.Fatalf("order: %v", names)
+	}
+}
+
+func TestWriteTarPrefixesNamesWithDotSlash(t *testing.T) {
+	// All entries — both extractor-derived files and installedDBEntries
+	// dir entries — must come out with `./` prefix so flatten() dedupes
+	// against rules_distroless / tar.bzl output (which uses `./` too).
+	es := []entry{
+		{hdr: &tar.Header{Name: "usr/bin/busybox", Mode: 0o755, Typeflag: tar.TypeReg, Size: 3}, body: []byte("ELF")},
+		{hdr: &tar.Header{Name: "usr/lib/apk/", Mode: 0o755, Typeflag: tar.TypeDir}},
+	}
+	var buf bytes.Buffer
+	if err := writeTar(&buf, es); err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(&buf)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(h.Name, "./") {
+			t.Errorf("entry %q not prefixed with ./", h.Name)
+		}
 	}
 }
