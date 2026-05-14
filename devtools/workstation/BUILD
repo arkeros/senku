@@ -29,31 +29,6 @@ WORKSTATION_IGNORE_CVES = [
     "CVE-2026-34040",
 ]
 
-# linux-libc-dev ships kernel headers (interfaces, ioctl numbers, struct
-# definitions). It's pulled transitively via libc6-dev as part of
-# build-essential. Grype matches Linux-kernel CVEs against the headers'
-# version, but the headers don't contain the vulnerable kernel code —
-# they're compile-time data. The actual kernel is provided by exe.dev's
-# hypervisor, not by this image.
-_LINUX_LIBC_DEV_VEX = [
-    vex_statement(
-        expires = "2026-07-30",
-        impact_statement = "linux-libc-dev ships only kernel headers; no kernel code runs from this image.",
-        justification = "vulnerable_code_not_present",
-        products = ["pkg:oci/workstation"],
-        status = "not_affected",
-        vulnerability = cve,
-    )
-    for cve in [
-        "CVE-2013-7445",
-        "CVE-2019-19449",
-        "CVE-2019-19814",
-        "CVE-2021-3847",
-        "CVE-2021-3864",
-        "CVE-2024-21803",
-    ]
-]
-
 # libxml2-16 CVE-2026-6732 — type confusion in XSD-validated documents
 # containing internal entity references; impact is a DoS crash, no RCE.
 # libxml2 enters the image only as a transitive dependency of
@@ -76,7 +51,7 @@ vex_document(
     name = "vex",
     author = "rafael@arquero.cat",
     id = "https://github.com/arkeros/senku/blob/main/devtools/workstation/BUILD",
-    statements = _LINUX_LIBC_DEV_VEX + _LIBXML2_VEX,
+    statements = _LIBXML2_VEX,
     timestamp = "2026-05-07T00:00:00Z",
     version = 3,
 )
