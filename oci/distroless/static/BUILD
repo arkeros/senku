@@ -5,7 +5,7 @@ load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
 load("//oci/distroless:platforms.bzl", BUSYBOX_ARCHITECTURES = "ALL_ARCHITECTURES")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
-load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
 load(":busybox.bzl", "busybox_layer")
 load(":config.bzl", "STATIC_ARCHITECTURES", "STATIC_DISTROS", "static_debug_layers", "static_layers")
 
@@ -58,7 +58,6 @@ _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         architectures = STATIC_ARCHITECTURES[distro],
         debug_entrypoint = ["/busybox/sh"],
         debug_env = {"PATH": _DEFAULT_PATH + ":/busybox"},
-        debug_ignore_cves = BUSYBOX_WONTFIX_CVES,
         debug_layers = static_debug_layers,
         debug_vex = [":debug_vex"],
         distro = distro,
@@ -76,7 +75,10 @@ _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 [
     busybox_layer(
         name = "busybox_" + arch + "_" + distro + "_layer",
-        busybox = "@{}//{}/{}".format(distro, "busybox-static", arch),
+        # Wolfi busybox-static — zero .so deps; replaces Debian busybox-static
+        # to drop CVE-2026-29004 (unfixed-in-sid). Distro-agnostic, so the
+        # `for distro` axis just picks up the Wolfi target unchanged.
+        busybox = "//oci/distroless/wolfi/busybox-static/{}".format(arch),
         compress = "gzip",
     )
     for arch in BUSYBOX_ARCHITECTURES

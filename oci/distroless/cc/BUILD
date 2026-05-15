@@ -4,7 +4,7 @@ load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
-load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
 load(":config.bzl", "CC_ARCHITECTURES", "CC_DISTROS", "cc_layers")
 
 package(default_visibility = ["//visibility:public"])
@@ -48,7 +48,6 @@ vex_document(
         name = "cc",
         architectures = CC_ARCHITECTURES[distro],
         base = "//oci/distroless/static",
-        debug_ignore_cves = BUSYBOX_WONTFIX_CVES,
         debug_vex = [":debug_vex"],
         distro = distro,
         ignore_cves = DEBIAN_WONTFIX_CVES,
