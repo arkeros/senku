@@ -64,14 +64,14 @@
 					"version": "1:4.5.1-1+b1"
 				}
 			],
-			"key": "nginx_1.30.0-1_trixie_amd64",
+			"key": "nginx_1.30.1-1_trixie_amd64",
 			"name": "nginx",
-			"sha256": "c169a3df82c3555d8497669e17eb421cd2abd2e0f64e1d0ed41ad44cf420cd38",
+			"sha256": "aa3b85c07ef92b44d1b07e46d6372e2477f4c0f8859c4c9cf481b7327836343c",
 			"source": "nginx",
 			"urls": [
-				"https://nginx.org/packages/debian/pool/nginx/n/nginx/nginx_1.30.0-1~trixie_amd64.deb"
+				"https://nginx.org/packages/debian/pool/nginx/n/nginx/nginx_1.30.1-1~trixie_amd64.deb"
 			],
-			"version": "1.30.0-1~trixie"
+			"version": "1.30.1-1~trixie"
 		},
 		{
 			"arch": "amd64",
@@ -293,14 +293,14 @@
 					"version": "1:4.5.1-1+b1"
 				}
 			],
-			"key": "nginx_1.30.0-1_trixie_arm64",
+			"key": "nginx_1.30.1-1_trixie_arm64",
 			"name": "nginx",
-			"sha256": "77176f2085328b6af8227080fd2695abd8f612d6600a54bca804893be4577c97",
+			"sha256": "5bee6dc0b3b462930689500ab118003d2693ecfd91e72dcb0f620f7e0b83eead",
 			"source": "nginx",
 			"urls": [
-				"https://nginx.org/packages/debian/pool/nginx/n/nginx/nginx_1.30.0-1~trixie_arm64.deb"
+				"https://nginx.org/packages/debian/pool/nginx/n/nginx/nginx_1.30.1-1~trixie_arm64.deb"
 			],
-			"version": "1.30.0-1~trixie"
+			"version": "1.30.1-1~trixie"
 		},
 		{
 			"arch": "arm64",
