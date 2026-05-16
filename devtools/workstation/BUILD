@@ -22,9 +22,14 @@ WORKSTATION_IGNORE_CVES = [
     # The Python interpreter in this image is not invoked on
     # network-supplied data; it's a fish dependency.
     "CVE-2026-4786",
-    # docker-cli 28.5.2+dfsg4-1 — two High CVEs unfixed in sid as of
-    # the snapshot date. Re-evaluate when Debian ships a patched build;
-    # _stale_ignores test will tell us when these stop matching.
+    # docker-cli 28.5.2+dfsg4-1 — BuildKit CVEs unfixed in sid as of
+    # the snapshot date. Threat model is the same as the image-level one
+    # (developer-interactive VM, operator-chosen inputs); BuildKit only
+    # sees Dockerfiles the user wrote or pulled themselves. Re-evaluate
+    # when Debian ships a patched build; _stale_ignores will tell us
+    # when these stop matching.
+    "CVE-2026-33747",
+    "CVE-2026-33748",
     "CVE-2026-33997",
     "CVE-2026-34040",
 ]
