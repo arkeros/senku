@@ -234,12 +234,26 @@ tar(
 # http_file URLs in //bazel/include:oci.MODULE.bazel.
 package_metadata(
     name = "bazelisk_metadata",
-    purl = "pkg:github/bazelbuild/bazelisk@v1.29.0",
+    # pkg:golang/, not pkg:github/: bazelisk is a Go binary, and grype's
+    # golang matcher routes `pkg:golang/...` against GHSA's `go` ecosystem
+    # without needing a `cpe`. `pkg:github/...` has no grype matcher and
+    # would trip the `_cve_test_silent_zero` gate (see //oci:supply_chain.bzl).
+    purl = "pkg:golang/github.com/bazelbuild/bazelisk@v1.29.0",
 )
+
+# Claude Code's `pkg:generic/` purl isn't routed by any grype ecosystem
+# matcher, so the silent-zero gate (//oci:supply_chain.bzl) requires the
+# CPE field to assert that the scanner is engaging. NVD publishes per-
+# version entries under `cpe:2.3:a:anthropic:claude_code:<ver>:*:*:*:*:
+# node.js:*:*` (verified empirically: 18 grype matches against 1.0.105,
+# 0 against 2.1.118 = scanned clean). Bump version and CPE in lock-step
+# with the http_file URLs in //bazel/include:oci.MODULE.bazel.
+_CLAUDE_VERSION = "2.1.118"
 
 package_metadata(
     name = "claude_metadata",
-    purl = "pkg:generic/claude@2.1.118?download_url=https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/2.1.118",
+    cpe = "cpe:2.3:a:anthropic:claude_code:" + _CLAUDE_VERSION + ":*:*:*:*:node.js:*:*",
+    purl = "pkg:generic/claude@" + _CLAUDE_VERSION + "?download_url=https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/" + _CLAUDE_VERSION,
 )
 
 # Per-arch out-of-band binary layer: bazelisk + claude. Repos defined
