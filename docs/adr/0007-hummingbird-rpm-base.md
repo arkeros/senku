@@ -1,0 +1,293 @@
+# Hummingbird-based distroless
+
+Senku's distroless surface (`distroless.io/*`) is Hummingbird-derived. All images consume RPMs from `koji-s3-cache.hummingbird-project.io` as their package base, ship `ID=hummingbird` in `/etc/os-release` for correct vulnerability-scanner routing, and brand as "distroless.io (Hummingbird-derived)" in `PRETTY_NAME`. The competitive thesis is real consumer-scanner zero on glibc-bearing images — matching Chainguard's `glibc-dynamic` and Red Hat Hardened Images on an OSS-pure supply chain — plus uniform supply-chain identity across the senku surface (no mixed Debian/Hummingbird footguns in consumer SBOMs).
+
+## Why not Debian sid
+
+[[oci/distroless/common/variables.bzl]] currently silences three glibc CVEs (CVE-2026-5435, 5450, 5928) via `DEBIAN_WONTFIX_CVES`, all unfixed in Debian sid's `libc6 2.42-15`. Tracking sid was chosen specifically to dodge Debian-stable's "no-DSA Minor" backport-skipping policy, but sid still inherits whatever upstream glibc ships, and the three CVEs sit unpatched upstream. The Hummingbird Project ships `glibc-2.42-13.hum1` containing backports for all three (advisory `RHSA-2026:12740` per Red Hat's CVE API). For glibc-bearing images this is the only OSS-pure source of those backports.
+
+## Why not the alternatives
+
+| Distro family | Verdict | Why |
+|---|---|---|
+| **SUSE SLE 16 / openSUSE Leap 16** | Rejected | OVAL feed acknowledges the three CVEs as `affected, no fix shipped` (verified empirically by fetching `suse.linux.enterprise.server.16.0-affected.xml.bz2`). The green `bci-micro:16.0` grype/trivy scan is feed-ingestion lag, not security posture. SUSE shares Debian's wontfix list under a different label. |
+| **RHEL standard (UBI / `registry.access.redhat.com/ubi9-minimal`)** | Rejected | All three CVEs in `Fix deferred` / `Affected` status on RHEL 6-10 per Red Hat's security data API. Empirically reproduces: scanning `ubi9-minimal` shows CVE-2026-5435 alongside other open glibc CVEs. RHEL standard is *worse* than what we ship today. |
+| **AlmaLinux 9** | Rejected | Inherits RHEL's "Fix deferred" status; same upstream-glibc reality. Tested empirically (`ID=almalinux` os-release on the same payload → 3 wontfix Mediums). |
+| **Fedora rolling** | Rejected | Aggressive CVE response but 13-month lifecycle is hostile to a stable consumer surface; would mean major-version migrations every year. |
+| **Wolfi (via Chainguard)** | Rejected | Single-vendor (Chainguard), the entity we're competing against. Adopting their distro forecloses the differentiation. |
+| **stagex** | Rejected per [[docs/research/deb-vs-apk-vs-oci-components.md]] | Catalog ceiling (~250 packages) too tight for a base-distro role. |
+| **Hummingbird** | **Chosen** | OSS-permissive EULA (GPLv2 redistribution); ~17,400 packages in the public repo; multi-arch (amd64, arm64, ppc64le, s390x); source RPMs published; GPG-signed; ships actual backports for the CVEs Debian/SUSE/RHEL all defer. Per Red Hat's CVE API: `glibc-2.42-13.hum1` is the only acknowledged-fixed version anywhere in the public field. |
+
+## Scope: all senku images
+
+| Image | Composition |
+|---|---|
+| `static` | zero-by-exclusion (no glibc) on Hummingbird base — 3 upstream packages: `tzdata`, `ca-certificates`, `mailcap` |
+| `cc`, `bash`, `nginx`, `python`, `nodejs` (future) | glibc-bearing on Hummingbird base — adds `glibc`, `glibc-common`, `libgcc`, etc. |
+
+All images ship a single uniform identity (`ID=hummingbird`) and use the same supply chain. The earlier draft of this ADR carved `static` out on the grounds that "no glibc → no security benefit"; that reasoning was rejected because brand/identity coherence and rules_rpm amortization both argue for uniform sourcing. A senku surface split between Debian-`static` and Hummingbird-`cc` would leak the migration internals into the public contract and double the rebuild-cadence infrastructure for no security gain.
+
+### Static composition on Hummingbird
+
+| Layer | Source | Notes |
+|---|---|---|
+| `tzdata` 2026a-1.1.hum1 | Hummingbird, noarch | Timezone data |
+| `ca-certificates` 2025.2.80_v9.0.304-7.1.hum1 | Hummingbird, noarch | CA bundle |
+| `mailcap` 2.1.54-10.1.hum1 | Hummingbird, noarch | `/etc/mime.types` |
+| rootfs / passwd / home / group / tmp / os-release | senku-synthesized | Existing tar generators in [[oci/distroless/common/BUILD]]; os-release rewritten with `ID=hummingbird` per the attribution block above |
+| EULA | senku-synthesized (cp from Hummingbird's `/usr/share/hummingbird-release/EULA` at lock time) | Placed at `/usr/share/licenses/hummingbird/EULA` |
+
+This is *fewer* upstream packages than Debian-static currently consumes (which pulls `base-files`, `netbase`, `tzdata`, `media-types`). The Hummingbird `setup`, `filesystem`, and `hummingbird-release` packages are deliberately *not* consumed — senku synthesizes the rootfs skeleton, user database, and os-release directly, which gives tighter control of identity and attribution than the upstream rpms would.
+
+Image-by-image migration uses the existing `*_DISTROS` matrix axis — see [[oci/distroless/matrix.bzl]]. Static migrates first because it has the smallest dep closure (no glibc transitive graph) and exercises the rules_rpm path on the simplest case.
+
+## Identity claim: `ID=hummingbird` in `/etc/os-release`
+
+For consumer vulnerability scanners (grype, trivy) to route glibc lookups to the `hummingbird-1` secdb provider — which acknowledges the backported fixes — our images must ship exact `ID=hummingbird` in `/etc/os-release`. Empirically verified by mutation tests on `registry.access.redhat.com/hi/curl:latest`:
+
+| `/etc/os-release` ID | grype distro routing | CVE-2026-5435/5450/5928 |
+|---|---|---|
+| `ID=hummingbird` | hummingbird 20251124 | **0 matches (real zero)** |
+| `ID=rhel` | rhel 10.0 | 5 reported incl. CVE-2026-5435 |
+| `ID=debian` | debian-13 | 3 reported as Critical/High wontfix |
+| `ID=distroless ID_LIKE="hummingbird"` (remix pattern) | (no provider matched) | silent zero — same trap as `bci-micro:16.0` |
+| `ID=almalinux ID_LIKE="rhel centos fedora"` | almalinux 9.5 | 3 reported as Medium |
+
+Grype does **not** use `ID_LIKE` as a fallback router (confirmed empirically). The only os-release shape that produces real-zero routing is the exact identifier `hummingbird`. The AlmaLinux-style remix pattern produces silent-zero — the fraud-by-silence anti-pattern we explicitly disqualified for SUSE in this same investigation.
+
+### Attribution
+
+The os-release makes derivation explicit:
+
+```ini
+ID="hummingbird"
+ID_LIKE="rhel fedora"
+NAME="distroless.io"
+PRETTY_NAME="distroless.io (Hummingbird-derived)"
+VERSION_ID="<hummingbird snapshot revision>"
+HOME_URL="https://distroless.io/"
+SUPPORT_URL="https://github.com/arkeros/senku/blob/main/oci/distroless/README.md"
+```
+
+The `ID` field is functionally a scanner-routing key. `NAME` and `PRETTY_NAME` carry the actual branding. Consumers see "distroless.io (Hummingbird-derived)" everywhere a human reads the image; scanner tooling reads `ID` to route correctly.
+
+## Consumption mechanism
+
+| Option | Verdict |
+|---|---|
+| **`rules_rpm` (Bazel-native, rules_jvm_external-style) + two Go binaries** | **Chosen.** New Bazel ruleset: `hummingbird.install(...)` module extension takes the package list inline in `MODULE.bazel`, pins via a checked-in `hummingbird_install.json` (JSON, not YAML), `bazel run @hummingbird//:pin` regenerates the lockfile from the declared list. Per-package tar emission shape-compatible with the existing `@debian//pkg/arch` label convention, so [[oci/distroless/matrix.bzl]] and image BUILDs need only the `_DISTROS` axis bumped. |
+| YAML manifest + JSON lockfile (rules_distroless apt mimic) | Rejected. Two formats for no senku gain; rules_distroless inherited the split from pip/apt conventions that don't carry over to bazel-native ecosystems. |
+| Starlark-only lockfile (`hummingbird.lock.bzl`) | Rejected. JSON is data, not code — easier to query with `jq`, dependabot-friendly, clean GitHub diffs, no `load()` semantics. Bazel's `json.decode()` makes JSON parsing trivial in the extension. |
+| OCI-component overlay (per [[docs/research/deb-vs-apk-vs-oci-components.md]] §7) | Rejected for Hummingbird specifically. Hummingbird publishes ~10 application images (`hi/curl`, `hi/nodejs`, ...) but no standalone building-block images (no `hi/glibc`, no `hi/static`, no `hi/cc`). Their building-block-bearing artifact is the RPM repo, not a container image. Extraction from app-image layers is fragile and version-coupled. |
+| `rules_distroless` patched to accept rpm repos | Rejected. Upstream is apt-shaped; bending it to rpm semantics is a larger refactor than a fresh module, and would muddy `@debian//` vs `@hummingbird//` boundaries. |
+
+### Module extension shape
+
+```starlark
+hummingbird = use_extension("//bazel/modules/rules_rpm:extensions.bzl", "hummingbird")
+hummingbird.install(
+    name = "hummingbird",
+    repo_url = "https://koji-s3-cache.hummingbird-project.io/packages.redhat.com/api/pulp-content/public-hummingbird",
+    gpg_key = "//bazel/modules/rules_rpm:hummingbird-release.pgp",
+    architectures = ["x86_64", "aarch64"],
+    packages = [
+        "tzdata", "ca-certificates", "mailcap",
+        "glibc", "glibc-common", # ...
+    ],
+    lock_file = "//:hummingbird_install.json",
+)
+use_repo(hummingbird, "hummingbird")
+```
+
+`hummingbird_install.json` is pin-tool output: hierarchical `packages[name][arch]` keyed structure carrying version, sha256, and rpm path per (package, arch) pair. `noarch` packages have one nested key; arch-specific packages have `x86_64`/`aarch64`. Never hand-edited.
+
+## Closed manifest, not solver
+
+Package names listed inline in `MODULE.bazel` are the canonical intent. The pin tool (`bazel run @hummingbird//:pin`) resolves them against `primary.xml.gz` and errors if any listed package is missing — closed-manifest semantics, no auto-transitive-expansion. Manual maintenance cost is bounded because senku's package universe is small (~50–100 packages across all images); solver-grade flexibility would cost more than it saves. Same posture as the existing [[oci/distroless/debian.yaml]] approach, just expressed in Starlark instead of YAML.
+
+## Snapshot strategy
+
+`repomd.xml` carries a `revision` (Unix timestamp; observed values: `1778835791` early-afternoon 2026-05-15, `1778852516` ~3 hours later — Hummingbird's repo updates multiple times per day). The lockfile pins both `revision` and per-rpm SHA256. `revision` gives cache-friendly URLs and a moment-in-time anchor; per-rpm digests are the build-graph determinism backstop independent of URL stability. Closest analog to `snapshot.debian.org`'s timestamp pinning that exists in rpm-land — no public time-machine service for rpm distros, but the lockfile *is* the snapshot.
+
+**Implementation note (CDN behavior):** Hummingbird's CDN rejects `HEAD` requests with HTTP 403 and returns `302` redirects on `GET` to S3-backed URLs. The pin tool must use `GET` with redirect-following (Go's `http.Get` default; `curl -fsSL` equivalent). Never use `HEAD` to probe — even existence checks need a `GET` of metadata files, then inspect the body.
+
+## rpmdb sqlite — two-binary architecture
+
+Hummingbird images use sqlite-based rpmdb at `/usr/lib/sysimage/rpm/rpmdb.sqlite` (verified empirically on `hi/curl`). syft's rpm-db cataloger reads this exact path; without it, syft falls back to CPE-based detection against syft-generated CPEs whose vendor strings don't match NVD's canonical `cpe:2.3:a:gnu:glibc:*`, producing CPE-mismatch silent zeros (the same trap we identified on `bci-micro:16.0`).
+
+**Why apk's single-tool pattern doesn't work for rpm.** [[devtools/build/tools/wolfi-apk-extract/main.go]] gets away with single-package emission because `/lib/apk/db/installed` is flat text — per-package fragments naturally concatenate when `flatten(deduplicate=True)` stacks the layers. rpmdb is binary sqlite; identical-path collisions clobber rather than merge. A single-binary rpm-extract emitting per-package sqlite at `/usr/lib/sysimage/rpm/rpmdb.sqlite` would cause the last tar listed to win — syft would see one package and consumers would see a one-package image regardless of what's actually in the layer. This is the fraud-by-silence anti-pattern the empirical investigation behind this ADR explicitly disqualified.
+
+**Solution: two Go binaries, fan-in at the layer level.**
+
+| Binary | Inputs | Outputs |
+|---|---|---|
+| `hummingbird-rpm-extract` (per-package) | One `.rpm` | `content.tar` (allow-listed paths, canonical uid/gid/mtime, **no rpmdb writes**) + `header.blob` (raw RPM header binary, ~10–50 KB) |
+| `rpmdb-merge` (per-image) | N `header.blob` files | `rpmdb.tar` containing `/usr/lib/sysimage/rpm/rpmdb.sqlite` with one Packages row per input blob plus secondary indexes (Name, Basenames, Group, Requirename, Providename) |
+
+In the BUILD seam:
+
+```starlark
+flatten(
+    name = "hummingbird_static_amd64_layer",
+    tars = [
+        "@hummingbird//tzdata/amd64:content",
+        "@hummingbird//ca-certificates/amd64:content",
+        "@hummingbird//mailcap/amd64:content",
+        ":rpmdb",                              # merged from the same three
+        "//oci/distroless/common:rootfs",
+        # ... senku-synthesized rootfs/passwd/etc ...
+    ],
+)
+
+rpmdb_merge(
+    name = "rpmdb",
+    headers = [
+        "@hummingbird//tzdata/amd64:header",
+        "@hummingbird//ca-certificates/amd64:header",
+        "@hummingbird//mailcap/amd64:header",
+    ],
+)
+```
+
+Per-package extraction is independent and cacheable; the merge runs once per image and reruns only when the package set changes. Pure-Go via `modernc.org/sqlite` keeps the toolchain hermetic.
+
+### Determinism
+
+`modernc.org/sqlite` keeps the *library* hermetic; the *output bytes* take explicit work. `rpmdb-merge` must:
+
+- **Sort inputs before insertion.** rpmdb's `Packages` table is `INTEGER PRIMARY KEY` (rowid alias); auto-assigned rowids follow insertion order, and b-tree page layout derives from rowids. Sort `header.blob`s by `(Name, EVR, Arch)` before the insert loop, and apply the same canonical ordering to every secondary-index population pass. Never iterate a Go map directly into a write.
+- **Zero senku-controlled install metadata.** The sqlite is synthesized directly (no `rpm --install` call), so every "install-time" tag is our choice, not librpm's. Set `RPMTAG_INSTALLTIME=0`, `RPMTAG_INSTALLTID=0` (librpm's default of `time(NULL)` is the canonical determinism trap), and fix `RPMTAG_INSTALLCOLOR` / `RPMTAG_INSTPREFIXES`. Pre-verify on `hi/curl` that syft's rpm-db cataloger reads only Name/EVR/Arch from each header — if any install-time field turns out to be consumed, switch that field to a canonical non-zero constant rather than zero.
+- **Pin SQLite knobs explicitly.** `PRAGMA page_size = 4096` before any write; `PRAGMA journal_mode = OFF` during build with a clean close so no `-wal`/`-shm` artifacts leak into the tar; no `AUTOINCREMENT` on any table (keeps `sqlite_sequence` out of the file entirely); single transaction, then `VACUUM` to normalize free-page layout.
+- **Schema fixture, version-pinned.** Check in the schema dump from `hi/curl`'s actual `rpmdb.sqlite` as a test fixture; `rpmdb-merge` builds *that* exact schema. If a future Hummingbird rpm-version bump shifts the schema, the fixture mismatch fails loudly instead of drifting silently into a "Packages table + ~10 secondary indexes" handwave. Schema reference for the implementer: rpm-tools' `rpmdb.c` and `librpmstrpool`.
+- **Byte-compare determinism test.** Build the merged rpmdb twice from identical inputs in the same Bazel action and `cmp` the outputs. Belongs in the `rpmdb-merge` package, not at the image level — regressions caught at the source binary, before they propagate into every image's layer hash.
+
+Tar wrapper around `rpmdb.sqlite` follows the canonical uid/gid/mode/mtime rules already applied to `content.tar`.
+
+## Multi-vendor sourcing during transition
+
+Image-by-image migration preserves the existing `_DISTROS` matrix axis. Senku images can compose layers from:
+
+| Source | Use for |
+|---|---|
+| Debian sid (`@debian//pkg/arch`) | `static` (zero-by-exclusion); transitional state for other images while Hummingbird migration is in progress |
+| Hummingbird (`@hummingbird//pkg/arch`) | Glibc-bearing images post-migration |
+| Wolfi (`//oci/distroless/wolfi/busybox-static/arch`) | `busybox-static` for `*_debug` variants (existing, see commit `e176b66`) |
+
+The matrix factory in [[oci/distroless/matrix.bzl]] doesn't know which package manager produced any given tar — it just composes them. The `_DISTROS` list axis is the migration switch.
+
+## Threat model and fallbacks
+
+| Risk | Defended? | Notes |
+|---|---|---|
+| Hummingbird sunsets the public repo | Partial | Lockfile + per-rpm SHA256 means existing builds remain reproducible from cached bytes indefinitely. New builds break; need to migrate to a successor (Red Hat may publish a continuity path, given the OSS posture). Plan B: snapshot the Hummingbird repo to our own infra ahead of any sunset signal. |
+| Hummingbird restricts free access | Same | Same mechanism — lockfile decouples build determinism from upstream availability. |
+| Grype/Trivy drop hummingbird provider coverage | Defended | The supply-chain claim doesn't depend on scanner support: bytes are still backported. Worst case our images stop *appearing* zero on those scanners; transparent VEX and the published SBOM still describe the underlying truth. |
+| Compromised Hummingbird repo (malicious RPM substituted) | Defended | GPG signature verification at lock and build time. Repo metadata is also GPG-signed (per `repomd.xml.asc`); both layers must be subverted simultaneously. Plus per-rpm SHA256 in our lockfile means any drift fails the checksum compare. |
+| Compromised Hummingbird GPG key | Not defended | Out of scope. Same posture as any apt/apk key compromise — trust root issue requiring a coordinated response. |
+| Scanner DB ingests fresh hummingbird CVE that we haven't rebuilt against | Defended by rebuild cadence | Daily/weekly snapshot bump CI job (open question, see below) closes the window; lockfile gets bumped, images rebuild, scan-clean test asserts. |
+
+## Operational considerations
+
+**Rebuild cadence is the actual competitive moat.** Chainguard's zero-CVE story is *continuous rebuild against current upstream*. Senku must match that or the zero claim drifts. Empirically, Hummingbird's `repomd.xml` revision bumped from `1778835791` to `1778852516` within ~3 hours during ADR drafting on 2026-05-15 — multiple updates per day. Daily auto-PR cadence is therefore the right floor; weekly would miss most upstream changes and let the wontfix window reopen. Recommend daily `@hummingbird//:pin` job with `_cve_test_stale_*` enforcement and "scan still clean" as the merge gate. Tracks closely to the existing [[oci/distroless/debian.yaml]] cadence with the same machinery, just faster.
+
+**Triple-scanner verification.** CI gates each image on grype + trivy + at least one third scanner (snyk or osv-scanner) reporting zero. Single-scanner verification has been shown to be insufficient by this same investigation; the upstream-feed-ingestion lag is a real risk and only diverges between vendors.
+
+**SBOM and attestation pipeline unchanged.** The cosign/SLSA chain in [[oci/mirror_push.bzl]] composes around `oci_image` and doesn't depend on the package source. The same `image_sbom` rule emits CycloneDX from whatever package metadata the image carries; the only change is purl prefix (`pkg:rpm/.../...?distro=hummingbird-<rev>` instead of `pkg:deb/debian/...`).
+
+## Migration order
+
+1. Drop `libc-bin`/`mawk` from current Debian-`static` — independent of Hummingbird, immediate win: removes 3 glibc CVE entries from the wontfix list while still on the old supply chain. Buys reaction time.
+2. `rules_rpm` skeleton (`hummingbird.install` module extension + `@hummingbird//:pin` tool + `hummingbird_install.json`) + `hummingbird-rpm-extract` and `rpmdb-merge` Go binaries — the new infrastructure.
+3. **`static` migrates to Hummingbird first.** Smallest dep closure (3 upstream packages); no glibc to wrangle; exercises the rules_rpm path on the simplest case. Validates the whole pipeline (lockfile → rpm-extract → rpmdb fragment → composed layer → scanner-zero verification with `ID=hummingbird`) end-to-end before the harder migrations.
+4. `cc` image migrated to Hummingbird — first glibc-bearing target. Validates the consumer-scanner-zero claim that motivates the whole ADR.
+5. `bash`, `nginx`, `python` migrated one at a time, each behind the same scanner-zero gate.
+6. `nodejs` distroless on Hummingbird — the marquee demo: ship a real distroless node, without npm or node-gyp, on the same glibc Hummingbird's own `hi/nodejs` ships. Tracer-bullet (shipped): nodejs.org prebuilt tarball on cc-hummingbird, ~95–145MB uncompressed per major (20/24/26), comparable to `hi/nodejs`'s 134MB. The ADR's earlier "30–50MB" estimate predated Node's growth and is unattainable from the `--enable-static-*` tarball regardless of stripping. Source-build with `--shared-{openssl,zlib,brotli,cares,nghttp2,libuv,zstd} --with-intl=system-icu` against Hummingbird's existing rpms (libicu alone unbundles ~30MB) is tracked in [#230](https://github.com/arkeros/senku/issues/230) and targets Chainguard-comparable ~60MB.
+7. `java` distroless on Hummingbird — same shape as nodejs, with four decisions worth flagging up front because each looks like a smaller choice than it is.
+
+    - **LTS-only policy (17 / 21 / 25).** Adoptium's LTS list is [8, 11, 17, 21, 25]; we ship the latest three. 8 and 11 are excluded — they're still in Adoptium's LTS catalogue but far down the EOL slope, and the per-quarter CPU rebuild promise has finite cycles. 26 is excluded as a non-LTS (six-month support window) — matches Google Distroless's `java/BUILD` posture. Auto-rolls forward: when JDK 29 ships in ~2027, 17 rolls off and 29 takes its place.
+
+    - **Temurin tarballs, not the Hummingbird `java-25-openjdk-headless` RPM.** This is the one place in the migration where we deviate from the secdb-routed pattern. Hummingbird ships 21 + 25 but *not* 17, and enterprise Java is still overwhelmingly 17 — dropping 17 to keep the supply chain pure would be the tail wagging the dog. Mixing JRE sources (Hummingbird for 21/25, Temurin for 17) was costed and rejected: two extract pipelines, two SBOM component shapes, two test surfaces, two CVE-response playbooks — at v1 the maintenance tax exceeds the secdb-routing benefit. Better to be uniformly Temurin and pay the NVD-CPE matching cost across all three majors. Revisit when Hummingbird ships 17 or when a fourth Java consumer in this repo justifies the duplication.
+
+    - **Headless-only.** `Adoptium-headless`-equivalent: no AWT/Swing/X11. Java server workloads (Spring, Quarkus, Kafka) don't need them; client GUIs don't run in distroless. The known foot-gun is `BufferedImage.drawString` — Apache POI, Apache PDFBox text rendering, ImageIO with custom fonts — silently NPEs at runtime without `libfontmanager`/`libfreetype`. Acknowledged and accepted: image-rendering workloads need the full JRE, not this image. Worth a callout in the published image description so a consumer doesn't spend half a day debugging a missing-font stack trace.
+
+    - **CPE: `cpe:2.3:a:oracle:openjdk` (not `eclipse:temurin`).** Empirically verified, not chosen by branding: probing the same in-tree grype DB against `cpe:2.3:a:oracle:openjdk:17.0.0:*:*:*:*:*:*:*` returns 95 matches; `cpe:2.3:a:eclipse:temurin:17.0.0:*` returns 0. NVD catalogues OpenJDK advisories under the upstream-codebase vendor regardless of which distributor (Temurin, Corretto, Microsoft, Zulu) ships the bytes — Adoptium itself cites this vendor in their own security disclosures. Using the builder-name CPE would be silent-zero by another name. The companion `_cve_test_silent_zero` gate (added in `461b5cfa`) catches any SBOM component that's neither secdb-routable nor has a CPE, and forces every future Java consumer through this same probe-before-ship workflow.
+
+    - **JDK in the `_debug` variant at /jre/ (same path as release JRE).** `kubectl exec ... -- /jre/bin/jstack 1` works against either variant: the release simply lacks the binary, debug supplies it. Operators don't have to special-case the variant in their debug-runbook command/args overrides. The JDK is a strict superset of the JRE (same `bin/java`, same `lib/server/libjvm.so`, plus `jdk.*` modules) so the entrypoint and SBOM component are unchanged — this is the same trick Google Distroless uses for its `java*-debug` variants and is the reason that pattern survives operationally.
+
+## Amendment (2026-05-18): silent-zero gate is matcher-routed, not secdb-routed
+
+The `_cve_test_silent_zero` gate referenced in the Java section above was originally scoped to `pkg:(rpm|deb|apk)/` purls — the distro-secdb providers — on the framing that those were "secdb-routable" and everything else needed an explicit CPE. That framing was overgeneralized from the empirical evidence behind it. The test case in commit `461b5cfa` was `pkg:generic/` (the nodejs.org tarball Node 18.0.0 case): for that purl shape, "secdb-routable vs explicit CPE" *is* the routing binary, because grype really does have no matcher for `pkg:generic/`. The mistake was inferring the positive allowlist by enumeration of what the senku surface happened to ship at the time (rpm/deb/apk only) rather than from grype's matcher list.
+
+Grype's `NewDefaultMatchers` wires 14 ecosystem matchers. Beyond rpm/deb/apk it routes `pkg:golang/`, `pkg:npm/`, `pkg:pypi/`, `pkg:maven/`, `pkg:gem/`, `pkg:cargo/`, `pkg:nuget/`, `pkg:hex/`, `pkg:bitnami/`, `pkg:alpm/` against GHSA and per-ecosystem advisory feeds — each without needing a CPE. Empirically verified at amendment time:
+
+| Component | Matches without `cpe` set |
+|---|---|
+| `pkg:golang/golang.org/x/net@v0.15.0` | 5 GHSA |
+| `pkg:golang/github.com/docker/docker@v20.10.0` | 16 GHSA |
+| `pkg:npm/lodash@4.17.20` | 5 |
+| `pkg:maven/org.apache.logging.log4j@2.14.1` | 7 |
+| `pkg:pypi/django@3.2.0` | 30 |
+
+The first senku image to ship a Go binary in its layer (the registry proxy, `//oci/cmd/registry`) tripped the narrow gate on its 7 transitive Go-module components — the gate fired correctly on its own filter, but the filter itself was incomplete. Fixed in commit `2095c66b`: `_SILENT_ZERO_FILTER` in `oci/supply_chain.bzl` widened to grype's full matcher list, sourced from `grype/matcher/matchers.go`'s `NewDefaultMatchers` and to be kept in lock-step on grype upgrades.
+
+**Restated invariant.** A component passes the silent-zero gate iff (a) its purl prefix matches one of grype's ecosystem matchers OR (b) it carries an explicit CPE for the `stock` matcher. The narrow rpm/deb/apk framing in the Java-section reference above was an over-fit to the original `pkg:generic/` evidence — accurate for that shape, misleading as a general rule. The Java decision (CPE on Temurin) stands unchanged: Java packages distributed outside any grype-matcher ecosystem still need a CPE, exactly as the Java section describes.
+
+**Lesson.** Structural gates need both positive (this should pass) and negative (this should fail) test inputs across every shape they're meant to handle. Commit `461b5cfa` landed only the negative case (`pkg:generic/` without CPE → fails) and inferred the positive allowlist from what shipped at the time, which silently constrained the gate to today's surface. Future structural-gate ADRs land both directions of the binary explicitly — and ideally drive the allowlist from the underlying tool's source of truth rather than a hand-curated enumeration.
+
+## Amendment (2026-05-18): lock-time `repomd.xml.asc` verification is now implemented
+
+The original "Threat model and fallbacks" table claimed lock-time GPG verification of repo metadata as a defended property: *"Repo metadata is also GPG-signed (per `repomd.xml.asc`); both layers must be subverted simultaneously."* Code review caught that the pin tool had been shipped with that step as a `// TODO` no-op (`pin/main.go` discarded the `--gpg-key` arg via `_ = *gpgKey`). The threat-model row was therefore aspirational — at lock time, trust reduced to TLS to the upstream CDN, and any MITM able to substitute `primary.xml.gz` could replace every per-rpm sha256 in the lockfile with digests of their own choosing. The downstream sha256 chain would then "validate" malicious bytes against attacker-controlled expectations; only the per-rpm in-RPM signature in `rpm-extract` caught it, and that's the wrong layer for a metadata-substitution attack.
+
+Closed by implementing verification:
+
+- `pin/main.go` now fetches `<repo>/<arch>/repodata/repomd.xml.asc` alongside `repomd.xml` and calls `openpgp.CheckArmoredDetachedSignature` against the consumer-supplied keyring before reading any byte of the repomd. Failure (bad signature, no matching key, malformed armor) aborts the whole pin run before any per-rpm digest lands in the lockfile.
+- Keyring decoding is factored out to `rpm/tools/internal/keyring`, shared with `rpm-extract`. Same multi-block parser, same skip-broken-block tolerance for vendor keyrings (e.g. Hummingbird's three-key rotation bundle).
+- Tests cover the three properties that matter: valid signature passes, tampered payload fails, signature from a key outside the trust root fails. Plus an end-to-end test that drives `resolve()` against an in-process fake repo and confirms an attacker-signed metadata bundle is refused.
+- `pin.sh.tpl` resolves `--gpg-key` to an absolute path before `cd`-ing into `BUILD_WORKSPACE_DIRECTORY`, matching the existing `TOOL` handling. The previous unresolved short-path was harmless while verification was a no-op; it would have broken the moment the key was actually read.
+
+The trust chain at lock time now matches the threat-model claim: `repomd.xml.asc` is the anchor, every primary.xml sha and per-rpm sha chains back to it, subverting any lockfile digest requires subverting that signature.
+
+**Caveat.** Empty `--gpg-key` still degrades to TLS-only trust (one-off CLI use), with a loud warning on stderr. The `rpm.install(...)` extension marks `gpg_key` mandatory, so production Bazel runs always populate it.
+
+## Amendment (2026-05-19): build horizon — image-config `created` timestamps
+
+Chainguard names two concepts senku had been reinventing: **build horizon** ("the maximum amount of time a build artifact… is permitted to remain in use before it must be rebuilt" — https://edu.chainguard.dev/software-security/build-horizon/) and the **principle of ephemerality** ("Everything that can be ephemeral, should be ephemerality" — https://www.chainguard.dev/unchained/the-principle-of-ephemerality). Both are the rebuild-cadence-as-moat argument from §"Operational considerations", with admission-controller enforcement as the new mechanism. The build-horizon article specifically calls out a trap: tools that set image-config `created` to the Unix epoch *"will always appear to exceed any reasonable build horizon"*, recommending `SOURCE_DATE_EPOCH` so timestamps derive from the source commit rather than wall-clock.
+
+Empirical audit pre-amendment: senku images had **no `created` field at all** — neither epoch-0 (always-stale trap) nor wall-clock (non-reproducible) nor source-derived. Third state: **policy-invisible**. An admission controller using sigstore/policy-controller's `fetchConfigFile` to gate on `created` would get `null` and apply its config default (fail-open or fail-closed). The rebuild-cadence claim was unverifiable from the image alone — consumers had no in-image signal to distinguish a fresh build from a six-month-old cached pull.
+
+Closed by deriving `created` from each distro's upstream-snapshot anchor:
+
+- **Hummingbird**: `.repo.revision` from the rules_rpm lockfile (Unix epoch). Matches Hummingbird's own multi-update-per-day cadence (§Snapshot strategy).
+- **Debian**: the `snapshot.debian.org` archive timestamp embedded in every package URL (`/archive/debian/<YYYYMMDDTHHMMSSZ>/`). senku already pinned via snapshot.debian.org for build determinism; the `created` derivation just surfaces that anchor at the image-config layer too.
+
+Both implemented as one-line `jq` macros in `//oci:created_timestamp.bzl`, threaded through `oci_image(created = ...)` → `image_manifest(created = ...)`. Stable across same-lockfile rebuilds (Bazel caches cleanly), meaningful as a build-horizon signal (tracks dependency freshness, which is what horizon admission actually checks), and symmetric across distros for the image families that have a real anchor.
+
+**Stronger than commit time.** Google distroless PR #1203 (2023) used `SOURCE_DATE_EPOCH=<commit_date>` — a senku-side signal. The lockfile-revision approach is stricter: a senku-codebase change that doesn't touch the lockfile shouldn't bump "freshness" (the underlying packages are the same age). In practice the daily auto-pin cron keeps lockfile revisions in lockstep with rebuild events, so both signals usually align; when they diverge, lockfile-revision is the more honest answer.
+
+**Asymmetry — nginx-on-debian is deliberately omitted.** nginx.org's apt repo doesn't operate a snapshot service (URLs are `https://nginx.org/packages/debian/pool/...` with no archive timestamp), so there's no honest upstream-anchor for nginx-on-debian variants. Shipping a misleading `created` (e.g. the base Debian snapshot, or git mtime of the per-channel lockfile) was rejected: missing-field is honest, misleading-field is a contract violation. Admission controllers can policy "field absent"; they can't policy "field lies." See #237 for the deferred design call.
+
+**Lesson.** Two principles a PR review surfaced after the initial implementation:
+1. *Falsifiable claims only*: the `created` field carries an implicit contract — "this image's deps are at most this stale". Don't populate the field on images where the contract can't be substantiated. Missing data > misleading data.
+2. *Wait for a consumer*: no admission controller currently gates on senku images' `created`. The implementation is preparation for hypothetical enforcement, justified by the cost-of-doing-later being roughly the cost-of-doing-now for the cases with a real anchor. Cases without a real anchor (nginx-on-debian) are explicitly deferred until a customer materializes — building speculative machinery for them is the over-engineering trap §"Lesson" from the silent-zero amendment warned against.
+
+## Amendment (2026-05-19): rpmdb-merge schema was overspecified
+
+The original §"Determinism" enumerated four invariants `rpmdb-merge` "must" satisfy. As shipped (commit `422b9d34`), `rpmdb-merge` satisfies the spirit but not the letter of three of them, in ways the original spec didn't anticipate. The mismatch is documented-as-aspiration vs. shipped-as-MVP; reconciling under (1) below.
+
+**1. "Synthesize the full librpm schema with secondary indexes (Name, Basenames, Group, Requirename, Providename)."** The shipped schema is one table: `Packages(hnum INTEGER PRIMARY KEY, blob BLOB NOT NULL)`. Justified empirically: secondary indexes drive librpm's transactional `install`/`remove`/`query` machinery, which distroless images never invoke (no `rpm`/`dnf` at runtime). The two consumers we ship for — syft's and trivy's rpm-db catalogers — both read via `knqyf263/go-rpmdb`, whose `pkg/sqlite3/sqlite3.go:56` issues a single statement: `SELECT blob FROM Packages` and no other SQL anywhere in the file. Empirically verified at amendment time by reading the upstream source. Ship the minimum that satisfies the consumer contract; let the byte-compare test (point 4 below) catch any drift in shape that *does* matter.
+
+**2. "Zero `RPMTAG_INSTALLTIME` / `RPMTAG_INSTALLTID`."** Obsoleted by an architecture change: `rpm-extract` doesn't synthesize header rows, it copies the upstream RPM general-header bytes verbatim (`rpm-extract/main.go:Extract`). Install-time tags carry whatever the upstream packager set at build time, which is fixed per RPM version → still deterministic at the build-graph level (same RPM → same bytes). The original concern — *"librpm's default of `time(NULL)` is the canonical determinism trap"* — was for the alternative architecture where we'd call `rpm --install` and let librpm stamp tags. We don't.
+
+**3. "Schema fixture from `hi/curl`'s `rpmdb.sqlite`, version-pinned."** Replaced by the structural-property tests in `rpmdb-merge/main_test.go`: `TestRun_PageSizePinned` (page_size = 4096 actually applied), `TestRun_NoSqliteSequenceTable` (no AUTOINCREMENT crept in), `TestRun_DeterministicAcrossInputOrders` (rowid assignment stable), `TestRun_ReproducibleSameInputs` (full byte-determinism). These catch the *failure modes* a fixture would catch — schema-shape drift, knob regression — without depending on a single upstream snapshot for a baseline. A fixture would freeze the answer to "what should the schema look like?"; the property tests freeze the answer to "what determinism invariants does the schema satisfy?" The latter survives upstream Hummingbird rpm-version bumps that change the schema for reasons unrelated to determinism.
+
+**4. "Byte-compare determinism test in the rpmdb-merge package."** Implemented. `TestRun_DeterministicAcrossInputOrders` and `TestRun_ReproducibleSameInputs` are the load-bearing regression backstops. The byte-compare property holds today against the empirical Hummingbird tzdata fixture.
+
+**Lesson.** Specifying schema-level invariants ahead of having concrete consumer contracts produced over-engineering pressure that the implementation correctly resisted. The fixable mistake was the ADR text framing them as `MUST` requirements when the actual contract was *"satisfy syft and trivy"* — which turns out to be one SELECT statement against one column. Future schema-fanout ADRs should lead with the consumer-side query that justifies each table or index, not with a fully-fanned-out schema spec that the consumers don't actually exercise.
+
+## See also
+
+- [[docs/research/deb-vs-apk-vs-oci-components.md]] — broader format/channel analysis; Option B (OCI-component overlay) was the prior recommendation; this ADR supersedes it for glibc-bearing images specifically while preserving its conclusions for non-glibc cases
+- [[devtools/build/tools/wolfi-apk-extract/main.go]] — apk extraction analog; pattern reused for rpm
+- [[oci/distroless/common/variables.bzl]] — `DEBIAN_WONTFIX_CVES` (to be renamed `WONTFIX_CVES[distro]` keyed map)
+- [[oci/distroless/matrix.bzl]] — the distro-agnostic image composition factory
+- [ADR 0006](0006-bazel-native-cosign-mirror-signing.md) — cosign signing chain (unchanged by this decision)

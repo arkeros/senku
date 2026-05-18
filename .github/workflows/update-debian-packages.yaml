@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 16 * * *"
+concurrency:
+  group: update-debian-packages
+  cancel-in-progress: false
 jobs:
   update:
     name: Update Debian packages
@@ -21,11 +24,11 @@ jobs:
             common --config=ci
             common --remote_header=x-buildbuddy-api-key=${{ secrets.BUILDBUDDY_API_KEY }}
       - name: Install knife
-        uses: arkeros/senku/.github/actions/setup-knife@main
+        uses: ./.github/actions/setup-knife
         with:
           target: //bazel/cmd/knife
       - name: Update Debian packages
-        uses: arkeros/senku/.github/actions/update-debian-packages@main
+        uses: ./.github/actions/update-debian-packages
         with:
           manifests: >-
             oci/distroless/debian.yaml

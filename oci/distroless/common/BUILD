@@ -1,8 +1,9 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@rules_distroless//distroless:defs.bzl", "cacerts", "group", "home", "locale", "os_release", "passwd")
 load("@tar.bzl", "tar")
+load("//oci:created_timestamp.bzl", "debian_created_timestamp", "hummingbird_created_timestamp")
 load("//oci/distroless:platforms.bzl", "ALL_ARCHITECTURES", "ALL_DISTROS", "VERSIONS")
-load(":variables.bzl", "COMPRESSION", "MTIME", "NOBODY", "NONROOT", "OS_RELEASE", "ROOT", "quote")
+load(":variables.bzl", "COMPRESSION", "MTIME", "NOBODY", "NONROOT", "OS_RELEASE_BY_DISTRO", "ROOT", "quote")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -70,6 +71,38 @@ tar(
     ],
 )
 
+# /etc/os-release -> /usr/lib/os-release per os-release(5). Debian's
+# base-files package ships this symlink for free; Hummingbird's package
+# set doesn't include a `setup` / `filesystem` rpm (deliberate, see ADR
+# 0007), so we synthesize it senku-side.
+tar(
+    name = "etc_os_release_symlink",
+    mtree = [
+        "./etc/os-release type=link link=/usr/lib/os-release",
+    ],
+)
+
+# UsrMerge root symlinks for Hummingbird-derived images. RHEL's `filesystem`
+# rpm ships /lib, /lib64, /bin, /sbin as symlinks into /usr — these are
+# *load-bearing*: every RHEL ELF binary is compiled with interpreter
+# `/lib64/ld-linux-x86-64.so.2` (or aarch64 equivalent), and libgcc places
+# libgcc_s.so.1 under /lib64. Without these symlinks, no upstream-built
+# binary can find its dynamic linker on a Hummingbird-derived distroless.
+#
+# Debian images don't need this — their packages are pre-merged via
+# `mergedusr = True` in apt.install (mergedusr.dh symlinks everything into
+# /usr at .deb-install time). For RHEL-shape rpms the merge has to happen
+# at image-composition time instead.
+tar(
+    name = "usrmerge_symlinks_hummingbird",
+    mtree = [
+        "./bin type=link link=usr/bin",
+        "./sbin type=link link=usr/bin",
+        "./lib type=link link=usr/lib",
+        "./lib64 type=link link=usr/lib64",
+    ],
+)
+
 # Create symlinks for rust-coreutils (avoids GNU coreutils which pulls in libsystemd0)
 # rust-coreutils is a multicall binary at /bin/coreutils.
 #
@@ -129,12 +162,19 @@ tar(
                 CODENAME = codename,
                 VERSION = version,
             ))
-            for (key, value) in OS_RELEASE.items()
+            for (key, value) in OS_RELEASE_BY_DISTRO[dist].items()
         },
         time = MTIME,
     )
     for (dist, codename, version) in VERSIONS
 ]
+
+# locale + cacerts here are Debian-shaped: locale extracts charmaps from
+# `libc-bin`, cacerts from Debian's `ca-certificates` package. Hummingbird's
+# equivalents live at different paths inside differently-named rpms
+# (glibc-common / ca-certificates with the RHEL ca-bundle layout) and need
+# their own extractor. Restrict this iteration to Debian until those are wired.
+_LOCALE_CACERTS_DISTROS = ["debian"]
 
 [
     locale(
@@ -144,7 +184,7 @@ tar(
         time = MTIME,
     )
     for arch in COMMON_ARCHITECTURES
-    for distro in COMMON_DISTROS
+    for distro in _LOCALE_CACERTS_DISTROS
 ]
 
 [
@@ -154,7 +194,7 @@ tar(
         time = MTIME,
     )
     for arch in COMMON_ARCHITECTURES
-    for distro in COMMON_DISTROS
+    for distro in _LOCALE_CACERTS_DISTROS
 ]
 
 # create /etc/group with the root, tty, and staff groups
@@ -245,6 +285,20 @@ home(
             "mode": 700,
         },
     ],
+)
+
+# RFC 3339 `created` timestamps shared across image families that consume
+# the same upstream-snapshot anchor. Each evaluates to a one-file label
+# consumable by `oci_image(created = ...)`. See //oci:created_timestamp.bzl
+# and ADR 0007 §"Build horizon" amendment for rationale.
+hummingbird_created_timestamp(
+    name = "created_hummingbird",
+    lock = "//:hummingbird.lock.json",
+)
+
+debian_created_timestamp(
+    name = "created_debian",
+    lock = "//oci/distroless:debian.lock.json",
 )
 
 bzl_library(

@@ -1,0 +1,282 @@
+// rpmdb-merge: N raw RPM header blobs -> tar containing
+// /usr/lib/sysimage/rpm/rpmdb.sqlite with one Packages row per header.
+//
+// Minimum-viable schema mirrors what syft / trivy actually read:
+// `SELECT blob FROM Packages` (see knqyf263/go-rpmdb pkg/sqlite3/sqlite3.go).
+// The full librpm schema also writes secondary indexes (Name, Basenames,
+// Requirename, ...) keyed off RPM header tags — those drive librpm's
+// transactional install/remove operations but aren't read by SBOM scanners,
+// so we omit them until something demands them.
+//
+// modernc.org/sqlite keeps the toolchain hermetic (pure Go, no cgo).
+//
+// Inputs are described by a config JSON written by the Bazel `rpmdb_merge`
+// rule: a list of {package, version, arch, header_path} records. The
+// header_path entries are paths relative to the action's exec root.
+package main
+
+import (
+	"archive/tar"
+	"bytes"
+	"database/sql"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"time"
+
+	"github.com/klauspost/compress/zstd"
+	_ "modernc.org/sqlite"
+)
+
+// The librpm on-disk header magic plus its 4-byte reserved padding. rpm-extract
+// emits header.blob with this prefix (it's the in-rpm-file general-header byte
+// range). librpm's rpmdb storage format strips it — the sqlite Packages.blob
+// column begins directly with the big-endian index_count. anchore/go-rpmdb's
+// header parser (which syft uses) assumes the stripped format.
+var rpmHeaderMagic = []byte{0x8e, 0xad, 0xe8, 0x01, 0x00, 0x00, 0x00, 0x00}
+
+type config struct {
+	Headers []headerEntry `json:"headers"`
+}
+
+type headerEntry struct {
+	Package    string `json:"package"`
+	Version    string `json:"version"`
+	Arch       string `json:"arch"`
+	HeaderPath string `json:"header_path"`
+}
+
+const rpmdbPath = "./usr/lib/sysimage/rpm/rpmdb.sqlite"
+
+func main() {
+	configPath := flag.String("config", "", "path to JSON config listing header inputs")
+	outPath := flag.String("out", "", "output tar path")
+	compressFlag := flag.String("compress", "zstd", "tar compression: zstd | none")
+	flag.Parse()
+
+	if *configPath == "" || *outPath == "" {
+		fmt.Fprintln(os.Stderr, "rpmdb-merge: --config and --out are required")
+		os.Exit(2)
+	}
+
+	if err := run(*configPath, *outPath, *compressFlag); err != nil {
+		fmt.Fprintln(os.Stderr, "rpmdb-merge:", err)
+		os.Exit(1)
+	}
+}
+
+func run(configPath, outPath, compress string) error {
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	sqliteBytes, err := buildRpmdb(cfg.Headers)
+	if err != nil {
+		return fmt.Errorf("build rpmdb: %w", err)
+	}
+
+	return writeTar(outPath, sqliteBytes, compress)
+}
+
+func loadConfig(path string) (*config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var cfg config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("decode config json: %w", err)
+	}
+	return &cfg, nil
+}
+
+// buildRpmdb materializes a fresh rpmdb.sqlite into a temp file, populates
+// the Packages table, then reads the bytes back. We round-trip through the
+// filesystem because modernc.org/sqlite doesn't expose an in-memory-with-
+// readback path that yields valid on-disk bytes for tar emission.
+//
+// Determinism (see docs/adr/0007-hummingbird-rpm-base.md §Determinism):
+//
+//   - Headers are sorted by (Package, Version, Arch) before insertion so
+//     rowid assignment — and the b-tree page layout that follows from it —
+//     is independent of the order the upstream config JSON happened to list.
+//   - page_size and journal_mode are pinned via URL-level pragmas at
+//     connection open, before any other SQL touches the empty file.
+//     journal_mode=OFF avoids `-wal`/`-shm` artifacts leaking past close.
+//   - Packages.hnum is a plain INTEGER PRIMARY KEY (rowid alias), not
+//     AUTOINCREMENT — keeps the sqlite_sequence table out of the file.
+//   - All inserts run inside one transaction; a final VACUUM normalizes
+//     free-page layout so the on-disk image is a function of inputs only.
+func buildRpmdb(headers []headerEntry) ([]byte, error) {
+	sorted := make([]headerEntry, len(headers))
+	copy(sorted, headers)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].Package != sorted[j].Package {
+			return sorted[i].Package < sorted[j].Package
+		}
+		if sorted[i].Version != sorted[j].Version {
+			return sorted[i].Version < sorted[j].Version
+		}
+		return sorted[i].Arch < sorted[j].Arch
+	})
+
+	tmp, err := os.CreateTemp("", "rpmdb-*.sqlite")
+	if err != nil {
+		return nil, err
+	}
+	dbPath := tmp.Name()
+	tmp.Close()
+	defer os.Remove(dbPath)
+
+	if err := populateRpmdb(dbPath, sorted); err != nil {
+		return nil, err
+	}
+	return os.ReadFile(dbPath)
+}
+
+// populateRpmdb writes the Packages table into the sqlite file at dbPath.
+// Split out from buildRpmdb so a single defer chain handles db/tx/stmt
+// cleanup uniformly across every error path. The named return surfaces
+// db.Close()'s flush error on the happy path while leaving any earlier
+// error intact.
+func populateRpmdb(dbPath string, sorted []headerEntry) (err error) {
+	dsn := "file:" + dbPath + "?_pragma=page_size(4096)&_pragma=journal_mode(off)"
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return err
+	}
+	// Pin to a single connection so URL-pragma application (and the
+	// determinism guarantees that follow) cannot be undone by a second
+	// connection opened without them.
+	db.SetMaxOpenConns(1)
+	defer func() {
+		if cerr := db.Close(); err == nil {
+			err = cerr
+		}
+	}()
+
+	if _, err := db.Exec(`CREATE TABLE Packages (hnum INTEGER PRIMARY KEY, blob BLOB NOT NULL)`); err != nil {
+		return fmt.Errorf("create Packages: %w", err)
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() // no-op after Commit
+
+	stmt, err := tx.Prepare(`INSERT INTO Packages (blob) VALUES (?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, h := range sorted {
+		blob, err := os.ReadFile(h.HeaderPath)
+		if err != nil {
+			return fmt.Errorf("read header %s: %w", h.HeaderPath, err)
+		}
+		stored := bytes.TrimPrefix(blob, rpmHeaderMagic)
+		if len(stored) == len(blob) {
+			return fmt.Errorf("header %s missing expected 0x8eade801 magic prefix", h.Package)
+		}
+		if _, err := stmt.Exec(stored); err != nil {
+			return fmt.Errorf("insert %s: %w", h.Package, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	if _, err := db.Exec(`VACUUM`); err != nil {
+		return fmt.Errorf("vacuum: %w", err)
+	}
+	return nil
+}
+
+// writeTar wraps the sqlite bytes in a tar at the rpmdb path expected by
+// syft/trivy/librpm. Parent dirs are emitted so `tar -x` on hosts that
+// don't auto-synthesize them (stereoscope) sees a navigable tree.
+//
+// When `compress == "zstd"`, the tar stream is wrapped in zstd so the
+// resulting layer ships with `tar+zstd` media type matching the rest of
+// senku's distroless layers. `none` writes raw tar bytes (useful for
+// in-process consumption / tests).
+func writeTar(outPath string, sqliteBytes []byte, compress string) error {
+	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+		return err
+	}
+	f, err := os.Create(outPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	var w io.Writer = f
+	var closer io.Closer
+	switch compress {
+	case "", "none":
+		// no-op
+	case "zstd":
+		zw, err := zstd.NewWriter(f)
+		if err != nil {
+			return fmt.Errorf("init zstd writer: %w", err)
+		}
+		w = zw
+		closer = zw
+	default:
+		return fmt.Errorf("unsupported --compress=%q (expected zstd|none)", compress)
+	}
+
+	tw := tar.NewWriter(w)
+	defer func() {
+		tw.Close()
+		if closer != nil {
+			closer.Close()
+		}
+	}()
+
+	// USTAR + zeroed uid/gid + epoch mtime keeps the tar bytes stable
+	// across hosts; PAX/GNU formats would emit extended records whose
+	// presence depends on locale or build-host metadata.
+	epoch := time.Unix(0, 0)
+	dirs := []string{
+		"./usr",
+		"./usr/lib",
+		"./usr/lib/sysimage",
+		"./usr/lib/sysimage/rpm",
+	}
+	for _, d := range dirs {
+		if err := tw.WriteHeader(&tar.Header{
+			Name:     d + "/",
+			Mode:     0o755,
+			Typeflag: tar.TypeDir,
+			ModTime:  epoch,
+			Uid:      0,
+			Gid:      0,
+			Format:   tar.FormatUSTAR,
+		}); err != nil {
+			return err
+		}
+	}
+
+	if err := tw.WriteHeader(&tar.Header{
+		Name:     rpmdbPath,
+		Mode:     0o644,
+		Size:     int64(len(sqliteBytes)),
+		Typeflag: tar.TypeReg,
+		ModTime:  epoch,
+		Uid:      0,
+		Gid:      0,
+		Format:   tar.FormatUSTAR,
+	}); err != nil {
+		return err
+	}
+	_, err = tw.Write(sqliteBytes)
+	return err
+}

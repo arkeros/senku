@@ -3,7 +3,7 @@
 def quote(str):
     return '''"{}"'''.format(str)
 
-OS_RELEASE = dict(
+DEBIAN_OS_RELEASE = dict(
     PRETTY_NAME = "Distroless",
     NAME = "Debian GNU/Linux",
     ID = "debian",
@@ -13,6 +13,29 @@ OS_RELEASE = dict(
     SUPPORT_URL = "https://github.com/arkeros/senku/blob/main/oci/distroless/README.md",
     BUG_REPORT_URL = "https://github.com/arkeros/senku/issues/new",
 )
+
+# Hummingbird-derived images. `ID=hummingbird` is the scanner-routing key
+# (grype/trivy match exact-string only, no ID_LIKE fallback — see ADR 0007);
+# NAME / PRETTY_NAME carry the senku brand for human readers. VERSION_ID is
+# the Hummingbird snapshot revision (Unix timestamp from repomd.xml).
+HUMMINGBIRD_OS_RELEASE = dict(
+    PRETTY_NAME = "distroless.io (Hummingbird-derived)",
+    NAME = "distroless.io",
+    ID = "hummingbird",
+    ID_LIKE = "rhel fedora",
+    VERSION_ID = "{VERSION}",
+    HOME_URL = "https://github.com/arkeros/senku",
+    SUPPORT_URL = "https://github.com/arkeros/senku/blob/main/oci/distroless/README.md",
+    BUG_REPORT_URL = "https://github.com/arkeros/senku/issues/new",
+)
+
+OS_RELEASE_BY_DISTRO = {
+    "debian": DEBIAN_OS_RELEASE,
+    "hummingbird": HUMMINGBIRD_OS_RELEASE,
+}
+
+# Back-compat for any caller that still imports OS_RELEASE directly.
+OS_RELEASE = DEBIAN_OS_RELEASE
 
 NOBODY = 65534
 NONROOT = 65532
@@ -29,6 +52,23 @@ DEBUG_MODE = ["", "_debug"]
 USERS = ["root", "nonroot"]
 
 COMPRESSION = "zstd"
+
+# Standard env every senku image carries. Previously inherited via
+# `base = //oci/distroless/static` (which set these on its distroless_matrix).
+# Composition-style images set this explicitly. `SSL_CERT_FILE` resolves on
+# both Debian (native path) and Hummingbird (Debian-compat symlink shipped
+# by Hummingbird's ca-certificates rpm).
+DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+DEFAULT_ENV = {
+    "PATH": DEFAULT_PATH,
+    "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
+}
+
+# Debug images append /busybox to PATH so the shell can resolve commands.
+DEFAULT_DEBUG_ENV = {
+    "PATH": DEFAULT_PATH + ":/busybox",
+}
 
 # Debian "no-DSA, Minor issue" CVEs that Debian Security has triaged but not
 # yet backported a fix for. We track Debian unstable (sid) so most fixes flow
