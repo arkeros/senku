@@ -1,11 +1,13 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
+load("@rules_apk//apk:defs.bzl", "apkdb_merge")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_rpm//rpm:defs.bzl", "rpmdb_merge")
+load("@tar.bzl", "tar")
 load("//oci:mirror_push.bzl", "mirror_push")
 load("//oci:vex.bzl", "vex_document", "vex_statement")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
-load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP")
+load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP", "WOLFI_ARCH_MAP")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS", "NCURSES_FIXED_VEX_STATEMENTS")
 load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEBUG_MODE", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV")
 load(":config.bzl", "BASH_ARCHITECTURES", "BASH_DISTROS", "bash_layers")
@@ -77,21 +79,42 @@ vex_document(
     timestamp = "2026-05-15T00:00:00Z",
 )
 
+# Wolfi ships regular coreutils (no libsystemd0 split, no rust-coreutils
+# workaround needed) and `gawk` as the awk implementation (no `mawk`
+# on wolfi). Empty VEX until the scanner DB surfaces something concrete.
+vex_document(
+    name = "vex_wolfi",
+    author = "rafael@arquero.cat",
+    id = "https://github.com/arkeros/senku/blob/main/oci/distroless/bash/BUILD#wolfi",
+    statements = [],
+    timestamp = "2026-05-19T00:00:00Z",
+)
+
 _IGNORE_CVES = {
     "debian": DEBIAN_WONTFIX_CVES,
     "hummingbird": [],
+    "wolfi": [],
 }
 
 _VEX = {
     "debian": [":vex"],
     "hummingbird": [":vex_hummingbird"],
+    "wolfi": [":vex_wolfi"],
+}
+
+# Wolfi has no honest single repo-revision anchor in APKINDEX — omit
+# `created` per ADR 0007 "missing > misleading".
+_CREATED = {
+    "debian": "//oci/distroless/common:created_debian",
+    "hummingbird": "//oci/distroless/common:created_hummingbird",
+    "wolfi": None,
 }
 
 [
     distroless_matrix(
         name = "bash",
         architectures = BASH_ARCHITECTURES[distro],
-        created = "//oci/distroless/common:created_" + distro,
+        created = _CREATED[distro],
         debug_env = DEFAULT_DEBUG_ENV,
         debug_ignore_cves = BUSYBOX_WONTFIX_CVES if distro == "debian" else [],
         debug_index_annotations = {
@@ -200,6 +223,73 @@ _VEX = {
     for arch in BASH_ARCHITECTURES["hummingbird"]
 ]
 
+# Wolfi bash layer: same shape as hummingbird, mapped to wolfi names.
+# Soname deps inline alongside the binaries — same posture as
+# hummingbird's flatten so the closure is honest about what each
+# binary links against.
+#
+#   bash       → bash               → libtinfo.so.6 (ncurses)
+#   coreutils  → coreutils          → libacl.so.1 (libacl1), libattr.so.1 (libattr1),
+#                                     libcrypto.so.3 (libcrypto3 already in cc)
+#   grep       → grep               → libpcre2-8.so.0 (pcre2 split: libpcre2-8-0)
+#   sed        → sed
+#   awk        → gawk               (wolfi has no mawk; gawk is the POSIX
+#                                    analog and identical for distroless scripts)
+#   mailcap    → mailcap            (/etc/mime.types, /etc/mailcap)
+#
+# `:awk` is the `usr/bin/awk -> /usr/bin/gawk` symlink (replaces the
+# `awk → mawk` link the debian/hummingbird stacks use; same file, new
+# target).
+[
+    flatten(
+        name = arch + "_wolfi_layer",
+        compress = COMPRESSION,
+        deduplicate = True,
+        tars = [
+            "@wolfi//bash/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//coreutils/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//sed/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//grep/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//gawk/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//mailcap/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//libacl1/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//libattr1/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//libcap/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//libselinux/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//libsepol/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//ncurses/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//pcre2/" + WOLFI_ARCH_MAP[arch],
+            ":awk_wolfi_symlink",
+        ],
+    )
+    for arch in BASH_ARCHITECTURES["wolfi"]
+]
+
+# /usr/bin/awk -> /usr/bin/gawk on wolfi. The common :awk target
+# points at /usr/bin/mawk which wolfi doesn't ship; rebuild the
+# symlink locally with the right target rather than parameterising
+# the common one (avoids leaking wolfi's awk-flavor preference into
+# the rest of the tree).
+tar(
+    name = "awk_wolfi_symlink",
+    mtree = [
+        "./usr/bin/awk type=link link=/usr/bin/gawk",
+    ],
+)
+
+# Wolfi apkdb merges static + cc + bash flattens.
+[
+    apkdb_merge(
+        name = "apkdb_bash_" + arch + "_wolfi",
+        srcs = [
+            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+            "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
+            ":" + arch + "_wolfi_layer",
+        ],
+    )
+    for arch in BASH_ARCHITECTURES["wolfi"]
+]
+
 [
     mirror_push(
         name = "bash" + mode,
@@ -226,6 +316,19 @@ container_structure_test(
         "test.init-dockerd": "true",
     },
     image = ":bash_nonroot_amd64_debian.oci_layout",
+    tags = ["requires-docker"],
+)
+
+container_structure_test(
+    name = "bash_wolfi_test",
+    size = "small",
+    configs = ["test.yaml"],
+    driver = "docker",
+    exec_properties = {
+        "test.workload-isolation-type": "firecracker",
+        "test.init-dockerd": "true",
+    },
+    image = ":bash_nonroot_amd64_wolfi.oci_layout",
     tags = ["requires-docker"],
 )
 
