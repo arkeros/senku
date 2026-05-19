@@ -281,29 +281,12 @@ _BUSYBOX_SOURCES = {
     for arch in BUSYBOX_ARCHITECTURES
 ]
 
-# Structure tests (amd64 only, tar driver doesn't need docker)
-[
-    container_structure_test(
-        name = "static_" + user + "_test",
-        size = "small",
-        configs = [
-            "test.yaml",
-            "test_" + user + ".yaml",
-        ],
-        driver = "tar",
-        image = ":static_" + user + "_amd64_debian.tar",
-    )
-    for user in [
-        "root",
-        "nonroot",
-    ]
-]
-
-# Hummingbird + wolfi structure tests share shape: test_<distro>.yaml
-# carries the distro-specific assertions — RHEL-shape /usr/lib64 paths
-# plus rpmdb sqlite for hummingbird; flat /usr/lib paths, /usr/bin/ld.so
-# dynamic linker, and /lib/apk/db/installed for wolfi — while the
-# per-user test_<user>.yaml carries the user/workdir/PATH assertions.
+# Structure tests (amd64 only, tar driver doesn't need docker).
+# Two yaml configs per test: `test_<distro>.yaml` carries the distro-
+# specific assertions (Debian-shape /usr/share paths; RHEL /usr/lib64
+# + rpmdb sqlite for hummingbird; flat /usr/lib + /usr/bin/ld.so +
+# /lib/apk/db/installed for wolfi). `test_<user>.yaml` carries the
+# user/workdir/PATH assertions, which are distro-agnostic.
 [
     container_structure_test(
         name = "static_{}_{}_test".format(user, distro),
@@ -315,10 +298,7 @@ _BUSYBOX_SOURCES = {
         driver = "tar",
         image = ":static_{}_amd64_{}.tar".format(user, distro),
     )
-    for distro in [
-        "hummingbird",
-        "wolfi",
-    ]
+    for distro in STATIC_DISTROS
     for user in [
         "root",
         "nonroot",
