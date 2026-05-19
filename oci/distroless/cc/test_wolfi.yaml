@@ -1,0 +1,55 @@
+schemaVersion: 2.0.0
+metadataTest:
+  envVars:
+    - key: PATH
+      value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    - key: SSL_CERT_FILE
+      value: /etc/ssl/certs/ca-certificates.crt
+fileExistenceTests:
+  # Inherited from static base.
+  - name: 'ca-certificates'
+    path: '/etc/ssl/certs/ca-certificates.crt'
+    shouldExist: true
+  - name: 'os-release canonical'
+    path: '/usr/lib/os-release'
+    shouldExist: true
+  # Wolfi ships runtime SOs at /usr/lib (Debian-style flat, not RHEL's
+  # /usr/lib64). The dynamic linker also lives outside the lib dir
+  # entirely — `ld-linux` is its own APK and lands at /usr/bin/ld.so.
+  - name: 'libc.so.6'
+    path: '/usr/lib/libc.so.6'
+    shouldExist: true
+  - name: 'libstdc++'
+    path: '/usr/lib/libstdc++.so.6'
+    shouldExist: true
+  - name: 'libgcc_s'
+    path: '/usr/lib/libgcc_s.so.1'
+    shouldExist: true
+  - name: 'libssl'
+    path: '/usr/lib/libssl.so.3'
+    shouldExist: true
+  - name: 'libcrypto'
+    path: '/usr/lib/libcrypto.so.3'
+    shouldExist: true
+  - name: 'dynamic linker'
+    path: '/usr/bin/ld.so'
+    shouldExist: true
+  - name: 'apk installed-db'
+    path: '/lib/apk/db/installed'
+    shouldExist: true
+  - name: 'no shell'
+    path: '/bin/sh'
+    shouldExist: false
+fileContentTests:
+  - name: 'os-release has ID=wolfi'
+    path: '/usr/lib/os-release'
+    expectedContents: ['(?m)^ID="wolfi"$']
+  - name: 'apk installed-db lists glibc'
+    path: '/lib/apk/db/installed'
+    expectedContents: ['(?m)^P:glibc$']
+  - name: 'apk installed-db lists libstdc++'
+    path: '/lib/apk/db/installed'
+    expectedContents: ['(?m)^P:libstdc\+\+$']
+  - name: 'apk installed-db lists libcrypto3'
+    path: '/lib/apk/db/installed'
+    expectedContents: ['(?m)^P:libcrypto3$']
