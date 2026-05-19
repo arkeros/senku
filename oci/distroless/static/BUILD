@@ -5,7 +5,7 @@ load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_rpm//rpm:defs.bzl", "rpmdb_merge")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
-load("//oci/distroless:platforms.bzl", "WOLFI_ARCH_MAP", BUSYBOX_ARCHITECTURES = "ALL_ARCHITECTURES")
+load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP", "WOLFI_ARCH_MAP", BUSYBOX_ARCHITECTURES = "ALL_ARCHITECTURES")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
 load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
 load(":busybox.bzl", "busybox_layer")
@@ -251,45 +251,35 @@ _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     for distro in STATIC_DISTROS
 ]
 
+# Per-distro busybox source. Debian calls the package `busybox-static`
+# and uses senku-native arch names (amd64/arm64); hummingbird and wolfi
+# both call it `busybox` and use the rpm/apk arch convention
+# (x86_64/aarch64). The /busybox/<cmd> symlink macro in busybox.bzl
+# points at /usr/bin/busybox uniformly — verified that all three repos
+# ship the binary at that path, so no per-distro symlink-target
+# divergence.
+_BUSYBOX_SOURCES = {
+    "debian": (
+        "busybox-static",
+        {arch: arch for arch in BUSYBOX_ARCHITECTURES},
+    ),
+    "hummingbird": ("busybox", HUMMINGBIRD_ARCH_MAP),
+    "wolfi": ("busybox", WOLFI_ARCH_MAP),
+}
+
 [
     busybox_layer(
-        name = "busybox_" + arch + "_debian_layer",
-        busybox = "@debian//{}/{}".format("busybox-static", arch),
+        name = "busybox_{}_{}_layer".format(arch, distro),
+        busybox = "@{}//{}/{}".format(
+            distro,
+            pkg,
+            arch_map[arch],
+        ),
         compress = COMPRESSION,
     )
+    for distro, (pkg, arch_map) in _BUSYBOX_SOURCES.items()
     for arch in BUSYBOX_ARCHITECTURES
 ]
-
-# Hummingbird busybox layers per arch. busybox is the first arch-specific
-# rpm in the lockfile (everything else is noarch), so the senku arch name
-# (amd64/arm64) maps to the rpm arch name (x86_64/aarch64) explicitly.
-busybox_layer(
-    name = "busybox_amd64_hummingbird_layer",
-    busybox = "@hummingbird//busybox/x86_64",
-    compress = COMPRESSION,
-)
-
-busybox_layer(
-    name = "busybox_arm64_hummingbird_layer",
-    busybox = "@hummingbird//busybox/aarch64",
-    compress = COMPRESSION,
-)
-
-# Wolfi busybox layers — same shape as hummingbird's. The /busybox/<cmd>
-# symlinks point at /usr/bin/busybox; wolfi's busybox APK ships the
-# binary at that path so the link macro in busybox.bzl works
-# distro-uniformly.
-busybox_layer(
-    name = "busybox_amd64_wolfi_layer",
-    busybox = "@wolfi//busybox/x86_64",
-    compress = COMPRESSION,
-)
-
-busybox_layer(
-    name = "busybox_arm64_wolfi_layer",
-    busybox = "@wolfi//busybox/aarch64",
-    compress = COMPRESSION,
-)
 
 # Structure tests (amd64 only, tar driver doesn't need docker)
 [
