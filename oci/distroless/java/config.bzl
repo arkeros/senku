@@ -1,9 +1,10 @@
 "Configuration for java distroless images"
 
-JAVA_DISTROS = ["hummingbird"]
+JAVA_DISTROS = ["hummingbird", "wolfi"]
 
 JAVA_ARCHITECTURES = {
     "hummingbird": ["amd64", "arm64"],
+    "wolfi": ["amd64", "arm64"],
 }
 
 # LTS-only policy. Auto-roll: latest 3 LTS, no non-LTS, no EOL-trajectory.
@@ -43,21 +44,23 @@ def java_layers(major_version):
 
     def _layers(ctx):
         layers = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(ctx.arch),
+            "//oci/distroless/static:static_{}_{}_layer".format(ctx.arch, ctx.distro),
         ]
-        if ctx.mode == "_debug":
-            layers.append("//oci/distroless/static:busybox_{}_hummingbird_layer".format(ctx.arch))
-        layers.append("//oci/distroless/cc:cc_{}_hummingbird_layer".format(ctx.arch))
-        if ctx.mode == "_debug":
-            layers += [
-                "//oci/distroless/java:java_jdk_{}_{}_hummingbird_layer".format(major_version, ctx.arch),
-                "//oci/distroless/java:rpmdb_java_debug_{}_{}_hummingbird".format(major_version, ctx.arch),
-            ]
-        else:
-            layers += [
-                "//oci/distroless/java:java_jre_{}_{}_hummingbird_layer".format(major_version, ctx.arch),
-                "//oci/distroless/java:rpmdb_java_{}_{}_hummingbird".format(major_version, ctx.arch),
-            ]
+        if ctx.mode == "_debug" and ctx.distro != "wolfi":
+            layers.append("//oci/distroless/static:busybox_{}_{}_layer".format(ctx.arch, ctx.distro))
+        layers.append("//oci/distroless/cc:cc_{}_{}_layer".format(ctx.arch, ctx.distro))
+        image_type = "jdk" if ctx.mode == "_debug" else "jre"
+        layers.append("//oci/distroless/java:java_{}_{}_{}_{}_layer".format(image_type, major_version, ctx.arch, ctx.distro))
+        if ctx.distro == "hummingbird":
+            if ctx.mode == "_debug":
+                layers.append("//oci/distroless/java:rpmdb_java_debug_{}_{}_hummingbird".format(major_version, ctx.arch))
+            else:
+                layers.append("//oci/distroless/java:rpmdb_java_{}_{}_hummingbird".format(major_version, ctx.arch))
+        elif ctx.distro == "wolfi":
+            if ctx.mode == "_debug":
+                layers.append("//oci/distroless/java:apkdb_java_debug_{}_{}_wolfi".format(major_version, ctx.arch))
+            else:
+                layers.append("//oci/distroless/java:apkdb_java_{}_{}_wolfi".format(major_version, ctx.arch))
         return layers
 
     return _layers
