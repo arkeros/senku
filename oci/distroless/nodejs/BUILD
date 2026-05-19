@@ -146,10 +146,7 @@ _CREATED = {
             ":nodejs_{}_{}_hummingbird_layer".format(major, arch),
         ],
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for major in NODEJS_MAJOR_VERSIONS
     for arch in NODEJS_ARCHITECTURES["hummingbird"]
 ]
@@ -168,10 +165,7 @@ _CREATED = {
             ":nodejs_{}_{}_wolfi_layer".format(major, arch),
         ],
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for major in NODEJS_MAJOR_VERSIONS
     for arch in NODEJS_ARCHITECTURES["wolfi"]
 ]

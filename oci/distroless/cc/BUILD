@@ -7,7 +7,7 @@ load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
 load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP", "WOLFI_ARCH_MAP")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
-load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV")
+load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEBUG_MODE", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV")
 load(":config.bzl", "CC_ARCHITECTURES", "CC_DISTROS", "cc_layers")
 
 package(default_visibility = ["//visibility:public"])
@@ -132,10 +132,7 @@ _CREATED = {
             ":cc_{}_hummingbird_layer".format(arch),
         ],
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for arch in CC_ARCHITECTURES["hummingbird"]
 ]
 
@@ -182,10 +179,7 @@ _CREATED = {
             ":cc_{}_wolfi_layer".format(arch),
         ],
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for arch in CC_ARCHITECTURES["wolfi"]
 ]
 

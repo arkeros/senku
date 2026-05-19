@@ -243,10 +243,7 @@ _NGINX_RPM_REPO = {
             ":" + version_label + "_" + arch + "_hummingbird_layer",
         ],
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for version_label in NGINX_VERSIONS.keys()
     for arch in NGINX_ARCHITECTURES["hummingbird"]
 ]
@@ -294,10 +291,7 @@ _NGINX_WOLFI_PKG = {
             ":" + version_label + "_" + arch + "_wolfi_layer",
         ],
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for version_label in NGINX_VERSIONS.keys()
     for arch in NGINX_ARCHITECTURES["wolfi"]
 ]

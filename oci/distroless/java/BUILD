@@ -188,10 +188,7 @@ _CREATED = {
             ),
         ],
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for major in JAVA_MAJOR_VERSIONS
     for arch in JAVA_ARCHITECTURES["hummingbird"]
 ]
@@ -216,10 +213,7 @@ _CREATED = {
             ),
         ],
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for major in JAVA_MAJOR_VERSIONS
     for arch in JAVA_ARCHITECTURES["wolfi"]
 ]

@@ -7,7 +7,7 @@ load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
 load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP", "WOLFI_ARCH_MAP", BUSYBOX_ARCHITECTURES = "ALL_ARCHITECTURES")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
-load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
+load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEBUG_MODE")
 load(":busybox.bzl", "busybox_layer")
 load(":config.bzl", "STATIC_ARCHITECTURES", "STATIC_DISTROS", "static_debug_layers", "static_layers")
 
@@ -154,10 +154,7 @@ _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             [":busybox_{}_hummingbird_layer".format(arch)] if mode == "_debug" else []
         ),
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for arch in STATIC_ARCHITECTURES["hummingbird"]
 ]
 
@@ -202,10 +199,7 @@ _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             [":busybox_{}_wolfi_layer".format(arch)] if mode == "_debug" else []
         ),
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for arch in STATIC_ARCHITECTURES["wolfi"]
 ]
 

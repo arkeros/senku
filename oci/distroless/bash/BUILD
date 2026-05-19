@@ -210,10 +210,7 @@ _CREATED = {
             ":" + arch + "_hummingbird_layer",
         ],
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for arch in BASH_ARCHITECTURES["hummingbird"]
 ]
 
@@ -285,10 +282,7 @@ tar(
             ":" + arch + "_wolfi_layer",
         ],
     )
-    for mode in [
-        "",
-        "_debug",
-    ]
+    for mode in DEBUG_MODE
     for arch in BASH_ARCHITECTURES["wolfi"]
 ]
 
