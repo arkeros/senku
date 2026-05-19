@@ -138,31 +138,26 @@ _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     for arch in STATIC_ARCHITECTURES["hummingbird"]
 ]
 
-# rpmdb tar per arch. Aspect-driven — `targets` walks each flatten's `tars`
-# and collects RpmHeaderInfo from every rpm_package reachable. No parallel
-# enumeration of headers; this stays in sync with the flatten by default.
+# rpmdb tars per (mode, arch). Aspect-driven — `targets` walks each
+# flatten's `tars` and collects RpmHeaderInfo from every rpm_package
+# reachable. Release lists only the static layer; debug also lists
+# busybox so its CVEs route through the hummingbird secdb provider
+# (which knows the hum1 backports) rather than NVD-generic via the
+# binary cataloger. rpmdb_merge dedupes by (package, arch), so
+# re-using the release flatten as a target doesn't duplicate rows
+# and the debug package set never falls out of sync with what the
+# release image actually ships.
 [
     rpmdb_merge(
-        name = "rpmdb_" + arch + "_hummingbird",
-        targets = [":static_" + arch + "_hummingbird_layer"],
+        name = "rpmdb{}_{}_hummingbird".format(mode, arch),
+        targets = [":static_{}_hummingbird_layer".format(arch)] + (
+            [":busybox_{}_hummingbird_layer".format(arch)] if mode == "_debug" else []
+        ),
     )
-    for arch in STATIC_ARCHITECTURES["hummingbird"]
-]
-
-# Debug-variant rpmdb: re-uses the release layer as a target and adds the
-# busybox layer on top. rpmdb_merge dedupes by (package, arch), so reusing
-# the release flatten doesn't duplicate rows — and the package set never
-# falls out of sync with what the release image actually ships. grype routes
-# busybox CVEs through the hummingbird provider (which knows hum1 backports)
-# rather than NVD-generic via the binary cataloger.
-[
-    rpmdb_merge(
-        name = "rpmdb_debug_" + arch + "_hummingbird",
-        targets = [
-            ":static_" + arch + "_hummingbird_layer",
-            ":busybox_" + arch + "_hummingbird_layer",
-        ],
-    )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for arch in STATIC_ARCHITECTURES["hummingbird"]
 ]
 
@@ -195,29 +190,22 @@ _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     for arch in STATIC_ARCHITECTURES["wolfi"]
 ]
 
-# /lib/apk/db/installed tar per arch. The gather_apk_fragments aspect
-# walks each flatten's `tars` and collects ApkFragmentInfo from every
-# apk_package reachable — same shape as rpmdb_merge.
+# /lib/apk/db/installed tars per (mode, arch). Same fan-in shape as
+# the hummingbird rpmdb above — gather_apk_fragments aspect walks
+# each flatten's `tars` and collects ApkFragmentInfo from every
+# apk_package reachable. Release lists only the static layer; debug
+# adds busybox.
 [
     apkdb_merge(
-        name = "apkdb_" + arch + "_wolfi",
-        srcs = [":static_" + arch + "_wolfi_layer"],
+        name = "apkdb{}_{}_wolfi".format(mode, arch),
+        srcs = [":static_{}_wolfi_layer".format(arch)] + (
+            [":busybox_{}_wolfi_layer".format(arch)] if mode == "_debug" else []
+        ),
     )
-    for arch in STATIC_ARCHITECTURES["wolfi"]
-]
-
-# Debug apkdb: adds busybox rows. Same shape as the hummingbird
-# rpmdb_debug variant — re-uses the release layer as a target so the
-# package set never falls out of sync with what the release image
-# actually ships.
-[
-    apkdb_merge(
-        name = "apkdb_debug_" + arch + "_wolfi",
-        srcs = [
-            ":static_" + arch + "_wolfi_layer",
-            ":busybox_" + arch + "_wolfi_layer",
-        ],
-    )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for arch in STATIC_ARCHITECTURES["wolfi"]
 ]
 
@@ -309,7 +297,7 @@ container_structure_test(
     name = "static_debug_test",
     size = "small",
     configs = [
-        "test.yaml",
+        "test_debian.yaml",
         "test_debug.yaml",
     ],
     driver = "docker",
