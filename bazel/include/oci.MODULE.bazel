@@ -222,13 +222,49 @@ apk.install(
     distro = "wolfi",
     lock_file = "//:wolfi.lock.json",
     # Closed manifest of *root* packages; pin walks D: edges and adds
-    # transitively reachable packages to the lockfile. Start with the
-    # static-image closure (smallest dep graph that exercises every
-    # part of the pipeline) and extend as additional images migrate.
+    # transitively reachable packages to the lockfile. Mirrors the
+    # hummingbird roots' shape — each name is an entry point for some
+    # image's flatten. Wolfi package-name notes:
+    #   * `ncurses` (terminfo+libs as one package, no -libs split)
+    #   * `libcrypto3` + `libssl3` (openssl is split runtime-side;
+    #     `openssl` CLI not needed for distroless)
+    #   * `libacl1` / `libattr1` (versioned-runtime convention)
+    #   * `gawk` (wolfi has no `mawk`; gawk is the closest analog —
+    #     POSIX awk semantics, same surface for distroless scripts)
+    #   * `pcre` AND `pcre2` (nginx links against legacy `pcre` v8 on
+    #     wolfi; `pcre2` covers grep / selinux soname deps)
     packages = [
+        # Base
+        "bash",
+        "busybox",
         "ca-certificates-bundle",
+        "coreutils",
+        "gawk",
+        "glibc",
+        "grep",
+        "libacl1",
+        "libatomic",
+        "libattr1",
+        "libcap",
+        "libcrypto3",
+        "libgcc",
+        "libselinux",
+        "libsepol",
+        "libssl3",
+        "libstdc++",
+        "mailcap",
+        "ncurses",
+        # nginx upstream links the legacy `pcre` (v8) runtime,
+        # so both `pcre` and `pcre2` (the latter for grep / selinux)
+        # are required.
+        "nginx-mainline",
+        "nginx-stable",
+        "pcre",
+        "pcre2",
+        "sed",
         "tzdata",
         "wolfi-baselayout",
+        "zlib",
     ],
     repo_url = "https://packages.wolfi.dev/os",
     signing_key = "//:wolfi-signing.rsa.pub",
