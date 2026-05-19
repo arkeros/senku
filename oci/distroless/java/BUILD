@@ -222,6 +222,7 @@ _CREATED = {
         name = "apkdb_java_debug_{}_{}_wolfi".format(major, arch),
         srcs = [
             "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+            "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
             "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
             ":java_jdk_{}_{}_wolfi_layer".format(major, arch),
         ],

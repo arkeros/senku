@@ -22,14 +22,13 @@ def cc_layers(ctx):
     layers = [
         "//oci/distroless/static:static_{}_{}_layer".format(ctx.arch, ctx.distro),
     ]
-    if ctx.mode == "_debug" and ctx.distro != "wolfi":
-        # Wolfi has no busybox layer yet — debug == release on wolfi
-        # until busybox lands. Mirrors static's posture.
+    if ctx.mode == "_debug":
         layers.append("//oci/distroless/static:busybox_{}_{}_layer".format(ctx.arch, ctx.distro))
     layers.append(":cc_{}_{}_layer".format(ctx.arch, ctx.distro))
     if ctx.distro == "hummingbird":
         rpmdb = ":rpmdb_cc_debug_{}_hummingbird" if ctx.mode == "_debug" else ":rpmdb_cc_{}_hummingbird"
         layers.append(rpmdb.format(ctx.arch))
     elif ctx.distro == "wolfi":
-        layers.append(":apkdb_cc_{}_wolfi".format(ctx.arch))
+        apkdb = ":apkdb_cc_debug_{}_wolfi" if ctx.mode == "_debug" else ":apkdb_cc_{}_wolfi"
+        layers.append(apkdb.format(ctx.arch))
     return layers

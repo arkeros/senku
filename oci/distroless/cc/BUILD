@@ -191,13 +191,28 @@ _CREATED = {
 
 # Per-arch apkdb for wolfi cc — gather_apk_fragments walks both the
 # static base and cc's own flatten so /lib/apk/db/installed lists
-# every package reachable in the image. No separate debug merge
-# because the wolfi side has no extra busybox apk in the closure yet.
+# every package reachable in the image.
 [
     apkdb_merge(
         name = "apkdb_cc_" + arch + "_wolfi",
         srcs = [
             "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+            ":cc_{}_wolfi_layer".format(arch),
+        ],
+    )
+    for arch in CC_ARCHITECTURES["wolfi"]
+]
+
+# Debug-variant apkdb: adds busybox to the catalog. Same fan-in shape
+# as hummingbird's rpmdb_cc_debug_*_hummingbird; the busybox layer
+# carries its own ApkFragmentInfo, the aspect picks it up via the
+# srcs target's transitive tars.
+[
+    apkdb_merge(
+        name = "apkdb_cc_debug_" + arch + "_wolfi",
+        srcs = [
+            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+            "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
             ":cc_{}_wolfi_layer".format(arch),
         ],
     )

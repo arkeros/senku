@@ -34,18 +34,17 @@ def static_debug_layers(ctx):
     # The release flatten provides rootfs, /etc/passwd, /etc/group,
     # /etc/os-release, ca-certificates, tzdata, etc. Without it the debug
     # image would be just busybox sitting on a bare filesystem.
-    #
-    # Wolfi: busybox isn't in the apk.install closure yet — debug ==
-    # release for now (matches hummingbird's pre-busybox posture). When
-    # `busybox` lands in @wolfi, lift the conditional and add the layer.
-    layers = [":static_{}_{}_layer".format(ctx.arch, ctx.distro)]
-    if ctx.distro != "wolfi":
-        layers.append(":busybox_{}_{}_layer".format(ctx.arch, ctx.distro))
+    layers = [
+        ":static_{}_{}_layer".format(ctx.arch, ctx.distro),
+        ":busybox_{}_{}_layer".format(ctx.arch, ctx.distro),
+    ]
     if ctx.distro == "hummingbird":
         # Replaces the static-release rpmdb at the same sqlite path with
         # one that includes busybox — grype routes its CVEs via the
         # hummingbird provider rather than NVD-generic-via-binary-cataloger.
         layers.append(":rpmdb_debug_{}_hummingbird".format(ctx.arch))
     elif ctx.distro == "wolfi":
-        layers.append(":apkdb_{}_wolfi".format(ctx.arch))
+        # apkdb that includes busybox alongside the release set so syft's
+        # apk-db cataloger sees one consistent /lib/apk/db/installed file.
+        layers.append(":apkdb_debug_{}_wolfi".format(ctx.arch))
     return layers

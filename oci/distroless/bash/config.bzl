@@ -12,8 +12,7 @@ def bash_layers(ctx):
     layers = [
         "//oci/distroless/static:static_{}_{}_layer".format(ctx.arch, ctx.distro),
     ]
-    if ctx.mode == "_debug" and ctx.distro != "wolfi":
-        # Wolfi has no busybox layer yet; debug == release.
+    if ctx.mode == "_debug":
         layers.append("//oci/distroless/static:busybox_{}_{}_layer".format(ctx.arch, ctx.distro))
     layers += [
         "//oci/distroless/cc:cc_{}_{}_layer".format(ctx.arch, ctx.distro),
@@ -23,5 +22,6 @@ def bash_layers(ctx):
         rpmdb = ":rpmdb_bash_debug_{}_hummingbird" if ctx.mode == "_debug" else ":rpmdb_bash_{}_hummingbird"
         layers.append(rpmdb.format(ctx.arch))
     elif ctx.distro == "wolfi":
-        layers.append(":apkdb_bash_{}_wolfi".format(ctx.arch))
+        apkdb = ":apkdb_bash_debug_{}_wolfi" if ctx.mode == "_debug" else ":apkdb_bash_{}_wolfi"
+        layers.append(apkdb.format(ctx.arch))
     return layers

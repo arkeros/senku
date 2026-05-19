@@ -30,7 +30,7 @@ def nodejs_layers(major_version):
         layers = [
             "//oci/distroless/static:static_{}_{}_layer".format(ctx.arch, ctx.distro),
         ]
-        if ctx.mode == "_debug" and ctx.distro != "wolfi":
+        if ctx.mode == "_debug":
             layers.append("//oci/distroless/static:busybox_{}_{}_layer".format(ctx.arch, ctx.distro))
         layers += [
             "//oci/distroless/cc:cc_{}_{}_layer".format(ctx.arch, ctx.distro),
@@ -42,7 +42,10 @@ def nodejs_layers(major_version):
             else:
                 layers.append("//oci/distroless/nodejs:rpmdb_nodejs_{}_{}_hummingbird".format(major_version, ctx.arch))
         elif ctx.distro == "wolfi":
-            layers.append("//oci/distroless/nodejs:apkdb_nodejs_{}_{}_wolfi".format(major_version, ctx.arch))
+            if ctx.mode == "_debug":
+                layers.append("//oci/distroless/nodejs:apkdb_nodejs_debug_{}_{}_wolfi".format(major_version, ctx.arch))
+            else:
+                layers.append("//oci/distroless/nodejs:apkdb_nodejs_{}_{}_wolfi".format(major_version, ctx.arch))
         return layers
 
     return _layers

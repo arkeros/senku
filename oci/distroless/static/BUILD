@@ -206,6 +206,21 @@ _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     for arch in STATIC_ARCHITECTURES["wolfi"]
 ]
 
+# Debug apkdb: adds busybox rows. Same shape as the hummingbird
+# rpmdb_debug variant — re-uses the release layer as a target so the
+# package set never falls out of sync with what the release image
+# actually ships.
+[
+    apkdb_merge(
+        name = "apkdb_debug_" + arch + "_wolfi",
+        srcs = [
+            ":static_" + arch + "_wolfi_layer",
+            ":busybox_" + arch + "_wolfi_layer",
+        ],
+    )
+    for arch in STATIC_ARCHITECTURES["wolfi"]
+]
+
 [
     distroless_matrix(
         name = "static",
@@ -219,9 +234,10 @@ _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         debug_env = {"PATH": _DEFAULT_PATH + ":/busybox"},
         debug_ignore_cves = BUSYBOX_WONTFIX_CVES if distro == "debian" else [],
         debug_layers = static_debug_layers,
-        # Hummingbird/wolfi debug == release (no busybox layer yet), so no
-        # extra VEX needed beyond what `vex` already provides — passing the
-        # same doc twice would trigger a `vex` duplicate-label check.
+        # Hummingbird debug carries no extra fixed-VEX yet (busybox CVEs
+        # come from the hummingbird secdb provider, not via NVD-CPE).
+        # Wolfi same: its continuous-rebuild model keeps busybox-CVE drift
+        # to a minimum; revisit if the scanner surfaces something.
         debug_vex = [":debug_vex"] if distro == "debian" else [],
         distro = distro,
         env = {
@@ -256,6 +272,22 @@ busybox_layer(
 busybox_layer(
     name = "busybox_arm64_hummingbird_layer",
     busybox = "@hummingbird//busybox/aarch64",
+    compress = COMPRESSION,
+)
+
+# Wolfi busybox layers — same shape as hummingbird's. The /busybox/<cmd>
+# symlinks point at /usr/bin/busybox; wolfi's busybox APK ships the
+# binary at that path so the link macro in busybox.bzl works
+# distro-uniformly.
+busybox_layer(
+    name = "busybox_amd64_wolfi_layer",
+    busybox = "@wolfi//busybox/x86_64",
+    compress = COMPRESSION,
+)
+
+busybox_layer(
+    name = "busybox_arm64_wolfi_layer",
+    busybox = "@wolfi//busybox/aarch64",
     compress = COMPRESSION,
 )
 

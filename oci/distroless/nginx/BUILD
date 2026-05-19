@@ -300,6 +300,21 @@ _NGINX_WOLFI_PKG = {
     for arch in NGINX_ARCHITECTURES["wolfi"]
 ]
 
+# Debug apkdbs add busybox rows.
+[
+    apkdb_merge(
+        name = "apkdb_nginx_debug_" + version_label + "_" + arch + "_wolfi",
+        srcs = [
+            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+            "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
+            "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
+            ":" + version_label + "_" + arch + "_wolfi_layer",
+        ],
+    )
+    for version_label in NGINX_VERSIONS.keys()
+    for arch in NGINX_ARCHITECTURES["wolfi"]
+]
+
 [
     distroless_matrix(
         name = "nginx_stable",

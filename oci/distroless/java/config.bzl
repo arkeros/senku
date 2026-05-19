@@ -46,7 +46,7 @@ def java_layers(major_version):
         layers = [
             "//oci/distroless/static:static_{}_{}_layer".format(ctx.arch, ctx.distro),
         ]
-        if ctx.mode == "_debug" and ctx.distro != "wolfi":
+        if ctx.mode == "_debug":
             layers.append("//oci/distroless/static:busybox_{}_{}_layer".format(ctx.arch, ctx.distro))
         layers.append("//oci/distroless/cc:cc_{}_{}_layer".format(ctx.arch, ctx.distro))
         image_type = "jdk" if ctx.mode == "_debug" else "jre"

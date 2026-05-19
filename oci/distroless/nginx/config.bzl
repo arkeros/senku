@@ -83,8 +83,7 @@ def nginx_layers(version_label):
         layers = [
             "//oci/distroless/static:static_{}_{}_layer".format(ctx.arch, ctx.distro),
         ]
-        if ctx.mode == "_debug" and ctx.distro != "wolfi":
-            # Wolfi: debug == release until busybox lands on the static side.
+        if ctx.mode == "_debug":
             layers.append("//oci/distroless/static:busybox_{}_{}_layer".format(ctx.arch, ctx.distro))
         layers += [
             "//oci/distroless/cc:cc_{}_{}_layer".format(ctx.arch, ctx.distro),
@@ -97,7 +96,10 @@ def nginx_layers(version_label):
             else:
                 layers.append(":rpmdb_nginx_{}_{}_hummingbird".format(version_label, ctx.arch))
         elif ctx.distro == "wolfi":
-            layers.append(":apkdb_nginx_{}_{}_wolfi".format(version_label, ctx.arch))
+            if ctx.mode == "_debug":
+                layers.append(":apkdb_nginx_debug_{}_{}_wolfi".format(version_label, ctx.arch))
+            else:
+                layers.append(":apkdb_nginx_{}_{}_wolfi".format(version_label, ctx.arch))
         return layers
 
     return _layers

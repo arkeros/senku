@@ -290,6 +290,20 @@ tar(
     for arch in BASH_ARCHITECTURES["wolfi"]
 ]
 
+# Debug apkdb adds busybox rows.
+[
+    apkdb_merge(
+        name = "apkdb_bash_debug_" + arch + "_wolfi",
+        srcs = [
+            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+            "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
+            "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
+            ":" + arch + "_wolfi_layer",
+        ],
+    )
+    for arch in BASH_ARCHITECTURES["wolfi"]
+]
+
 [
     mirror_push(
         name = "bash" + mode,
