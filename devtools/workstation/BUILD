@@ -22,6 +22,7 @@ WORKSTATION_IGNORE_CVES = [
     # The Python interpreter in this image is not invoked on
     # network-supplied data; it's a fish dependency.
     "CVE-2026-4786",
+    "CVE-2026-7210",
     # docker-cli 28.5.2+dfsg4-1 — BuildKit CVEs unfixed in sid as of
     # the snapshot date. Threat model is the same as the image-level one
     # (developer-interactive VM, operator-chosen inputs); BuildKit only
