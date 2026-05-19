@@ -296,10 +296,11 @@ func closeDeps(candidates map[pkgKey]candidate, providesIndex map[string][]pkgKe
 			closure[cur] = true
 			c := candidates[cur]
 			for _, req := range c.depends {
-				if skipRequire(req) {
+				bare := normalizeDep(req)
+				if bare == "" {
 					continue
 				}
-				chosen, ok := pickProvider(providesIndex[req], arch)
+				chosen, ok := pickProvider(bare, providesIndex[bare], arch)
 				if !ok {
 					fmt.Fprintf(os.Stderr, "pin: warning: no provider for %q (required by %s.%s)\n", req, cur.name, cur.arch)
 					continue
@@ -311,14 +312,27 @@ func closeDeps(candidates map[pkgKey]candidate, providesIndex map[string][]pkgKe
 	return closure, nil
 }
 
-// skipRequire filters dep tokens that aren't real package edges. apk's
-// dep tokens are simpler than rpm's: bare names, sometimes prefixed
-// with `so:` (shared-library soname), `pc:` (pkg-config), or `cmd:`
-// (command). The soname/pkgconfig/cmd providers ARE registered in the
-// provides index, so we keep those. apko's index parser already strips
-// version constraints from D:/p: tokens, so no token filtering is needed.
-func skipRequire(name string) bool {
-	return false
+// normalizeDep maps an APKINDEX `D:` token to the bare capability
+// name we look up in the provides index. apko's `ParsePackageIndex`
+// returns D: tokens verbatim — version constraints (`name=ver`,
+// `name>=ver`, …), the conflict marker (`!name`), and operator
+// suffixes leak through unchanged.
+//
+// Longest operators are matched first so `name>=2` resolves to `name`,
+// not `name>` (left-to-right scan would hit `=` inside `>=` first).
+// Conflict markers (`!name`) collapse to empty so the closure walker
+// skips them; they're "must not be present" assertions, not edges
+// to walk.
+func normalizeDep(tok string) string {
+	if tok == "" || strings.HasPrefix(tok, "!") {
+		return ""
+	}
+	for _, sep := range []string{">=", "<=", "~=", "=", ">", "<", "~"} {
+		if i := strings.Index(tok, sep); i >= 0 {
+			return tok[:i]
+		}
+	}
+	return tok
 }
 
 // parseIndexFromTar walks the (already gunzipped) index tar bytes,
@@ -354,7 +368,22 @@ func checksumString(raw []byte) string {
 	return "Q1" + base64.StdEncoding.EncodeToString(raw)
 }
 
-func pickProvider(providers []pkgKey, targetArch string) (pkgKey, bool) {
+// pickProvider chooses one (name, arch) candidate to satisfy the
+// requested capability. Selection priority:
+//
+//  1. Package whose name *equals* the capability (e.g. for `nginx-config`,
+//     prefer the package named `nginx-config` over alphabetically-earlier
+//     virtual providers like `apicurio-registry-nginx-config`).
+//  2. Compatible arch (target arch wins over noarch when both exist).
+//  3. Shorter name (less likely to be a niche virtual provider).
+//  4. Lexically first (final tiebreaker for determinism).
+//
+// Without #1, wolfi virtual capabilities like `nginx-config` resolve
+// to whichever vendor-prefixed package happens to come first by name
+// — pulling in entire app bundles as transitive closure for a config
+// stub. Same problem with `cmd:node`, which dozens of packages may
+// provide while one nodejs runtime is the obvious answer.
+func pickProvider(capability string, providers []pkgKey, targetArch string) (pkgKey, bool) {
 	var compatible []pkgKey
 	for _, p := range providers {
 		if p.arch == targetArch || p.arch == "noarch" {
@@ -365,10 +394,20 @@ func pickProvider(providers []pkgKey, targetArch string) (pkgKey, bool) {
 		return pkgKey{}, false
 	}
 	sort.Slice(compatible, func(i, j int) bool {
-		if compatible[i].name != compatible[j].name {
-			return compatible[i].name < compatible[j].name
+		iExact := compatible[i].name == capability
+		jExact := compatible[j].name == capability
+		if iExact != jExact {
+			return iExact
 		}
-		return compatible[i].arch == targetArch
+		iArch := compatible[i].arch == targetArch
+		jArch := compatible[j].arch == targetArch
+		if iArch != jArch {
+			return iArch
+		}
+		if len(compatible[i].name) != len(compatible[j].name) {
+			return len(compatible[i].name) < len(compatible[j].name)
+		}
+		return compatible[i].name < compatible[j].name
 	})
 	return compatible[0], true
 }

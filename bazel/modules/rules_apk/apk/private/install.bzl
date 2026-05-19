@@ -8,12 +8,27 @@ under `@<name>//<pkg>/<arch>:package`, plus a `:pin` runnable that
 shells out to the pin Go binary against the live repo.
 """
 
-# Bazel repo names must match `[A-Za-z0-9._-]+`. APK package names mostly
-# follow that already, but the convention is to keep an escape hook
-# parallel to rules_rpm.safe_repo_name in case a wolfi/alpine package
-# ever introduces a character outside the set. Currently a no-op.
+# Bazel repo names must match `[A-Za-z0-9._-]+`. APK package names
+# include characters that violate this — most notably `+` in C++ stdlib
+# (`libstdc++`) and historical names. Same encoding as
+# rules_rpm.safe_repo_name: map `+` to `.plus.` for the spoke repo
+# name only; the hub-side alias under `@<hub>//<pkg>/<arch>` keeps the
+# original `+` (Bazel package directories accept it).
+#
+# Not strictly bijective: a hypothetical APK named `lib.plus.x` would
+# collide with `lib+x`. Guard against the theoretical collision so a
+# real hit fails loud — currently no wolfi/alpine package uses
+# `.plus.` as a substring. Graduating to a fully bijective scheme
+# (e.g. `_p` with `_` doubled) would invalidate every existing spoke
+# cache key, so save that move for if/when the guard ever fires.
 def safe_repo_name(s):
-    return s
+    if ".plus." in s:
+        fail(
+            ("rules_apk: package name %r contains '.plus.', which would " +
+             "collide with the spoke-repo encoding of a '+' in another name. " +
+             "Extend safe_repo_name to a bijective scheme before adding this package.") % s,
+        )
+    return s.replace("+", ".plus.")
 
 def _apk_purl(namespace, name, version, arch, origin, distro):
     # purl-spec for apk: pkg:apk/<namespace>/<name>@<version>?<qualifiers>
