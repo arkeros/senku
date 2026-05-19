@@ -299,41 +299,26 @@ _BUSYBOX_SOURCES = {
     ]
 ]
 
-# Hummingbird structure tests reuse test_<user>.yaml (user/workdir/PATH are
-# distro-agnostic) plus a distro-specific test_hummingbird.yaml that asserts
-# the RHEL-shape paths actually shipped by ca-certificates/mailcap/tzdata
-# and the senku-synthesized /etc/os-release symlink + rpmdb sqlite.
+# Hummingbird + wolfi structure tests share shape: test_<distro>.yaml
+# carries the distro-specific assertions — RHEL-shape /usr/lib64 paths
+# plus rpmdb sqlite for hummingbird; flat /usr/lib paths, /usr/bin/ld.so
+# dynamic linker, and /lib/apk/db/installed for wolfi — while the
+# per-user test_<user>.yaml carries the user/workdir/PATH assertions.
 [
     container_structure_test(
-        name = "static_" + user + "_hummingbird_test",
+        name = "static_{}_{}_test".format(user, distro),
         size = "small",
         configs = [
-            "test_hummingbird.yaml",
-            "test_" + user + ".yaml",
+            "test_{}.yaml".format(distro),
+            "test_{}.yaml".format(user),
         ],
         driver = "tar",
-        image = ":static_" + user + "_amd64_hummingbird.tar",
+        image = ":static_{}_amd64_{}.tar".format(user, distro),
     )
-    for user in [
-        "root",
-        "nonroot",
+    for distro in [
+        "hummingbird",
+        "wolfi",
     ]
-]
-
-# Wolfi structure tests: test_wolfi.yaml asserts the apk-shape installed-db
-# at /lib/apk/db/installed, the senku-branded /etc/os-release with
-# ID=wolfi for scanner routing, and the wolfi-baselayout-shipped paths.
-[
-    container_structure_test(
-        name = "static_" + user + "_wolfi_test",
-        size = "small",
-        configs = [
-            "test_wolfi.yaml",
-            "test_" + user + ".yaml",
-        ],
-        driver = "tar",
-        image = ":static_" + user + "_amd64_wolfi.tar",
-    )
     for user in [
         "root",
         "nonroot",
