@@ -7,7 +7,7 @@ That replaces the previous `terraform_remote_state` data sources — same
 content, no runtime indirection.
 """
 
-load("//devtools/build/tools/tf:defs.bzl", "output", "resource")
+load("@terraform.bzl", "output", "resource")
 load("//oci/cmd/registry:defs.bzl", _REGISTRY_LB_BACKEND = "LB_BACKEND")
 
 PROJECT = "senku-prod"

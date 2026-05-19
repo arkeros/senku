@@ -37,9 +37,9 @@ root's resources (gar's `google_project_service`, lb's compute resources,
 etc.) without per-root IAM duplication.
 """
 
-load("//devtools/build/tools/tf:defs.bzl", "output")
+load("@terraform.bzl", "output")
 load(
-    "//devtools/build/tools/tf/resources:gcp.bzl",
+    "@terraform.bzl//:gcp.bzl",
     "iam_workload_identity_pool",
     "iam_workload_identity_pool_provider",
     "project_iam_member",
