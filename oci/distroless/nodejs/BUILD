@@ -1,13 +1,14 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@package_metadata//:defs.bzl", "package_metadata")
+load("@rules_apk//apk:defs.bzl", "apkdb_merge")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_rpm//rpm:defs.bzl", "rpmdb_merge")
 load("@tar.bzl", "tar")
 load("//oci:mirror_push.bzl", "mirror_push")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
-load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP")
+load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP", "WOLFI_ARCH_MAP")
 load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBUG_MODE", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV")
 load(":config.bzl", "NODEJS_ARCHITECTURES", "NODEJS_DISTROS", "NODEJS_MAJOR_VERSIONS", "NODEJS_VERSIONS", "nodejs_layers")
 
@@ -35,6 +36,24 @@ vex_document(
     timestamp = "2026-05-16T00:00:00Z",
 )
 
+vex_document(
+    name = "vex_wolfi",
+    author = "rafael@arquero.cat",
+    id = "https://github.com/arkeros/senku/blob/main/oci/distroless/nodejs/BUILD#wolfi",
+    statements = [],
+    timestamp = "2026-05-19T00:00:00Z",
+)
+
+_VEX = {
+    "hummingbird": [":vex_hummingbird"],
+    "wolfi": [":vex_wolfi"],
+}
+
+_CREATED = {
+    "hummingbird": "//oci/distroless/common:created_hummingbird",
+    "wolfi": None,
+}
+
 # Per-version PURL — `pkg:generic/nodejs.org/node@<full_version>`. Surfaces
 # node in the image's CycloneDX SBOM so the in-tree grype scan can match
 # Node.js CVEs.
@@ -60,9 +79,12 @@ vex_document(
 # from nginx_conf_layer in //oci/distroless/nginx/BUILD — single-file tar
 # placed at a non-standard prefix so the host distro's PATH never resolves
 # to it. Image entrypoint is the absolute path /nodejs/bin/node.
+#
+# The same binary tar is reused across distros — it's just the
+# nodejs.org tarball's /bin/node, no distro-specific patches.
 [
     tar(
-        name = "nodejs_{}_{}_hummingbird_binary".format(major, arch),
+        name = "nodejs_{}_{}_binary".format(major, arch),
         srcs = ["@nodejs_{}_{}//:bin/node".format(major, arch)],
         mtree = [
             "./nodejs uid=0 gid=0 mode=0755 type=dir",
@@ -86,12 +108,27 @@ vex_document(
         compress = COMPRESSION,
         deduplicate = True,
         tars = [
-            ":nodejs_{}_{}_hummingbird_binary".format(major, arch),
+            ":nodejs_{}_{}_binary".format(major, arch),
             "@hummingbird//libatomic/{}".format(HUMMINGBIRD_ARCH_MAP[arch]),
         ],
     )
     for major in NODEJS_MAJOR_VERSIONS
     for arch in NODEJS_ARCHITECTURES["hummingbird"]
+]
+
+# Wolfi nodejs layer: same binary tar + wolfi's libatomic apk.
+[
+    flatten(
+        name = "nodejs_{}_{}_wolfi_layer".format(major, arch),
+        compress = COMPRESSION,
+        deduplicate = True,
+        tars = [
+            ":nodejs_{}_{}_binary".format(major, arch),
+            "@wolfi//libatomic/{}".format(WOLFI_ARCH_MAP[arch]),
+        ],
+    )
+    for major in NODEJS_MAJOR_VERSIONS
+    for arch in NODEJS_ARCHITECTURES["wolfi"]
 ]
 
 # rpmdb_merge — single sqlite covering static + cc + libatomic. With no base
@@ -124,15 +161,29 @@ vex_document(
     for arch in NODEJS_ARCHITECTURES["hummingbird"]
 ]
 
+# Wolfi apkdb walks static + cc + nodejs layer.
+[
+    apkdb_merge(
+        name = "apkdb_nodejs_{}_{}_wolfi".format(major, arch),
+        srcs = [
+            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+            "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
+            ":nodejs_{}_{}_wolfi_layer".format(major, arch),
+        ],
+    )
+    for major in NODEJS_MAJOR_VERSIONS
+    for arch in NODEJS_ARCHITECTURES["wolfi"]
+]
+
 [
     distroless_matrix(
         name = "nodejs" + major,
         architectures = NODEJS_ARCHITECTURES[distro],
-        # NODEJS_DISTROS is currently hummingbird-only; the Node tarball
-        # version is pinned independently in MODULE.bazel and surfaces
-        # via the CPE on java_metadata_<major>. Image-level `created`
-        # tracks the Hummingbird base snapshot.
-        created = "//oci/distroless/common:created_" + distro,
+        # Node tarball version is pinned in MODULE.bazel and surfaces
+        # via the CPE on node_metadata_<major>. Image-level `created`
+        # tracks the distro's upstream-snapshot anchor where one exists
+        # (hummingbird); wolfi has no honest anchor and is omitted.
+        created = _CREATED[distro],
         debug_entrypoint = ["/busybox/sh"],
         debug_env = DEFAULT_DEBUG_ENV,
         debug_ignore_cves = BUSYBOX_WONTFIX_CVES if distro == "debian" else [],
@@ -149,7 +200,7 @@ vex_document(
             "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/nodejs/BUILD",
         },
         layers = nodejs_layers(major),
-        vex = [":vex_hummingbird"],
+        vex = _VEX[distro],
     )
     for distro in NODEJS_DISTROS
     for major in NODEJS_MAJOR_VERSIONS
@@ -184,6 +235,25 @@ vex_document(
             "test.init-dockerd": "true",
         },
         image = ":nodejs" + major + "_nonroot_amd64_hummingbird.oci_layout",
+        tags = ["requires-docker"],
+    )
+    for major in NODEJS_MAJOR_VERSIONS
+]
+
+[
+    container_structure_test(
+        name = "nodejs" + major + "_wolfi_test",
+        size = "small",
+        configs = [
+            "test_wolfi.yaml",
+            "test_node" + major + ".yaml",
+        ],
+        driver = "docker",
+        exec_properties = {
+            "test.workload-isolation-type": "firecracker",
+            "test.init-dockerd": "true",
+        },
+        image = ":nodejs" + major + "_nonroot_amd64_wolfi.oci_layout",
         tags = ["requires-docker"],
     )
     for major in NODEJS_MAJOR_VERSIONS
