@@ -1,10 +1,11 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
-load("//devtools/build/tools/tf:defs.bzl", "tf_root")
-load("//devtools/build/tools/tf/resources:gcp.bzl", "google_provider")
+load("@terraform.bzl//:gcp.bzl", "google_provider")
+load("@terraform.bzl", "tf_root")
 load(":defs.bzl", "CI_DOCS", "PROJECT")
 
 tf_root(
     name = "terraform",
+    backend_bucket = "senku-prod-terraform-state",
     docs = [google_provider(project = PROJECT)] + CI_DOCS,
     providers = ["@terraform_providers//:google"],
     visibility = ["//visibility:public"],
@@ -15,7 +16,7 @@ bzl_library(
     srcs = ["defs.bzl"],
     visibility = ["//visibility:public"],
     deps = [
-        "//devtools/build/tools/tf:defs",
-        "//devtools/build/tools/tf/resources:gcp",
+        "@terraform.bzl//:gcp",
+        "@terraform.bzl//:terraform",
     ],
 )
