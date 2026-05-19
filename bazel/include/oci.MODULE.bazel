@@ -6,6 +6,7 @@ bazel_dep(name = "grype.bzl", version = "0.1.0")
 bazel_dep(name = "cosign.bzl", version = "0.0.0")
 bazel_dep(name = "container_structure_test", version = "1.22.1")
 bazel_dep(name = "rules_rpm", version = "0.0.0")
+bazel_dep(name = "rules_apk", version = "0.0.0")
 
 local_path_override(
     module_name = "cosign.bzl",
@@ -15,6 +16,11 @@ local_path_override(
 local_path_override(
     module_name = "rules_rpm",
     path = "bazel/modules/rules_rpm",
+)
+
+local_path_override(
+    module_name = "rules_apk",
+    path = "bazel/modules/rules_apk",
 )
 
 single_version_override(
@@ -198,6 +204,36 @@ rpm.install(
     repo_url = "https://nginx.org/packages/mainline/rhel/10",
 )
 use_repo(rpm, "hummingbird", "nginx_mainline_rpm", "nginx_stable_rpm")
+
+# Wolfi APK repository. Single-vendor (Chainguard) but the public OS
+# repo is open-access and signed; senku consumes it as a peer distro
+# next to debian and hummingbird. ID=wolfi in /etc/os-release routes
+# grype to its wolfi:distro:wolfi:* provider. Refresh the lockfile via
+# `bazel run @wolfi//:pin`.
+apk = use_extension("@rules_apk//apk:extensions.bzl", "apk")
+apk.install(
+    name = "wolfi",
+    architectures = [
+        "x86_64",
+        "aarch64",
+    ],
+    # Routes via grype's wolfi secdb. Per-package secdb routing relies
+    # on this qualifier on every SBOM-emitted purl.
+    distro = "wolfi",
+    lock_file = "//:wolfi.lock.json",
+    # Closed manifest of *root* packages; pin walks D: edges and adds
+    # transitively reachable packages to the lockfile. Start with the
+    # static-image closure (smallest dep graph that exercises every
+    # part of the pipeline) and extend as additional images migrate.
+    packages = [
+        "ca-certificates-bundle",
+        "tzdata",
+        "wolfi-baselayout",
+    ],
+    repo_url = "https://packages.wolfi.dev/os",
+    signing_key = "//:wolfi-signing.rsa.pub",
+)
+use_repo(apk, "wolfi")
 
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 

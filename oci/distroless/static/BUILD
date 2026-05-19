@@ -1,10 +1,11 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
+load("@rules_apk//apk:defs.bzl", "apkdb_merge")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_rpm//rpm:defs.bzl", "rpmdb_merge")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
-load("//oci/distroless:platforms.bzl", BUSYBOX_ARCHITECTURES = "ALL_ARCHITECTURES")
+load("//oci/distroless:platforms.bzl", "WOLFI_ARCH_MAP", BUSYBOX_ARCHITECTURES = "ALL_ARCHITECTURES")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
 load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
 load(":busybox.bzl", "busybox_layer")
@@ -39,18 +40,46 @@ vex_document(
     timestamp = "2026-05-15T00:00:00Z",
 )
 
+# Wolfi: also empty for now — wolfi-baselayout / ca-certificates-bundle
+# / tzdata have no open advisories against the secdb provider as of the
+# current snapshot. Wolfi's continuous-rebuild model keeps the wontfix
+# list near zero structurally; revisit if a glibc-bearing wolfi image
+# accumulates one.
+vex_document(
+    name = "vex_wolfi",
+    author = "rafael@arquero.cat",
+    id = "https://github.com/arkeros/senku/blob/main/oci/distroless/static/BUILD#wolfi",
+    statements = [],
+    timestamp = "2026-05-19T00:00:00Z",
+)
+
 # Per-distro CVE allow-list and VEX. Each invocation of distroless_matrix
 # below selects the right pair via _IGNORE_CVES[distro] / _VEX[distro].
-# Hummingbird's `tzdata`/`ca-certificates`/`mailcap` carry no published CVEs,
-# so both lists are empty; revisit once glibc-bearing images migrate.
+# Hummingbird's and wolfi's `tzdata`/`ca-certificates`/`mailcap` carry no
+# published CVEs, so both lists are empty; revisit once glibc-bearing
+# images migrate.
 _IGNORE_CVES = {
     "debian": DEBIAN_WONTFIX_CVES,
     "hummingbird": [],
+    "wolfi": [],
 }
 
 _VEX = {
     "debian": [":vex"],
     "hummingbird": [":vex_hummingbird"],
+    "wolfi": [":vex_wolfi"],
+}
+
+# Per-distro `created` timestamp source. Wolfi's APKINDEX exposes
+# per-package build times but no single repo-revision anchor; per ADR
+# 0007's "missing data > misleading data" principle, omit the field
+# until we have an honest snapshot signal (#TODO open: aggregate
+# max(t:) across the closure, or wait for chainguard's snapshot
+# service). The matrix accepts `created = None`.
+_CREATED = {
+    "debian": "//oci/distroless/common:created_debian",
+    "hummingbird": "//oci/distroless/common:created_hummingbird",
+    "wolfi": None,
 }
 
 _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -137,20 +166,62 @@ _DEFAULT_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     for arch in STATIC_ARCHITECTURES["hummingbird"]
 ]
 
+# Wolfi flatten — wolfi-baselayout provides /etc/passwd, /etc/group,
+# /etc/shadow, /etc/os-release, and the standard FHS-style rootfs
+# directory tree. The apt-side `cacerts_<distro>_<arch>` extractor
+# isn't needed because wolfi's ca-certificates-bundle ships
+# /etc/ssl/certs/ca-certificates.crt at the conventional path.
+#
+# Wolfi labels even nominally-noarch packages (tzdata, wolfi-baselayout)
+# as arch-specific in APKINDEX, so all spoke paths use the apk-native
+# arch name (x86_64 / aarch64) via WOLFI_ARCH_MAP. The lockfile-driven
+# shape matches: `noarch` keys never appear for the wolfi closure as
+# of this snapshot.
+[
+    flatten(
+        name = "static_" + arch + "_wolfi_layer",
+        compress = COMPRESSION,
+        deduplicate = True,
+        tars = [
+            "@wolfi//wolfi-baselayout/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//ca-certificates-bundle/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//tzdata/" + WOLFI_ARCH_MAP[arch],
+            "//oci/distroless/common:rootfs",
+            "//oci/distroless/common:tmp",
+            "//oci/distroless/common:os_release_wolfi",
+            "//oci/distroless/common:etc_os_release_symlink",
+        ],
+    )
+    for arch in STATIC_ARCHITECTURES["wolfi"]
+]
+
+# /lib/apk/db/installed tar per arch. The gather_apk_fragments aspect
+# walks each flatten's `tars` and collects ApkFragmentInfo from every
+# apk_package reachable — same shape as rpmdb_merge.
+[
+    apkdb_merge(
+        name = "apkdb_" + arch + "_wolfi",
+        srcs = [":static_" + arch + "_wolfi_layer"],
+    )
+    for arch in STATIC_ARCHITECTURES["wolfi"]
+]
+
 [
     distroless_matrix(
         name = "static",
         architectures = STATIC_ARCHITECTURES[distro],
         # RFC 3339 `created` from the per-distro upstream-snapshot anchor;
         # see //oci:created_timestamp.bzl + ADR 0007 §"Build horizon".
-        created = "//oci/distroless/common:created_" + distro,
+        # Wolfi has no honest single anchor today, so _CREATED[distro] is
+        # None and the field is omitted from the image config.
+        created = _CREATED[distro],
         debug_entrypoint = ["/busybox/sh"],
         debug_env = {"PATH": _DEFAULT_PATH + ":/busybox"},
         debug_ignore_cves = BUSYBOX_WONTFIX_CVES if distro == "debian" else [],
         debug_layers = static_debug_layers,
-        # Hummingbird debug == release (no busybox layer yet), so no extra VEX
-        # needed beyond what `vex` already provides — passing the same doc
-        # twice would trigger a `vex` duplicate-label check downstream.
+        # Hummingbird/wolfi debug == release (no busybox layer yet), so no
+        # extra VEX needed beyond what `vex` already provides — passing the
+        # same doc twice would trigger a `vex` duplicate-label check.
         debug_vex = [":debug_vex"] if distro == "debian" else [],
         distro = distro,
         env = {
@@ -220,6 +291,26 @@ busybox_layer(
         ],
         driver = "tar",
         image = ":static_" + user + "_amd64_hummingbird.tar",
+    )
+    for user in [
+        "root",
+        "nonroot",
+    ]
+]
+
+# Wolfi structure tests: test_wolfi.yaml asserts the apk-shape installed-db
+# at /lib/apk/db/installed, the senku-branded /etc/os-release with
+# ID=wolfi for scanner routing, and the wolfi-baselayout-shipped paths.
+[
+    container_structure_test(
+        name = "static_" + user + "_wolfi_test",
+        size = "small",
+        configs = [
+            "test_wolfi.yaml",
+            "test_" + user + ".yaml",
+        ],
+        driver = "tar",
+        image = ":static_" + user + "_amd64_wolfi.tar",
     )
     for user in [
         "root",

@@ -969,6 +969,123 @@
         }
       }
     },
+    "@@rules_apk+//apk:extensions.bzl%apk": {
+      "general": {
+        "bzlTransitiveDigest": "SDMfSTacu4IxJbEvaLYtbUY/KCz7E0YHadrHExPTswg=",
+        "usagesDigest": "pW2OEPaGB88xYa+sYuZyCEX1rj8XlH7sF3CMaob+UkU=",
+        "recordedInputs": [
+          "FILE:@@//wolfi.lock.json d205716df8a3bbbd9438ce6c4b8d6be233df75fa9f1b15f7d60f880c3cbcb8b7"
+        ],
+        "generatedRepoSpecs": {
+          "wolfi__ca-certificates-bundle__aarch64": {
+            "repoRuleId": "@@rules_apk+//apk/private:install.bzl%apk_package_repo",
+            "attributes": {
+              "package": "ca-certificates-bundle",
+              "arch": "aarch64",
+              "version": "20260413-r0",
+              "url": "https://packages.wolfi.dev/os/aarch64/ca-certificates-bundle-20260413-r0.apk",
+              "sha256": "a894593aa51c51425d7f40153d6207a6cfec8c1e9c4535592658a70d0efb39df",
+              "checksum": "Q1YLGEH8o/PNCjR8sxoxh//AGpOgQ=",
+              "purl_namespace": "wolfi",
+              "origin": "ca-certificates",
+              "purl_distro": "wolfi"
+            }
+          },
+          "wolfi__ca-certificates-bundle__x86_64": {
+            "repoRuleId": "@@rules_apk+//apk/private:install.bzl%apk_package_repo",
+            "attributes": {
+              "package": "ca-certificates-bundle",
+              "arch": "x86_64",
+              "version": "20260413-r0",
+              "url": "https://packages.wolfi.dev/os/x86_64/ca-certificates-bundle-20260413-r0.apk",
+              "sha256": "353081c30814492d7f5f47834cb56b5662b8cff320f8836c5a4e2da7c03dd7b7",
+              "checksum": "Q1KyCdEL20IKE+B7DKW97GLXu2QLM=",
+              "purl_namespace": "wolfi",
+              "origin": "ca-certificates",
+              "purl_distro": "wolfi"
+            }
+          },
+          "wolfi__tzdata__aarch64": {
+            "repoRuleId": "@@rules_apk+//apk/private:install.bzl%apk_package_repo",
+            "attributes": {
+              "package": "tzdata",
+              "arch": "aarch64",
+              "version": "2026b-r0",
+              "url": "https://packages.wolfi.dev/os/aarch64/tzdata-2026b-r0.apk",
+              "sha256": "7a4c0676dbd9b3dc44cc9cdfe660b54e8b0fde3108ba58db105896e4ade01424",
+              "checksum": "Q1yyT/D58O4t2lena7GdWWe3wxvgU=",
+              "purl_namespace": "wolfi",
+              "origin": "tzdata",
+              "purl_distro": "wolfi"
+            }
+          },
+          "wolfi__tzdata__x86_64": {
+            "repoRuleId": "@@rules_apk+//apk/private:install.bzl%apk_package_repo",
+            "attributes": {
+              "package": "tzdata",
+              "arch": "x86_64",
+              "version": "2026b-r0",
+              "url": "https://packages.wolfi.dev/os/x86_64/tzdata-2026b-r0.apk",
+              "sha256": "a122cad504cd9b03cdae08576eea6664158cff3e9c86a3d122e9a44fc614bcac",
+              "checksum": "Q1XJdlhV9j7CMl4cuG6j8NS28g6RM=",
+              "purl_namespace": "wolfi",
+              "origin": "tzdata",
+              "purl_distro": "wolfi"
+            }
+          },
+          "wolfi__wolfi-baselayout__aarch64": {
+            "repoRuleId": "@@rules_apk+//apk/private:install.bzl%apk_package_repo",
+            "attributes": {
+              "package": "wolfi-baselayout",
+              "arch": "aarch64",
+              "version": "20230201-r29",
+              "url": "https://packages.wolfi.dev/os/aarch64/wolfi-baselayout-20230201-r29.apk",
+              "sha256": "51e0e79dc5b570862fcaf818d338bc8a1c0e070de1c8d785356ab64230d8987a",
+              "checksum": "Q1FcjlR8BAUcyRjMQxsc/f5gWSv8I=",
+              "purl_namespace": "wolfi",
+              "origin": "wolfi-baselayout",
+              "purl_distro": "wolfi"
+            }
+          },
+          "wolfi__wolfi-baselayout__x86_64": {
+            "repoRuleId": "@@rules_apk+//apk/private:install.bzl%apk_package_repo",
+            "attributes": {
+              "package": "wolfi-baselayout",
+              "arch": "x86_64",
+              "version": "20230201-r29",
+              "url": "https://packages.wolfi.dev/os/x86_64/wolfi-baselayout-20230201-r29.apk",
+              "sha256": "c7aef94f6c8e3060cac5a6b1dfa6257ad0d2d4d0a6ff93d02bba26e0ea518457",
+              "checksum": "Q1mxVgkD4+r1cSUSeWo6ClkgNR1IA=",
+              "purl_namespace": "wolfi",
+              "origin": "wolfi-baselayout",
+              "purl_distro": "wolfi"
+            }
+          },
+          "wolfi": {
+            "repoRuleId": "@@rules_apk+//apk/private:install.bzl%apk_install_repo",
+            "attributes": {
+              "packages": [
+                "ca-certificates-bundle",
+                "tzdata",
+                "wolfi-baselayout"
+              ],
+              "architectures": [
+                "x86_64",
+                "aarch64"
+              ],
+              "repo_url": "https://packages.wolfi.dev/os",
+              "signing_key": "@@//:wolfi-signing.rsa.pub",
+              "lock_file": "@@//:wolfi.lock.json",
+              "package_list": [
+                "ca-certificates-bundle",
+                "tzdata",
+                "wolfi-baselayout"
+              ]
+            }
+          }
+        }
+      }
+    },
     "@@rules_nodejs+//nodejs:extensions.bzl%node": {
       "general": {
         "bzlTransitiveDigest": "6YPtCNjJA6Z9Gx0rUblcrrRiR7ag60iRLmALQo7b76U=",

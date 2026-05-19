@@ -29,9 +29,25 @@ HUMMINGBIRD_OS_RELEASE = dict(
     BUG_REPORT_URL = "https://github.com/arkeros/senku/issues/new",
 )
 
+# Wolfi-derived images. `ID=wolfi` is the scanner-routing key (grype routes
+# pkg:apk/*?distro=wolfi to wolfi's secdb provider). NAME / PRETTY_NAME
+# carry the senku brand. VERSION_ID is the wolfi snapshot anchor (truncated
+# APKINDEX sha256 from the rules_apk lockfile).
+WOLFI_OS_RELEASE = dict(
+    PRETTY_NAME = "distroless.io (Wolfi-derived)",
+    NAME = "distroless.io",
+    ID = "wolfi",
+    ID_LIKE = "alpine",
+    VERSION_ID = "{VERSION}",
+    HOME_URL = "https://github.com/arkeros/senku",
+    SUPPORT_URL = "https://github.com/arkeros/senku/blob/main/oci/distroless/README.md",
+    BUG_REPORT_URL = "https://github.com/arkeros/senku/issues/new",
+)
+
 OS_RELEASE_BY_DISTRO = {
     "debian": DEBIAN_OS_RELEASE,
     "hummingbird": HUMMINGBIRD_OS_RELEASE,
+    "wolfi": WOLFI_OS_RELEASE,
 }
 
 # Back-compat for any caller that still imports OS_RELEASE directly.

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "repo": {
+    "url": "https://packages.wolfi.dev/os",
+    "revision": "1d7d8c4c381af360",
+    "apkindex_sha256": "1d7d8c4c381af360386844f88753b5181479a6b674259745f2a75e40c50173bb"
+  },
+  "packages": {
+    "ca-certificates-bundle": {
+      "aarch64": {
+        "version": "20260413-r0",
+        "sha256": "a894593aa51c51425d7f40153d6207a6cfec8c1e9c4535592658a70d0efb39df",
+        "path": "aarch64/ca-certificates-bundle-20260413-r0.apk",
+        "size": 137553,
+        "checksum": "Q1YLGEH8o/PNCjR8sxoxh//AGpOgQ=",
+        "origin": "ca-certificates"
+      },
+      "x86_64": {
+        "version": "20260413-r0",
+        "sha256": "353081c30814492d7f5f47834cb56b5662b8cff320f8836c5a4e2da7c03dd7b7",
+        "path": "x86_64/ca-certificates-bundle-20260413-r0.apk",
+        "size": 137519,
+        "checksum": "Q1KyCdEL20IKE+B7DKW97GLXu2QLM=",
+        "origin": "ca-certificates"
+      }
+    },
+    "tzdata": {
+      "aarch64": {
+        "version": "2026b-r0",
+        "sha256": "7a4c0676dbd9b3dc44cc9cdfe660b54e8b0fde3108ba58db105896e4ade01424",
+        "path": "aarch64/tzdata-2026b-r0.apk",
+        "size": 569030,
+        "checksum": "Q1yyT/D58O4t2lena7GdWWe3wxvgU=",
+        "origin": "tzdata"
+      },
+      "x86_64": {
+        "version": "2026b-r0",
+        "sha256": "a122cad504cd9b03cdae08576eea6664158cff3e9c86a3d122e9a44fc614bcac",
+        "path": "x86_64/tzdata-2026b-r0.apk",
+        "size": 569004,
+        "checksum": "Q1XJdlhV9j7CMl4cuG6j8NS28g6RM=",
+        "origin": "tzdata"
+      }
+    },
+    "wolfi-baselayout": {
+      "aarch64": {
+        "version": "20230201-r29",
+        "sha256": "51e0e79dc5b570862fcaf818d338bc8a1c0e070de1c8d785356ab64230d8987a",
+        "path": "aarch64/wolfi-baselayout-20230201-r29.apk",
+        "size": 13981,
+        "checksum": "Q1FcjlR8BAUcyRjMQxsc/f5gWSv8I=",
+        "origin": "wolfi-baselayout"
+      },
+      "x86_64": {
+        "version": "20230201-r29",
+        "sha256": "c7aef94f6c8e3060cac5a6b1dfa6257ad0d2d4d0a6ff93d02bba26e0ea518457",
+        "path": "x86_64/wolfi-baselayout-20230201-r29.apk",
+        "size": 13953,
+        "checksum": "Q1mxVgkD4+r1cSUSeWo6ClkgNR1IA=",
+        "origin": "wolfi-baselayout"
+      }
+    }
+  }
+}
