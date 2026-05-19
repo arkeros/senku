@@ -131,61 +131,47 @@ _CREATED = {
     for arch in NODEJS_ARCHITECTURES["wolfi"]
 ]
 
-# rpmdb_merge — single sqlite covering static + cc + libatomic. With no base
-# inheritance, this is the only rpmdb in the release image.
+# rpmdb_merge per (mode, major, arch) — single sqlite covering static +
+# cc + libatomic (plus busybox on debug). With no base inheritance,
+# this is the only rpmdb in the image.
 [
     rpmdb_merge(
-        name = "rpmdb_nodejs_{}_{}_hummingbird".format(major, arch),
+        name = "rpmdb_nodejs{}_{}_{}_hummingbird".format(mode, major, arch),
         targets = [
             "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
-            ":nodejs_{}_{}_hummingbird_layer".format(major, arch),
-        ],
-    )
-    for major in NODEJS_MAJOR_VERSIONS
-    for arch in NODEJS_ARCHITECTURES["hummingbird"]
-]
-
-# Debug rpmdb adds busybox rows for the _debug variant.
-[
-    rpmdb_merge(
-        name = "rpmdb_nodejs_debug_{}_{}_hummingbird".format(major, arch),
-        targets = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
+        ] + ([
             "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
             ":nodejs_{}_{}_hummingbird_layer".format(major, arch),
         ],
     )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for major in NODEJS_MAJOR_VERSIONS
     for arch in NODEJS_ARCHITECTURES["hummingbird"]
 ]
 
-# Wolfi apkdb walks static + cc + nodejs layer.
+# Wolfi apkdb per (mode, major, arch): static + cc + nodejs layer
+# (plus busybox on debug).
 [
     apkdb_merge(
-        name = "apkdb_nodejs_{}_{}_wolfi".format(major, arch),
+        name = "apkdb_nodejs{}_{}_{}_wolfi".format(mode, major, arch),
         srcs = [
             "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
-            ":nodejs_{}_{}_wolfi_layer".format(major, arch),
-        ],
-    )
-    for major in NODEJS_MAJOR_VERSIONS
-    for arch in NODEJS_ARCHITECTURES["wolfi"]
-]
-
-# Debug apkdb adds busybox rows.
-[
-    apkdb_merge(
-        name = "apkdb_nodejs_debug_{}_{}_wolfi".format(major, arch),
-        srcs = [
-            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+        ] + ([
             "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
             ":nodejs_{}_{}_wolfi_layer".format(major, arch),
         ],
     )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for major in NODEJS_MAJOR_VERSIONS
     for arch in NODEJS_ARCHITECTURES["wolfi"]
 ]

@@ -195,31 +195,25 @@ _CREATED = {
     for arch in BASH_ARCHITECTURES["hummingbird"]
 ]
 
-# rpmdb tar per arch. Aspect-walks static + cc + bash flattens; single sqlite
-# is the only rpmdb in the composed image (no inheritance, no dead layers).
+# rpmdb tars per (mode, arch). Aspect-walks static + cc + bash flattens
+# (plus busybox on debug); single sqlite is the only rpmdb in the
+# composed image (no inheritance, no dead layers).
 [
     rpmdb_merge(
-        name = "rpmdb_bash_" + arch + "_hummingbird",
+        name = "rpmdb_bash{}_{}_hummingbird".format(mode, arch),
         targets = [
             "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
-            ":" + arch + "_hummingbird_layer",
-        ],
-    )
-    for arch in BASH_ARCHITECTURES["hummingbird"]
-]
-
-# Debug rpmdb adds busybox rows.
-[
-    rpmdb_merge(
-        name = "rpmdb_bash_debug_" + arch + "_hummingbird",
-        targets = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
+        ] + ([
             "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
             ":" + arch + "_hummingbird_layer",
         ],
     )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for arch in BASH_ARCHITECTURES["hummingbird"]
 ]
 
@@ -277,30 +271,24 @@ tar(
     ],
 )
 
-# Wolfi apkdb merges static + cc + bash flattens.
+# Wolfi apkdbs per (mode, arch): static + cc + bash flattens (plus
+# busybox on debug).
 [
     apkdb_merge(
-        name = "apkdb_bash_" + arch + "_wolfi",
+        name = "apkdb_bash{}_{}_wolfi".format(mode, arch),
         srcs = [
             "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
-            ":" + arch + "_wolfi_layer",
-        ],
-    )
-    for arch in BASH_ARCHITECTURES["wolfi"]
-]
-
-# Debug apkdb adds busybox rows.
-[
-    apkdb_merge(
-        name = "apkdb_bash_debug_" + arch + "_wolfi",
-        srcs = [
-            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+        ] + ([
             "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
             ":" + arch + "_wolfi_layer",
         ],
     )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for arch in BASH_ARCHITECTURES["wolfi"]
 ]
 

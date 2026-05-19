@@ -5,7 +5,7 @@ load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_rpm//rpm:defs.bzl", "rpmdb_merge")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
-load("//oci/distroless:platforms.bzl", "WOLFI_ARCH_MAP")
+load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP", "WOLFI_ARCH_MAP")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
 load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV")
 load(":config.bzl", "CC_ARCHITECTURES", "CC_DISTROS", "cc_layers")
@@ -101,62 +101,41 @@ _CREATED = {
 # still has on its wontfix list. This layer is the proof point for ADR 0007.
 [
     flatten(
-        name = "cc_amd64_hummingbird_layer",
+        name = "cc_" + arch + "_hummingbird_layer",
         compress = COMPRESSION,
         deduplicate = True,
         tars = [
-            "@hummingbird//glibc/x86_64",
-            "@hummingbird//glibc-common/x86_64",
-            "@hummingbird//libgcc/x86_64",
-            "@hummingbird//libstdc++/x86_64",
-            "@hummingbird//openssl-libs/x86_64",
-            "@hummingbird//zlib-ng-compat/x86_64",
-        ],
-    ),
-]
-
-[
-    flatten(
-        name = "cc_arm64_hummingbird_layer",
-        compress = COMPRESSION,
-        deduplicate = True,
-        tars = [
-            "@hummingbird//glibc/aarch64",
-            "@hummingbird//glibc-common/aarch64",
-            "@hummingbird//libgcc/aarch64",
-            "@hummingbird//libstdc++/aarch64",
-            "@hummingbird//openssl-libs/aarch64",
-            "@hummingbird//zlib-ng-compat/aarch64",
-        ],
-    ),
-]
-
-# Full-package rpmdb per arch — single sqlite covering static's 3 noarch rows
-# plus cc's 6 glibc-bearing additions. Composition (no base inheritance) means
-# this is the ONLY rpmdb in the cc release image, not one of N along an
-# inheritance chain — saves ~1MB of duplicate rpmdb.sqlite layers vs the old
-# base-inheritance model.
-[
-    rpmdb_merge(
-        name = "rpmdb_cc_" + arch + "_hummingbird",
-        targets = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
-            ":cc_{}_hummingbird_layer".format(arch),
+            "@hummingbird//glibc/" + HUMMINGBIRD_ARCH_MAP[arch],
+            "@hummingbird//glibc-common/" + HUMMINGBIRD_ARCH_MAP[arch],
+            "@hummingbird//libgcc/" + HUMMINGBIRD_ARCH_MAP[arch],
+            "@hummingbird//libstdc++/" + HUMMINGBIRD_ARCH_MAP[arch],
+            "@hummingbird//openssl-libs/" + HUMMINGBIRD_ARCH_MAP[arch],
+            "@hummingbird//zlib-ng-compat/" + HUMMINGBIRD_ARCH_MAP[arch],
         ],
     )
     for arch in CC_ARCHITECTURES["hummingbird"]
 ]
 
-# Debug variant rpmdb — adds busybox rows. Same aspect walk pattern.
+# Full-package rpmdb per (mode, arch) — single sqlite covering static's
+# 3 noarch rows plus cc's 6 glibc-bearing additions (plus busybox on
+# debug). Composition (no base inheritance) means this is the ONLY
+# rpmdb in the cc image, saves ~1MB of duplicate rpmdb.sqlite layers
+# vs the old base-inheritance model.
 [
     rpmdb_merge(
-        name = "rpmdb_cc_debug_" + arch + "_hummingbird",
+        name = "rpmdb_cc{}_{}_hummingbird".format(mode, arch),
         targets = [
             "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
+        ] + ([
             "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             ":cc_{}_hummingbird_layer".format(arch),
         ],
     )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for arch in CC_ARCHITECTURES["hummingbird"]
 ]
 
@@ -189,33 +168,24 @@ _CREATED = {
     for arch in CC_ARCHITECTURES["wolfi"]
 ]
 
-# Per-arch apkdb for wolfi cc — gather_apk_fragments walks both the
-# static base and cc's own flatten so /lib/apk/db/installed lists
-# every package reachable in the image.
+# Per-(mode, arch) apkdb for wolfi cc — gather_apk_fragments walks the
+# static base, the busybox layer (debug only), and cc's own flatten
+# so /lib/apk/db/installed lists every package reachable in the image.
 [
     apkdb_merge(
-        name = "apkdb_cc_" + arch + "_wolfi",
+        name = "apkdb_cc{}_{}_wolfi".format(mode, arch),
         srcs = [
             "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
-            ":cc_{}_wolfi_layer".format(arch),
-        ],
-    )
-    for arch in CC_ARCHITECTURES["wolfi"]
-]
-
-# Debug-variant apkdb: adds busybox to the catalog. Same fan-in shape
-# as hummingbird's rpmdb_cc_debug_*_hummingbird; the busybox layer
-# carries its own ApkFragmentInfo, the aspect picks it up via the
-# srcs target's transitive tars.
-[
-    apkdb_merge(
-        name = "apkdb_cc_debug_" + arch + "_wolfi",
-        srcs = [
-            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+        ] + ([
             "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             ":cc_{}_wolfi_layer".format(arch),
         ],
     )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for arch in CC_ARCHITECTURES["wolfi"]
 ]
 

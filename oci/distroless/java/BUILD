@@ -166,67 +166,60 @@ _CREATED = {
     for arch in JAVA_ARCHITECTURES["wolfi"]
 ]
 
-# rpmdb_merge — single sqlite covering static + cc + libatomic. With no
-# base inheritance, this is the only rpmdb in the release image. The
-# Temurin tree itself is *not* in the rpmdb (it's a tarball, not an rpm)
-# — secdb routing for OpenJDK goes via the `cpe` on `java_metadata_*`.
-# Release uses the JRE layer; debug substitutes the JDK layer (which
-# differs only in additional jdk.* modules — same upstream packages).
+# rpmdb_merge per (mode, major, arch) — single sqlite covering static
+# + cc + libatomic (plus busybox on debug). The Temurin tree itself
+# is *not* in the rpmdb (it's a tarball, not an rpm); secdb routing
+# for OpenJDK goes via the `cpe` on `java_metadata_*`. Release uses
+# the JRE layer; debug substitutes the JDK layer (which differs only
+# in additional jdk.* modules — same upstream packages).
 [
     rpmdb_merge(
-        name = "rpmdb_java_{}_{}_hummingbird".format(major, arch),
+        name = "rpmdb_java{}_{}_{}_hummingbird".format(mode, major, arch),
         targets = [
             "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
-            ":java_jre_{}_{}_hummingbird_layer".format(major, arch),
-        ],
-    )
-    for major in JAVA_MAJOR_VERSIONS
-    for arch in JAVA_ARCHITECTURES["hummingbird"]
-]
-
-# Debug rpmdb adds busybox rows for the _debug variant and substitutes
-# the JDK layer (jstack/jcmd/jmap/javac live here).
-[
-    rpmdb_merge(
-        name = "rpmdb_java_debug_{}_{}_hummingbird".format(major, arch),
-        targets = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
+        ] + ([
             "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
-            ":java_jdk_{}_{}_hummingbird_layer".format(major, arch),
+            ":java_{}_{}_{}_hummingbird_layer".format(
+                "jdk" if mode == "_debug" else "jre",
+                major,
+                arch,
+            ),
         ],
     )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for major in JAVA_MAJOR_VERSIONS
     for arch in JAVA_ARCHITECTURES["hummingbird"]
 ]
 
-# Wolfi apkdb: release walks JRE layer, debug walks JDK layer. Both
-# walk static + cc as well so /lib/apk/db/installed lists every
-# package reachable through the image-composition graph.
+# Wolfi apkdb per (mode, major, arch): release walks JRE layer, debug
+# walks JDK layer + busybox. Both walk static + cc so
+# /lib/apk/db/installed lists every package reachable through the
+# image-composition graph.
 [
     apkdb_merge(
-        name = "apkdb_java_{}_{}_wolfi".format(major, arch),
+        name = "apkdb_java{}_{}_{}_wolfi".format(mode, major, arch),
         srcs = [
             "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
-            ":java_jre_{}_{}_wolfi_layer".format(major, arch),
-        ],
-    )
-    for major in JAVA_MAJOR_VERSIONS
-    for arch in JAVA_ARCHITECTURES["wolfi"]
-]
-
-[
-    apkdb_merge(
-        name = "apkdb_java_debug_{}_{}_wolfi".format(major, arch),
-        srcs = [
-            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+        ] + ([
             "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
-            ":java_jdk_{}_{}_wolfi_layer".format(major, arch),
+            ":java_{}_{}_{}_wolfi_layer".format(
+                "jdk" if mode == "_debug" else "jre",
+                major,
+                arch,
+            ),
         ],
     )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for major in JAVA_MAJOR_VERSIONS
     for arch in JAVA_ARCHITECTURES["wolfi"]
 ]

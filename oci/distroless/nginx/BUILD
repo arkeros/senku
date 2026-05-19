@@ -228,32 +228,25 @@ _NGINX_RPM_REPO = {
     for arch in NGINX_ARCHITECTURES["hummingbird"]
 ]
 
-# rpmdb tars per (channel, arch). Merges static + cc + this nginx layer.
-# Single sqlite per image — no base inheritance, no duplicate rpmdb layers.
+# rpmdb tars per (mode, channel, arch). Merges static + cc + this
+# nginx layer (plus busybox on debug). Single sqlite per image — no
+# base inheritance, no duplicate rpmdb layers.
 [
     rpmdb_merge(
-        name = "rpmdb_nginx_" + version_label + "_" + arch + "_hummingbird",
+        name = "rpmdb_nginx{}_{}_{}_hummingbird".format(mode, version_label, arch),
         targets = [
             "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
-            ":" + version_label + "_" + arch + "_hummingbird_layer",
-        ],
-    )
-    for version_label in NGINX_VERSIONS.keys()
-    for arch in NGINX_ARCHITECTURES["hummingbird"]
-]
-
-# Debug rpmdbs add busybox rows.
-[
-    rpmdb_merge(
-        name = "rpmdb_nginx_debug_" + version_label + "_" + arch + "_hummingbird",
-        targets = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
+        ] + ([
             "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
             ":" + version_label + "_" + arch + "_hummingbird_layer",
         ],
     )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for version_label in NGINX_VERSIONS.keys()
     for arch in NGINX_ARCHITECTURES["hummingbird"]
 ]
@@ -287,30 +280,24 @@ _NGINX_WOLFI_PKG = {
     for arch in NGINX_ARCHITECTURES["wolfi"]
 ]
 
+# Wolfi apkdbs per (mode, channel, arch): static + cc + nginx layer
+# (plus busybox on debug).
 [
     apkdb_merge(
-        name = "apkdb_nginx_" + version_label + "_" + arch + "_wolfi",
+        name = "apkdb_nginx{}_{}_{}_wolfi".format(mode, version_label, arch),
         srcs = [
             "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
-            ":" + version_label + "_" + arch + "_wolfi_layer",
-        ],
-    )
-    for version_label in NGINX_VERSIONS.keys()
-    for arch in NGINX_ARCHITECTURES["wolfi"]
-]
-
-# Debug apkdbs add busybox rows.
-[
-    apkdb_merge(
-        name = "apkdb_nginx_debug_" + version_label + "_" + arch + "_wolfi",
-        srcs = [
-            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+        ] + ([
             "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
             ":" + version_label + "_" + arch + "_wolfi_layer",
         ],
     )
+    for mode in [
+        "",
+        "_debug",
+    ]
     for version_label in NGINX_VERSIONS.keys()
     for arch in NGINX_ARCHITECTURES["wolfi"]
 ]
