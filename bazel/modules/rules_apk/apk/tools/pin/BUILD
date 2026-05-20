@@ -6,8 +6,6 @@ go_library(
     importpath = "github.com/arkeros/senku/bazel/modules/rules_apk/apk/tools/pin",
     visibility = ["//visibility:private"],
     deps = [
-        "//apk/tools/internal/apkformat",
-        "//apk/tools/internal/apkkey",
         "@dev_chainguard_apko//pkg/apk/apk",
     ],
 )

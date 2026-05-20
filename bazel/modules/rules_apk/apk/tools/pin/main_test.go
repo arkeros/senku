@@ -86,7 +86,15 @@ func signedAPKINDEX(t *testing.T, key *rsa.PrivateKey, indexBody []byte) []byte 
 	if err != nil {
 		t.Fatalf("SignPKCS1v15: %v", err)
 	}
-	gzSig := gzipBytes(t, sigTar(t, ".SIGN.RSA256.test.rsa.pub", sigBytes))
+	sigBody := sigTar(t, ".SIGN.RSA256.test.rsa.pub", sigBytes)
+	// apk-tools/apko signed indexes concatenate the signature tar with the
+	// index tar. The signature tar stream does not include final zero
+	// blocks, so a tar reader can continue into the APKINDEX archive.
+	if len(sigBody) < 1024 {
+		t.Fatalf("signature tar unexpectedly short: %d bytes", len(sigBody))
+	}
+	sigBody = sigBody[:len(sigBody)-1024]
+	gzSig := gzipBytes(t, sigBody)
 	return append(gzSig, gzIndex...)
 }
 
@@ -97,7 +105,7 @@ func writePubKeyPEM(t *testing.T, key *rsa.PrivateKey) string {
 		t.Fatalf("MarshalPKIXPublicKey: %v", err)
 	}
 	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})
-	path := filepath.Join(t.TempDir(), "signing.rsa.pub")
+	path := filepath.Join(t.TempDir(), "test.rsa.pub")
 	if err := os.WriteFile(path, pemBytes, 0o644); err != nil {
 		t.Fatalf("write key: %v", err)
 	}
@@ -214,6 +222,45 @@ func TestResolve_WrongKeyFails(t *testing.T) {
 	_, err := resolve(srv.URL, []string{"x86_64"}, []string{"foo"}, trustRoot)
 	if err == nil {
 		t.Fatal("expected verification error, got nil")
+	}
+}
+
+func TestResolve_ConflictingRootPackagesFail(t *testing.T) {
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	indexBody := []byte("" +
+		"P:app\n" +
+		"V:1-r0\n" +
+		"A:x86_64\n" +
+		"D:!bad\n" +
+		"\n" +
+		"P:bad\n" +
+		"V:1-r0\n" +
+		"A:x86_64\n" +
+		"\n")
+	apkindex := signedAPKINDEX(t, key, indexBody)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/x86_64/APKINDEX.tar.gz", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(apkindex)
+	})
+	mux.HandleFunc("/x86_64/app-1-r0.apk", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("app"))
+	})
+	mux.HandleFunc("/x86_64/bad-1-r0.apk", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("bad"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	keyPath := writePubKeyPEM(t, key)
+	trustRoot, _ := loadTrustRoot(keyPath)
+
+	_, err := resolve(srv.URL, []string{"x86_64"}, []string{"app", "bad"}, trustRoot)
+	if err == nil {
+		t.Fatal("expected package conflict error, got nil")
+	}
+	if !strings.Contains(err.Error(), "bad") {
+		t.Errorf("err = %v, want it to name the conflicting package", err)
 	}
 }
 

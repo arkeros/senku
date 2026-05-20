@@ -20,8 +20,9 @@ Senku consumes this module via:
 
 Differences from rules_rpm that the format dictates:
 
-  * APK signatures are RSA (PEM-encoded pubkey), not OpenPGP. The shared
-    keyring loader is `apk/tools/internal/apkkey`.
+  * APK signatures are RSA (PEM-encoded pubkey), not OpenPGP. The `pin`
+    tool delegates repository signature verification and dependency
+    resolution to apko's `pkg/apk/apk` library.
   * The installed-db at `/lib/apk/db/installed` is flat text, not binary
     sqlite. Per-package fragments are emitted at extract time and
     concatenated by `apkdb_merge` at layer-composition time — same fan-in
@@ -72,5 +73,5 @@ use_repo(go_deps, "dev_chainguard_apko")
 #
 # `gazelle_override` is root-only by Bazel design (rules_apk can't
 # declare it here), so the indirection leaks to consumers. The
-# referenced sdk code is unreachable at runtime — apko's auth.go is
-# the only caller, and rules_apk's binaries never invoke auth.
+# referenced sdk code is unreachable at runtime — rules_apk passes a
+# no-op authenticator into apko's repository-index fetch path.

@@ -77,11 +77,11 @@ keeps each ruleset readable and lets either move independently.
 | Repo metadata | `repomd.xml` + per-arch `primary.xml.gz` (XML) | `APKINDEX.tar.gz` (tar with text records) |
 | Repo signature | Detached `repomd.xml.asc` (OpenPGP) | RSA detached, embedded in `APKINDEX.tar.gz`'s signature segment |
 | Hash family | SHA-1/SHA-256/SHA-512 inside RPM header (OpenPGP) | RSA-PKCS#1-v1.5 over SHA-1/SHA-256/SHA-512 of post-signature bytes |
-| Keyring loader | OpenPGP via `ProtonMail/go-crypto` | PEM-encoded RSA pubkeys via `crypto/rsa` (`apk/tools/internal/apkkey`) |
+| Keyring loader | OpenPGP via `ProtonMail/go-crypto` | PEM-encoded RSA pubkeys verified by apko's `pkg/apk/apk` repository parser |
 | Installed-db | Binary sqlite at `/usr/lib/sysimage/rpm/rpmdb.sqlite` | Flat text at `/lib/apk/db/installed` |
 | Merge step | `rpmdb-merge` synthesizes sqlite + secondary indexes | `apkdb-merge` sorts + concatenates text fragments |
 | Per-package output | `content.tar` + `header.blob` | `content.tar` + `installed.fragment` |
-| Version-constraint deps | `requires` with rpmvercmp | `D:`/`p:` with apk-version compare (simplified to string compare in MVP) |
+| Version-constraint deps | `requires` with rpmvercmp | `D:`/`p:` resolved by apko's package resolver |
 
 ## Trust chain
 
@@ -137,8 +137,8 @@ apk_go_deps.gazelle_override(
 )
 ```
 
-The referenced sdk code is unreachable at runtime — apko's auth.go is
-the only caller, and rules_apk's binaries never invoke auth.
+The referenced sdk code is unreachable at runtime — rules_apk passes a
+no-op authenticator into apko's repository-index fetch path.
 
 ## Layout
 
@@ -163,16 +163,11 @@ rules_apk/
     │   └── lockfile.bzl         # JSON schema + parser
     └── tools/
         ├── pin/                 # Go binary: APKINDEX → lockfile
-        │                          (uses apk.ParsePackageIndex, apk.CompareVersions)
+        │                          (uses apko index verification + package resolver)
         ├── apk-extract/         # Go binary: .apk → (content.tar, installed.fragment)
         │                          (uses expandapk.Split, types.ParsePackageInfo,
         │                           apk.PackageToInstalled)
-        ├── apkdb-merge/         # Go binary: N fragments → /lib/apk/db/installed tar
-        └── internal/
-            ├── apkkey/          # PEM RSA pubkey parser (apko has only digest primitives)
-            └── apkformat/       # APKINDEX signature verifier (apko doesn't expose this
-                                    without dragging in repository-fetching auth code);
-                                    multi-gz reader and signature primitives only.
+        └── apkdb-merge/         # Go binary: N fragments → /lib/apk/db/installed tar
 ```
 
 ## See also
