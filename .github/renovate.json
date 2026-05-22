@@ -61,7 +61,8 @@
       ],
       "postUpgradeTasks": {
         "commands": [
-          "cd ./{{{packageFileDir}}} && bazel mod deps --lockfile_mode=update && bazel mod tidy"
+          "bazel mod deps --lockfile_mode=update",
+          "bazel mod tidy"
         ],
         "fileFilters": [
           "MODULE.bazel.lock",
@@ -101,7 +102,8 @@
       ],
       "postUpgradeTasks": {
         "commands": [
-          "cd ./{{{packageFileDir}}} && bazel mod deps --lockfile_mode=update && bazel mod tidy"
+          "bazel mod deps --lockfile_mode=update",
+          "bazel mod tidy"
         ],
         "fileFilters": [
           "bazel/include/go.MODULE.bazel",
@@ -114,6 +116,23 @@
       "postUpdateOptions": [
         "goModTidy"
       ]
+    },
+    {
+      "matchManagers": [
+        "terraform",
+        "terraform-lockfile"
+      ],
+      "postUpgradeTasks": {
+        "commands": [
+          "bazel mod deps --lockfile_mode=update",
+          "bazel mod tidy"
+        ],
+        "fileFilters": [
+          ".terraform.lock.hcl",
+          "MODULE.bazel.lock"
+        ],
+        "executionMode": "update"
+      }
     },
     {
       "matchDepNames": ["rules_img", "rules_img_tool"],

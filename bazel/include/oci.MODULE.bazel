@@ -1,7 +1,7 @@
 bazel_dep(name = "rules_img", version = "0.3.11")
 bazel_dep(name = "rules_img_tool", version = "0.3.11")
 bazel_dep(name = "rules_distroless", version = "0.6.2")
-bazel_dep(name = "tar.bzl", version = "0.10.4")
+bazel_dep(name = "tar.bzl", version = "0.10.5")
 bazel_dep(name = "grype.bzl", version = "0.1.0")
 bazel_dep(name = "cosign.bzl", version = "0.0.0")
 bazel_dep(name = "container_structure_test", version = "1.22.1")
@@ -169,11 +169,12 @@ rpm.install(
     # nginx.org. RHEL-10's secdb has CVE entries for nginx but no fix
     # data (RHEL doesn't ship nginx) — every flag would be a no-fix
     # false positive. Hummingbird's secdb has accurate version-range
-    # data: all `< 1.30.0-1.hum1` advisories pass cleanly (we ship
-    # 1.30.1+), and the only flag is CVE-2026-42945's release-suffix-
-    # strict `< 1.30.1-1.hum1` constraint on stable, which is VEXed in
-    # //oci/distroless/nginx/BUILD with `vulnerable_code_not_present`
-    # because upstream 1.30.1 carries the fix regardless of release tag.
+    # data and all current advisories are rpmvercmp-below the shipped
+    # nginx.org rpm, so no flags surface today. Future advisories with
+    # release-suffix-strict constraints (e.g. `< X-1.hum1`) may falsely
+    # flag nginx.org's `*.el10.ngx` releases via rpmvercmp's suffix
+    # ordering; document those in //oci/distroless/nginx/BUILD under
+    # `NGINX_HUMMINGBIRD_*_VEX_STATEMENTS` when they arise.
     distro = "hummingbird-1",
     gpg_key = "//oci/distroless/nginx:nginx_signing.key",
     lock_file = "//oci/distroless/nginx:nginx-stable.hummingbird.lock.json",
@@ -181,12 +182,13 @@ rpm.install(
     # Surfaces `pkg:rpm/nginx.org/nginx@...` in the image SBOM so grype
     # routes lookups to NVD-CPE rather than `pkg:rpm/nginx_stable_rpm/...`
     # (no provider matches). Crucially decouples nginx from the
-    # `ID=hummingbird` image-scan routing: Hummingbird's secdb advisory
-    # for CVE-2026-42945 is release-suffix-strict (`< 1.30.1-1.hum1`)
-    # and would falsely flag nginx.org's `1.30.1-1.el10.ngx` even though
-    # the upstream fix is in 1.30.1 itself. With this namespace, grype's
-    # SBOM-scan correctly treats nginx as an nginx.org-provided package
-    # and applies NVD's upstream version-range matching.
+    # `ID=hummingbird` image-scan routing, sidestepping false positives
+    # from any Hummingbird advisory whose release-suffix-strict
+    # `< X-1.hum1` constraint would match nginx.org's `el10.ngx` rpms
+    # under rpmvercmp even when the upstream fix is in shared source.
+    # With this namespace, grype's SBOM-scan correctly treats nginx as
+    # an nginx.org-provided package and applies NVD's upstream
+    # version-range matching.
     purl_namespace = "nginx.org",
     repo_url = "https://nginx.org/packages/rhel/10",
 )
@@ -485,7 +487,7 @@ http_file(
 grype_db = use_extension("@grype.bzl//grype:extensions.bzl", "grype_database", dev_dependency = True)
 grype_db.database(
     name = "grype_database",
-    sha256 = "eb477a433119afc2d4a7a8592f7fabfcc39b13019c752589d83594c46559f41a",
-    url = "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.4_2026-05-18T00:49:08Z_1779090299.tar.zst",
+    sha256 = "e773d018da1678f360ed0ce0a95dee5822a9e0b3719a65deb4d09623da835d1c",
+    url = "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.4_2026-05-19T09:22:30Z_1779349005.tar.zst",
 )
 use_repo(grype_db, "grype_database")
