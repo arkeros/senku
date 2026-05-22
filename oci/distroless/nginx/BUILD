@@ -2,6 +2,7 @@ load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@jq.bzl//jq:jq.bzl", "jq_test")
+load("@rules_apk//apk:defs.bzl", "apkdb_merge")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_rpm//rpm:defs.bzl", "rpmdb_merge")
 load("@tar.bzl", "tar")
@@ -9,10 +10,10 @@ load("//oci:created_timestamp.bzl", "hummingbird_created_timestamp")
 load("//oci:mirror_push.bzl", "mirror_push")
 load("//oci:vex.bzl", "vex_document", "vex_statement")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
-load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP")
+load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP", "WOLFI_ARCH_MAP")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
 load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEBUG_MODE", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV")
-load(":config.bzl", "NGINX_ARCHITECTURES", "NGINX_CHANNEL_DISTROS", "NGINX_DISTROS", "NGINX_LATEST_CHANNEL", "NGINX_TAGS", "NGINX_VERSIONS", "nginx_layers")
+load(":config.bzl", "NGINX_ARCHITECTURES", "NGINX_CHANNEL_DISTROS", "NGINX_DISTROS", "NGINX_LATEST_CHANNEL", "NGINX_TAGS", "NGINX_VERSIONS", "nginx_created", "nginx_layers")
 
 exports_files([
     "nginx_signing.key",
@@ -101,9 +102,30 @@ vex_document(
     timestamp = "2026-05-22T00:00:00Z",
 )
 
+# Wolfi: nginx-stable and nginx-mainline both come from wolfi-os
+# directly, signed by wolfi's RSA key. No release-suffix-strict
+# advisory drama — wolfi's secdb feeds match upstream nginx version
+# ranges. Empty VEX docs keep the matrix wiring uniform.
+vex_document(
+    name = "vex_wolfi_stable",
+    author = "rafael@arquero.cat",
+    id = "https://github.com/arkeros/senku/blob/main/oci/distroless/nginx/BUILD#wolfi-stable",
+    statements = [],
+    timestamp = "2026-05-19T00:00:00Z",
+)
+
+vex_document(
+    name = "vex_wolfi_mainline",
+    author = "rafael@arquero.cat",
+    id = "https://github.com/arkeros/senku/blob/main/oci/distroless/nginx/BUILD#wolfi-mainline",
+    statements = [],
+    timestamp = "2026-05-19T00:00:00Z",
+)
+
 _IGNORE_CVES_BY_DISTRO = {
     "debian": DEBIAN_WONTFIX_CVES,
     "hummingbird": [],
+    "wolfi": [],
 }
 
 # Per (channel, distro). Both Hummingbird channels currently carry no
@@ -114,10 +136,12 @@ _VEX_BY_CHANNEL_AND_DISTRO = {
     "stable": {
         "debian": [":vex"],
         "hummingbird": [":vex_hummingbird_stable"],
+        "wolfi": [":vex_wolfi_stable"],
     },
     "mainline": {
         "debian": [":vex"],
         "hummingbird": [":vex_hummingbird_mainline"],
+        "wolfi": [":vex_wolfi_mainline"],
     },
 }
 
@@ -185,41 +209,79 @@ _NGINX_RPM_REPO = {
     for arch in NGINX_ARCHITECTURES["hummingbird"]
 ]
 
-# rpmdb tars per (channel, arch). Merges static + cc + this nginx layer.
-# Single sqlite per image — no base inheritance, no duplicate rpmdb layers.
+# rpmdb tars per (mode, channel, arch). Merges static + cc + this
+# nginx layer (plus busybox on debug). Single sqlite per image — no
+# base inheritance, no duplicate rpmdb layers.
 [
     rpmdb_merge(
-        name = "rpmdb_nginx_" + version_label + "_" + arch + "_hummingbird",
+        name = "rpmdb_nginx{}_{}_{}_hummingbird".format(mode, version_label, arch),
         targets = [
             "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
+        ] + ([
+            "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
+        ] if mode == "_debug" else []) + [
             "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
             ":" + version_label + "_" + arch + "_hummingbird_layer",
         ],
     )
+    for mode in DEBUG_MODE
     for version_label in NGINX_VERSIONS.keys()
     for arch in NGINX_ARCHITECTURES["hummingbird"]
 ]
 
-# Debug rpmdbs add busybox rows.
+# Wolfi layers per (channel, arch). Wolfi-os ships both channels as
+# native APKs (`nginx-stable` / `nginx-mainline`); each links against
+# legacy `pcre` v8 at runtime (not pcre2), so add the pcre apk here.
+# Our :nginx_conf_layer overrides whatever default config the wolfi
+# nginx-{channel}-config transitive ships (the channel-config APKs land
+# at the same /etc/nginx/* paths and flatten dedupes to the last
+# occurrence — our config goes last).
+_NGINX_WOLFI_PKG = {
+    "stable": "nginx-stable",
+    "mainline": "nginx-mainline",
+}
+
 [
-    rpmdb_merge(
-        name = "rpmdb_nginx_debug_" + version_label + "_" + arch + "_hummingbird",
-        targets = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
-            "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
-            ":" + version_label + "_" + arch + "_hummingbird_layer",
+    flatten(
+        name = version_label + "_" + arch + "_wolfi_layer",
+        compress = COMPRESSION,
+        deduplicate = True,
+        tars = [
+            "@wolfi//{}/{}".format(
+                _NGINX_WOLFI_PKG[version_label],
+                WOLFI_ARCH_MAP[arch],
+            ),
+            "@wolfi//pcre/{}".format(WOLFI_ARCH_MAP[arch]),
         ],
     )
     for version_label in NGINX_VERSIONS.keys()
-    for arch in NGINX_ARCHITECTURES["hummingbird"]
+    for arch in NGINX_ARCHITECTURES["wolfi"]
+]
+
+# Wolfi apkdbs per (mode, channel, arch): static + cc + nginx layer
+# (plus busybox on debug).
+[
+    apkdb_merge(
+        name = "apkdb_nginx{}_{}_{}_wolfi".format(mode, version_label, arch),
+        srcs = [
+            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+        ] + ([
+            "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
+        ] if mode == "_debug" else []) + [
+            "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
+            ":" + version_label + "_" + arch + "_wolfi_layer",
+        ],
+    )
+    for mode in DEBUG_MODE
+    for version_label in NGINX_VERSIONS.keys()
+    for arch in NGINX_ARCHITECTURES["wolfi"]
 ]
 
 [
     distroless_matrix(
         name = "nginx_stable",
         architectures = NGINX_ARCHITECTURES[distro],
-        created = ":created_stable_hummingbird" if distro == "hummingbird" else None,
+        created = nginx_created("stable", distro),
         debug_env = DEFAULT_DEBUG_ENV,
         debug_ignore_cves = BUSYBOX_WONTFIX_CVES if distro == "debian" else [],
         debug_index_annotations = {
@@ -246,7 +308,7 @@ _NGINX_RPM_REPO = {
     distroless_matrix(
         name = "nginx_mainline",
         architectures = NGINX_ARCHITECTURES[distro],
-        created = ":created_mainline_hummingbird" if distro == "hummingbird" else None,
+        created = nginx_created("mainline", distro),
         debug_env = DEFAULT_DEBUG_ENV,
         debug_ignore_cves = BUSYBOX_WONTFIX_CVES if distro == "debian" else [],
         debug_index_annotations = {

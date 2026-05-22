@@ -1,11 +1,13 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
+load("@rules_apk//apk:defs.bzl", "apkdb_merge")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_rpm//rpm:defs.bzl", "rpmdb_merge")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
+load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP", "WOLFI_ARCH_MAP")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
-load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV")
+load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEBUG_MODE", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV")
 load(":config.bzl", "CC_ARCHITECTURES", "CC_DISTROS", "cc_layers")
 
 package(default_visibility = ["//visibility:public"])
@@ -39,14 +41,37 @@ vex_document(
     timestamp = "2026-05-15T00:00:00Z",
 )
 
+# Wolfi: same posture as hummingbird — empty until the scanner DB
+# surfaces something on the glibc/libstdc++/openssl/zlib closure that
+# would warrant VEX. Wolfi's continuous-rebuild keeps the wontfix list
+# at zero structurally.
+vex_document(
+    name = "vex_wolfi",
+    author = "rafael@arquero.cat",
+    id = "https://github.com/arkeros/senku/blob/main/oci/distroless/cc/BUILD#wolfi",
+    statements = [],
+    timestamp = "2026-05-19T00:00:00Z",
+)
+
 _IGNORE_CVES = {
     "debian": DEBIAN_WONTFIX_CVES,
     "hummingbird": [],
+    "wolfi": [],
 }
 
 _VEX = {
     "debian": [":vex"],
     "hummingbird": [":vex_hummingbird"],
+    "wolfi": [":vex_wolfi"],
+}
+
+# Per-distro `created` source. Wolfi has no single repo-revision
+# anchor in its APKINDEX — omit the field rather than synthesize a
+# misleading timestamp (ADR 0007 "missing > misleading").
+_CREATED = {
+    "debian": "//oci/distroless/common:created_debian",
+    "hummingbird": "//oci/distroless/common:created_hummingbird",
+    "wolfi": None,
 }
 
 # Debian cc layer: libc6 + libssl3t64 + libstdc++6. Closure refs (not `:data`)
@@ -76,70 +101,93 @@ _VEX = {
 # still has on its wontfix list. This layer is the proof point for ADR 0007.
 [
     flatten(
-        name = "cc_amd64_hummingbird_layer",
+        name = "cc_" + arch + "_hummingbird_layer",
         compress = COMPRESSION,
         deduplicate = True,
         tars = [
-            "@hummingbird//glibc/x86_64",
-            "@hummingbird//glibc-common/x86_64",
-            "@hummingbird//libgcc/x86_64",
-            "@hummingbird//libstdc++/x86_64",
-            "@hummingbird//openssl-libs/x86_64",
-            "@hummingbird//zlib-ng-compat/x86_64",
+            "@hummingbird//glibc/" + HUMMINGBIRD_ARCH_MAP[arch],
+            "@hummingbird//glibc-common/" + HUMMINGBIRD_ARCH_MAP[arch],
+            "@hummingbird//libgcc/" + HUMMINGBIRD_ARCH_MAP[arch],
+            "@hummingbird//libstdc++/" + HUMMINGBIRD_ARCH_MAP[arch],
+            "@hummingbird//openssl-libs/" + HUMMINGBIRD_ARCH_MAP[arch],
+            "@hummingbird//zlib-ng-compat/" + HUMMINGBIRD_ARCH_MAP[arch],
         ],
-    ),
+    )
+    for arch in CC_ARCHITECTURES["hummingbird"]
 ]
 
+# Full-package rpmdb per (mode, arch) — single sqlite covering static's
+# 3 noarch rows plus cc's 6 glibc-bearing additions (plus busybox on
+# debug). Composition (no base inheritance) means this is the ONLY
+# rpmdb in the cc image, saves ~1MB of duplicate rpmdb.sqlite layers
+# vs the old base-inheritance model.
+[
+    rpmdb_merge(
+        name = "rpmdb_cc{}_{}_hummingbird".format(mode, arch),
+        targets = [
+            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
+        ] + ([
+            "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
+        ] if mode == "_debug" else []) + [
+            ":cc_{}_hummingbird_layer".format(arch),
+        ],
+    )
+    for mode in DEBUG_MODE
+    for arch in CC_ARCHITECTURES["hummingbird"]
+]
+
+# Wolfi cc layer: maps the same Debian set as hummingbird, with wolfi's
+# package decomposition —
+#   libc6        → glibc (+ ld-linux as a separate runtime stub; wolfi
+#                  packages the dynamic linker outside glibc unlike
+#                  hummingbird's monolithic glibc rpm)
+#   libstdc++6   → libstdc++ (+ libgcc; libstdc++.so.6 dynlinks libgcc_s.so.1)
+#   libssl3t64   → libcrypto3 + libssl3 (openssl runtime is split into
+#                  two APKs on wolfi; the `openssl` CLI package is *not*
+#                  included — distroless never invokes the CLI)
+#   (zlib)       → zlib (separately required by node/nginx; included
+#                  here so cc-on-wolfi parallels cc-on-hummingbird's
+#                  zlib-ng-compat shape)
 [
     flatten(
-        name = "cc_arm64_hummingbird_layer",
+        name = "cc_" + arch + "_wolfi_layer",
         compress = COMPRESSION,
         deduplicate = True,
         tars = [
-            "@hummingbird//glibc/aarch64",
-            "@hummingbird//glibc-common/aarch64",
-            "@hummingbird//libgcc/aarch64",
-            "@hummingbird//libstdc++/aarch64",
-            "@hummingbird//openssl-libs/aarch64",
-            "@hummingbird//zlib-ng-compat/aarch64",
-        ],
-    ),
-]
-
-# Full-package rpmdb per arch — single sqlite covering static's 3 noarch rows
-# plus cc's 6 glibc-bearing additions. Composition (no base inheritance) means
-# this is the ONLY rpmdb in the cc release image, not one of N along an
-# inheritance chain — saves ~1MB of duplicate rpmdb.sqlite layers vs the old
-# base-inheritance model.
-[
-    rpmdb_merge(
-        name = "rpmdb_cc_" + arch + "_hummingbird",
-        targets = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
-            ":cc_{}_hummingbird_layer".format(arch),
+            "@wolfi//glibc/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//libgcc/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//libstdc++/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//libcrypto3/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//libssl3/" + WOLFI_ARCH_MAP[arch],
+            "@wolfi//zlib/" + WOLFI_ARCH_MAP[arch],
         ],
     )
-    for arch in CC_ARCHITECTURES["hummingbird"]
+    for arch in CC_ARCHITECTURES["wolfi"]
 ]
 
-# Debug variant rpmdb — adds busybox rows. Same aspect walk pattern.
+# Per-(mode, arch) apkdb for wolfi cc — gather_apk_fragments walks the
+# static base, the busybox layer (debug only), and cc's own flatten
+# so /lib/apk/db/installed lists every package reachable in the image.
 [
-    rpmdb_merge(
-        name = "rpmdb_cc_debug_" + arch + "_hummingbird",
-        targets = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
-            "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
-            ":cc_{}_hummingbird_layer".format(arch),
+    apkdb_merge(
+        name = "apkdb_cc{}_{}_wolfi".format(mode, arch),
+        srcs = [
+            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+        ] + ([
+            "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
+        ] if mode == "_debug" else []) + [
+            ":cc_{}_wolfi_layer".format(arch),
         ],
     )
-    for arch in CC_ARCHITECTURES["hummingbird"]
+    for mode in DEBUG_MODE
+    for arch in CC_ARCHITECTURES["wolfi"]
 ]
 
 [
     distroless_matrix(
         name = "cc",
         architectures = CC_ARCHITECTURES[distro],
-        created = "//oci/distroless/common:created_" + distro,
+        created = _CREATED[distro],
         debug_entrypoint = ["/busybox/sh"],
         debug_env = DEFAULT_DEBUG_ENV,
         debug_ignore_cves = BUSYBOX_WONTFIX_CVES if distro == "debian" else [],
@@ -168,6 +216,14 @@ container_structure_test(
     configs = ["test_hummingbird.yaml"],
     driver = "tar",
     image = ":cc_nonroot_amd64_hummingbird.tar",
+)
+
+container_structure_test(
+    name = "cc_wolfi_test",
+    size = "small",
+    configs = ["test_wolfi.yaml"],
+    driver = "tar",
+    image = ":cc_nonroot_amd64_wolfi.tar",
 )
 
 bzl_library(

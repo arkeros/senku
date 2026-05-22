@@ -1,0 +1,58 @@
+schemaVersion: 2.0.0
+metadataTest:
+  entrypoint: ['/jre/bin/java', '-jar']
+  workdir: '/home/nonroot'
+  user: '65532'
+  envVars:
+    - key: SSL_CERT_FILE
+      value: /etc/ssl/certs/ca-certificates.crt
+fileExistenceTests:
+  # Temurin headless JRE — bin/java, lib/server/libjvm.so, lib/modules, cacerts.
+  - name: 'java launcher'
+    path: '/jre/bin/java'
+    shouldExist: true
+  - name: 'libjvm'
+    path: '/jre/lib/server/libjvm.so'
+    shouldExist: true
+  - name: 'jimage (lib/modules)'
+    path: '/jre/lib/modules'
+    shouldExist: true
+  - name: 'cacerts (JSSE truststore)'
+    path: '/jre/lib/security/cacerts'
+    shouldExist: true
+  # JRE only — no JDK tools in the release image.
+  - name: 'no javac'
+    path: '/jre/bin/javac'
+    shouldExist: false
+  - name: 'no jlink'
+    path: '/jre/bin/jlink'
+    shouldExist: false
+  - name: 'no jstack'
+    path: '/jre/bin/jstack'
+    shouldExist: false
+  # Inherited cc/static surface. Wolfi runtime SOs land at /usr/lib
+  # (Debian-style flat), dynamic linker at /usr/bin/ld.so.
+  - name: 'libstdc++'
+    path: '/usr/lib/libstdc++.so.6'
+    shouldExist: true
+  - name: 'dynamic linker'
+    path: '/usr/bin/ld.so'
+    shouldExist: true
+  - name: 'os-release canonical'
+    path: '/usr/lib/os-release'
+    shouldExist: true
+  - name: 'apk installed-db'
+    path: '/lib/apk/db/installed'
+    shouldExist: true
+  - name: 'no shell'
+    path: '/bin/sh'
+    shouldExist: false
+fileContentTests:
+  - name: 'os-release has ID=wolfi'
+    path: '/usr/lib/os-release'
+    expectedContents: ['(?m)^ID="wolfi"$']
+commandTests:
+  - name: 'java version'
+    command: '/jre/bin/java'
+    args: ['--version']
+    exitCode: 0

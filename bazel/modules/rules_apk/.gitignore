@@ -1,0 +1,8 @@
+bazel-*
+
+# Stray binaries produced by `go build ./...` outside Bazel — each tool
+# dir is named the same as its binary, so an out-of-tree go build drops
+# the binary in-tree.
+/apk/tools/pin/pin
+/apk/tools/apk-extract/apk-extract
+/apk/tools/apkdb-merge/apkdb-merge

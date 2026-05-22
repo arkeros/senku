@@ -84,6 +84,20 @@ single_version_override(
 jq_toolchains = use_extension("@jq.bzl//jq:extensions.bzl", "toolchains")
 use_repo(jq_toolchains, "jq_toolchains")
 
+# rules_apk consumes chainguard.dev/apko for canonical APK parsing.
+# apko's auth code transitively pulls in chainguard.dev/sdk, which ships
+# protobuf files referencing google/api/* paths that aren't in our dep
+# graph. gazelle generates BUILD rules for every .proto and breaks
+# analysis on the missing imports — suppress proto codegen for the sdk
+# module since rules_apk's binaries never reach auth's call sites at
+# runtime. `gazelle_override` is required by Bazel to live in the root
+# module, so the directive can't ride with rules_apk's own MODULE.bazel.
+apk_go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
+apk_go_deps.gazelle_override(
+    directives = ["gazelle:proto disable"],
+    path = "chainguard.dev/sdk",
+)
+
 buildbuddy = use_extension("@toolchains_buildbuddy//:extensions.bzl", "buildbuddy")
 buildbuddy.platform(buildbuddy_container_image = "UBUNTU22_04_IMAGE")
 use_repo(buildbuddy, "buildbuddy_toolchain")

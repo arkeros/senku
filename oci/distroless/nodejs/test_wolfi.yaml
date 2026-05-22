@@ -1,0 +1,52 @@
+schemaVersion: 2.0.0
+metadataTest:
+  entrypoint: ['/nodejs/bin/node']
+  workdir: '/home/nonroot'
+  user: '65532'
+  envVars:
+    - key: NODE_ENV
+      value: production
+    - key: SSL_CERT_FILE
+      value: /etc/ssl/certs/ca-certificates.crt
+fileExistenceTests:
+  - name: 'node binary'
+    path: '/nodejs/bin/node'
+    shouldExist: true
+  - name: 'no npm'
+    path: '/nodejs/bin/npm'
+    shouldExist: false
+  - name: 'no npx'
+    path: '/nodejs/bin/npx'
+    shouldExist: false
+  - name: 'no corepack'
+    path: '/nodejs/bin/corepack'
+    shouldExist: false
+  - name: 'no node headers'
+    path: '/nodejs/include/node'
+    shouldExist: false
+  # Inherited cc/static surface. Wolfi runtime SOs land at /usr/lib
+  # (Debian-style flat), the dynamic linker at /usr/bin/ld.so.
+  - name: 'libstdc++'
+    path: '/usr/lib/libstdc++.so.6'
+    shouldExist: true
+  - name: 'dynamic linker'
+    path: '/usr/bin/ld.so'
+    shouldExist: true
+  - name: 'os-release canonical'
+    path: '/usr/lib/os-release'
+    shouldExist: true
+  - name: 'apk installed-db'
+    path: '/lib/apk/db/installed'
+    shouldExist: true
+  - name: 'no shell'
+    path: '/bin/sh'
+    shouldExist: false
+fileContentTests:
+  - name: 'os-release has ID=wolfi'
+    path: '/usr/lib/os-release'
+    expectedContents: ['(?m)^ID="wolfi"$']
+commandTests:
+  - name: 'node executes'
+    command: '/nodejs/bin/node'
+    args: ['-e', 'console.log("ok")']
+    expectedOutput: ['^ok']

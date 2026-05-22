@@ -1,0 +1,77 @@
+"""Bazel-native APK consumption for wolfi/alpine repositories.
+
+Mirrors @rules_rpm: an `apk.install(...)` tag class takes the package list
+inline, a checked-in JSON lockfile pins versions+sha256, and
+`bazel run @<name>//:pin` regenerates the lockfile from the declared list.
+
+Senku consumes this module via:
+
+    apk = use_extension("@rules_apk//apk:extensions.bzl", "apk")
+    apk.install(
+        name = "wolfi",
+        repo_url = "https://packages.wolfi.dev/os",
+        signing_key = "//:wolfi-signing.rsa.pub",
+        architectures = ["x86_64", "aarch64"],
+        packages = ["wolfi-baselayout", "ca-certificates-bundle", "tzdata"],
+        lock_file = "//:wolfi.lock.json",
+        distro = "wolfi",
+    )
+    use_repo(apk, "wolfi")
+
+Differences from rules_rpm that the format dictates:
+
+  * APK signatures are RSA (PEM-encoded pubkey), not OpenPGP. The `pin`
+    tool delegates repository signature verification and dependency
+    resolution to apko's `pkg/apk/apk` library.
+  * The installed-db at `/lib/apk/db/installed` is flat text, not binary
+    sqlite. Per-package fragments are emitted at extract time and
+    concatenated by `apkdb_merge` at layer-composition time — same fan-in
+    shape as rpmdb_merge but with `cat | sort` instead of librpm schema
+    synthesis. See README.md for the full divergence list.
+"""
+
+module(
+    name = "rules_apk",
+    version = "0.0.0",
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.9.0")
+bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "rules_go", version = "0.60.0")
+bazel_dep(name = "gazelle", version = "0.51.0")
+
+# Spoke BUILD.bazel files emit a `package_metadata` target per (package, arch)
+# so the supply-chain `gather_metadata` aspect surfaces each apk as its own
+# component in the image SBOM. Same convention as rules_rpm's per-rpm shape.
+bazel_dep(name = "package_metadata", version = "0.0.10")
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk", dev_dependency = True)
+go_sdk.from_file(
+    go_mod = "//:go.mod",
+)
+
+# Vendored Go deps for the internal tools. Anchored by
+# `chainguard.dev/apko/pkg/apk/{apk,expandapk,types}` for the canonical
+# parser/index/installed-db implementations (the library that apko itself
+# sits on top of); the rest is apko's transitive dep tree. The tools
+# tree-shake unused imports at link time, but the dep tree at go.mod
+# level is wide — accepted as the cost of leaning on the upstream
+# implementation instead of maintaining a parallel fork.
+go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
+go_deps.from_file(go_mod = "//:go.mod")
+use_repo(go_deps, "dev_chainguard_apko")
+
+# Note: chainguard.dev/sdk (an indirect dep of apko's auth code) ships
+# protobuf files that reference google/api/* paths the dep graph doesn't
+# carry. Consumers of rules_apk must add this `gazelle_override` to
+# their root MODULE.bazel to suppress proto codegen for that module:
+#
+#     go_deps.gazelle_override(
+#         directives = ["gazelle:proto disable"],
+#         path = "chainguard.dev/sdk",
+#     )
+#
+# `gazelle_override` is root-only by Bazel design (rules_apk can't
+# declare it here), so the indirection leaks to consumers. The
+# referenced sdk code is unreachable at runtime — rules_apk passes a
+# no-op authenticator into apko's repository-index fetch path.

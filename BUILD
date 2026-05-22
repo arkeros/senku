@@ -40,6 +40,9 @@ exports_files([
     "hummingbird.lock.json",
     "hummingbird_install.json",
     "versions.tf",
+    # Consumed by rules_apk via @wolfi//... — see bazel/include/oci.MODULE.bazel.
+    "wolfi-signing.rsa.pub",
+    "wolfi.lock.json",
 ])
 
 # Ignore the node_modules dir

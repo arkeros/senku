@@ -1,14 +1,18 @@
 "Configuration for static distroless images"
 
-STATIC_DISTROS = ["debian", "hummingbird"]
+STATIC_DISTROS = ["debian", "hummingbird", "wolfi"]
 
 # Hummingbird's static package set is all-noarch (tzdata, ca-certificates,
 # mailcap), so amd64 and arm64 images share identical content layers — only
 # the OCI manifest's platform field differs. arch-specific arches (e.g.
 # glibc.x86_64 vs glibc.aarch64) land once cc migrates.
+#
+# Wolfi's static set is similar (wolfi-baselayout / ca-certificates-bundle
+# / tzdata, mostly noarch); arch-specific arches arrive with cc.
 STATIC_ARCHITECTURES = {
     "debian": ["amd64", "arm64"],
     "hummingbird": ["amd64", "arm64"],
+    "wolfi": ["amd64", "arm64"],
 }
 
 def static_layers(ctx):
@@ -18,6 +22,11 @@ def static_layers(ctx):
         # finds /usr/lib/sysimage/rpm/rpmdb.sqlite. Aspect-collected per
         # ADR 0007 §"aspect-driven rpmdb_merge".
         layers.append(":rpmdb_{}_hummingbird".format(ctx.arch))
+    elif ctx.distro == "wolfi":
+        # /lib/apk/db/installed tar from apkdb_merge — text-concat of
+        # per-package installed-fragments, no sqlite involved. Single
+        # binary, no fan-out merge complexity (see rules_apk/README).
+        layers.append(":apkdb_{}_wolfi".format(ctx.arch))
     return layers
 
 def static_debug_layers(ctx):
@@ -34,4 +43,8 @@ def static_debug_layers(ctx):
         # one that includes busybox — grype routes its CVEs via the
         # hummingbird provider rather than NVD-generic-via-binary-cataloger.
         layers.append(":rpmdb_debug_{}_hummingbird".format(ctx.arch))
+    elif ctx.distro == "wolfi":
+        # apkdb that includes busybox alongside the release set so syft's
+        # apk-db cataloger sees one consistent /lib/apk/db/installed file.
+        layers.append(":apkdb_debug_{}_wolfi".format(ctx.arch))
     return layers

@@ -1,13 +1,14 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@container_structure_test//:defs.bzl", "container_structure_test")
 load("@package_metadata//:defs.bzl", "package_metadata")
+load("@rules_apk//apk:defs.bzl", "apkdb_merge")
 load("@rules_distroless//distroless:defs.bzl", "flatten")
 load("@rules_rpm//rpm:defs.bzl", "rpmdb_merge")
 load("@tar.bzl", "mutate", "tar")
 load("//oci:mirror_push.bzl", "mirror_push")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
-load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP")
+load("//oci/distroless:platforms.bzl", "HUMMINGBIRD_ARCH_MAP", "WOLFI_ARCH_MAP")
 load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBUG_MODE", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV")
 load(":config.bzl", "JAVA_ARCHITECTURES", "JAVA_DISTROS", "JAVA_MAJOR_VERSIONS", "JAVA_VERSIONS", "java_layers")
 
@@ -36,6 +37,24 @@ vex_document(
     statements = [],
     timestamp = "2026-05-17T00:00:00Z",
 )
+
+vex_document(
+    name = "vex_wolfi",
+    author = "rafael@arquero.cat",
+    id = "https://github.com/arkeros/senku/blob/main/oci/distroless/java/BUILD#wolfi",
+    statements = [],
+    timestamp = "2026-05-19T00:00:00Z",
+)
+
+_VEX = {
+    "hummingbird": [":vex_hummingbird"],
+    "wolfi": [":vex_wolfi"],
+}
+
+_CREATED = {
+    "hummingbird": "//oci/distroless/common:created_hummingbird",
+    "wolfi": None,
+}
 
 # Per-version PURL + CPE. Same CPE-is-mandatory reason as nodejs (see the
 # long comment in //oci/distroless/nodejs/BUILD): `pkg:generic/...` does
@@ -87,7 +106,7 @@ vex_document(
 # prepends the destination prefix and we get `./jre/bin/java`.
 [
     tar(
-        name = "java_{}_{}_{}_hummingbird_binary".format(image_type, major, arch),
+        name = "java_{}_{}_{}_binary".format(image_type, major, arch),
         srcs = ["@temurin_{}_{}_{}//:all".format(image_type, major, arch)],
         mutate = mutate(
             owner = "0",
@@ -107,16 +126,16 @@ vex_document(
 # Per-version layer = Temurin tree + libatomic. Adoptium's JRE/JDK are
 # glibc-only, but ARM64 builds historically dlopen libatomic.so.1 for
 # compiler-generated atomic ops (depends on the gcc version used to
-# build the JDK). Bundling it uniformly across archs keeps the rpmdb
-# consistent and prevents a future Temurin minor bump from surfacing a
-# runtime linker failure on aarch64. Cost is ~10 KB per image.
+# build the JDK). Bundling it uniformly across archs keeps the package
+# catalog consistent and prevents a future Temurin minor bump from
+# surfacing a runtime linker failure on aarch64. Cost is ~10 KB per image.
 [
     flatten(
         name = "java_{}_{}_{}_hummingbird_layer".format(image_type, major, arch),
         compress = COMPRESSION,
         deduplicate = True,
         tars = [
-            ":java_{}_{}_{}_hummingbird_binary".format(image_type, major, arch),
+            ":java_{}_{}_{}_binary".format(image_type, major, arch),
             "@hummingbird//libatomic/{}".format(HUMMINGBIRD_ARCH_MAP[arch]),
         ],
     )
@@ -128,50 +147,87 @@ vex_document(
     for arch in JAVA_ARCHITECTURES["hummingbird"]
 ]
 
-# rpmdb_merge — single sqlite covering static + cc + libatomic. With no
-# base inheritance, this is the only rpmdb in the release image. The
-# Temurin tree itself is *not* in the rpmdb (it's a tarball, not an rpm)
-# — secdb routing for OpenJDK goes via the `cpe` on `java_metadata_*`.
-# Release uses the JRE layer; debug substitutes the JDK layer (which
-# differs only in additional jdk.* modules — same upstream packages).
+# Wolfi layers — same Temurin binary tar, wolfi's libatomic apk.
 [
-    rpmdb_merge(
-        name = "rpmdb_java_{}_{}_hummingbird".format(major, arch),
-        targets = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
-            ":java_jre_{}_{}_hummingbird_layer".format(major, arch),
+    flatten(
+        name = "java_{}_{}_{}_wolfi_layer".format(image_type, major, arch),
+        compress = COMPRESSION,
+        deduplicate = True,
+        tars = [
+            ":java_{}_{}_{}_binary".format(image_type, major, arch),
+            "@wolfi//libatomic/{}".format(WOLFI_ARCH_MAP[arch]),
         ],
     )
+    for image_type in [
+        "jre",
+        "jdk",
+    ]
+    for major in JAVA_MAJOR_VERSIONS
+    for arch in JAVA_ARCHITECTURES["wolfi"]
+]
+
+# rpmdb_merge per (mode, major, arch) — single sqlite covering static
+# + cc + libatomic (plus busybox on debug). The Temurin tree itself
+# is *not* in the rpmdb (it's a tarball, not an rpm); secdb routing
+# for OpenJDK goes via the `cpe` on `java_metadata_*`. Release uses
+# the JRE layer; debug substitutes the JDK layer (which differs only
+# in additional jdk.* modules — same upstream packages).
+[
+    rpmdb_merge(
+        name = "rpmdb_java{}_{}_{}_hummingbird".format(mode, major, arch),
+        targets = [
+            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
+        ] + ([
+            "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
+        ] if mode == "_debug" else []) + [
+            "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
+            ":java_{}_{}_{}_hummingbird_layer".format(
+                "jdk" if mode == "_debug" else "jre",
+                major,
+                arch,
+            ),
+        ],
+    )
+    for mode in DEBUG_MODE
     for major in JAVA_MAJOR_VERSIONS
     for arch in JAVA_ARCHITECTURES["hummingbird"]
 ]
 
-# Debug rpmdb adds busybox rows for the _debug variant and substitutes
-# the JDK layer (jstack/jcmd/jmap/javac live here).
+# Wolfi apkdb per (mode, major, arch): release walks JRE layer, debug
+# walks JDK layer + busybox. Both walk static + cc so
+# /lib/apk/db/installed lists every package reachable through the
+# image-composition graph.
 [
-    rpmdb_merge(
-        name = "rpmdb_java_debug_{}_{}_hummingbird".format(major, arch),
-        targets = [
-            "//oci/distroless/static:static_{}_hummingbird_layer".format(arch),
-            "//oci/distroless/static:busybox_{}_hummingbird_layer".format(arch),
-            "//oci/distroless/cc:cc_{}_hummingbird_layer".format(arch),
-            ":java_jdk_{}_{}_hummingbird_layer".format(major, arch),
+    apkdb_merge(
+        name = "apkdb_java{}_{}_{}_wolfi".format(mode, major, arch),
+        srcs = [
+            "//oci/distroless/static:static_{}_wolfi_layer".format(arch),
+        ] + ([
+            "//oci/distroless/static:busybox_{}_wolfi_layer".format(arch),
+        ] if mode == "_debug" else []) + [
+            "//oci/distroless/cc:cc_{}_wolfi_layer".format(arch),
+            ":java_{}_{}_{}_wolfi_layer".format(
+                "jdk" if mode == "_debug" else "jre",
+                major,
+                arch,
+            ),
         ],
     )
+    for mode in DEBUG_MODE
     for major in JAVA_MAJOR_VERSIONS
-    for arch in JAVA_ARCHITECTURES["hummingbird"]
+    for arch in JAVA_ARCHITECTURES["wolfi"]
 ]
 
 [
     distroless_matrix(
         name = "java" + major,
         architectures = JAVA_ARCHITECTURES[distro],
-        # JAVA_DISTROS is currently hummingbird-only; the Temurin tarball
-        # version is pinned independently in MODULE.bazel and surfaces
+        # Temurin tarball version is pinned in MODULE.bazel and surfaces
         # via the CPE on java_metadata_<major>. Image-level `created`
-        # tracks the Hummingbird base snapshot.
-        created = "//oci/distroless/common:created_" + distro,
+        # tracks the distro's upstream-snapshot anchor where one exists;
+        # wolfi has no honest single anchor (per-package builddates only)
+        # and is omitted.
+        created = _CREATED[distro],
         debug_entrypoint = ["/busybox/sh"],
         # Prepend /jre/bin so a kubectl-exec shell finds jstack/jcmd/
         # jmap/javac on PATH without operators having to type the absolute
@@ -193,7 +249,7 @@ vex_document(
             "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/oci/distroless/java/BUILD",
         },
         layers = java_layers(major),
-        vex = [":vex_hummingbird"],
+        vex = _VEX[distro],
     )
     for distro in JAVA_DISTROS
     for major in JAVA_MAJOR_VERSIONS
@@ -228,6 +284,25 @@ vex_document(
             "test.init-dockerd": "true",
         },
         image = ":java" + major + "_nonroot_amd64_hummingbird.oci_layout",
+        tags = ["requires-docker"],
+    )
+    for major in JAVA_MAJOR_VERSIONS
+]
+
+[
+    container_structure_test(
+        name = "java" + major + "_wolfi_test",
+        size = "small",
+        configs = [
+            "test_wolfi.yaml",
+            "test_java" + major + ".yaml",
+        ],
+        driver = "docker",
+        exec_properties = {
+            "test.workload-isolation-type": "firecracker",
+            "test.init-dockerd": "true",
+        },
+        image = ":java" + major + "_nonroot_amd64_wolfi.oci_layout",
         tags = ["requires-docker"],
     )
     for major in JAVA_MAJOR_VERSIONS

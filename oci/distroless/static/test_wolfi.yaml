@@ -1,0 +1,60 @@
+schemaVersion: 2.0.0
+metadataTest:
+  envVars:
+    - key: SSL_CERT_FILE
+      value: /etc/ssl/certs/ca-certificates.crt
+fileExistenceTests:
+  # Wolfi's ca-certificates-bundle ships the cert bundle at the
+  # conventional Debian path; SSL_CERT_FILE in the matrix call points
+  # there. No need for a separate cacerts extractor.
+  - name: 'ca-certificates'
+    path: '/etc/ssl/certs/ca-certificates.crt'
+    shouldExist: true
+  - name: 'tzdata UTC'
+    path: '/usr/share/zoneinfo/UTC'
+    shouldExist: true
+  # wolfi-baselayout ships /etc/passwd, /etc/group, /etc/shadow,
+  # /etc/os-release, and the standard FHS rootfs. The senku-side
+  # `os_release_wolfi` overrides the wolfi-baselayout-shipped file
+  # with the senku-branded one (ID=wolfi for scanner routing,
+  # PRETTY_NAME="distroless.io (Wolfi-derived)" for humans).
+  - name: 'passwd'
+    path: '/etc/passwd'
+    shouldExist: true
+  - name: 'group'
+    path: '/etc/group'
+    shouldExist: true
+  - name: 'os-release canonical'
+    path: '/usr/lib/os-release'
+    shouldExist: true
+  - name: 'os-release /etc symlink'
+    path: '/etc/os-release'
+    shouldExist: true
+  - name: 'tmp dir'
+    path: '/tmp'
+    shouldExist: true
+  # /lib/apk/db/installed: synthesized by apkdb_merge. Without this
+  # file syft's apk-db cataloger falls back to NVD-CPE matching and
+  # produces silent-zero results on the apk packages.
+  - name: 'apk installed-db'
+    path: '/lib/apk/db/installed'
+    shouldExist: true
+  - name: 'no shell'
+    path: '/bin/sh'
+    shouldExist: false
+fileContentTests:
+  - name: 'os-release has ID=wolfi'
+    path: '/usr/lib/os-release'
+    expectedContents: ['(?m)^ID="wolfi"$']
+  - name: 'os-release brand'
+    path: '/usr/lib/os-release'
+    expectedContents: ['Wolfi-derived']
+  - name: 'apk installed-db lists tzdata'
+    path: '/lib/apk/db/installed'
+    expectedContents: ['(?m)^P:tzdata$']
+  - name: 'apk installed-db lists ca-certificates-bundle'
+    path: '/lib/apk/db/installed'
+    expectedContents: ['(?m)^P:ca-certificates-bundle$']
+  - name: 'apk installed-db lists wolfi-baselayout'
+    path: '/lib/apk/db/installed'
+    expectedContents: ['(?m)^P:wolfi-baselayout$']

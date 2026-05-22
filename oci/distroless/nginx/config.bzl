@@ -38,18 +38,39 @@ NGINX_DISTROS = ["debian"]
 # than Debian's nginx package. nginx.org publishes stable and mainline as
 # first-class separate repos, so both channels are available without any
 # version-constraint pinning logic.
+#
+# Wolfi sources from the wolfi-os repo directly — both channels are
+# first-class APK packages (`nginx-stable`, `nginx-mainline`). Wolfi's
+# build links against legacy `pcre` v8 (not pcre2) so the cc base
+# doesn't carry the SO and nginx-wolfi adds it.
 NGINX_CHANNEL_DISTROS = {
-    "stable": ["debian", "hummingbird"],
-    "mainline": ["debian", "hummingbird"],
+    "stable": ["debian", "hummingbird", "wolfi"],
+    "mainline": ["debian", "hummingbird", "wolfi"],
 }
 
 NGINX_ARCHITECTURES = {
     "debian": ["amd64", "arm64"],
     "hummingbird": ["amd64", "arm64"],
+    "wolfi": ["amd64", "arm64"],
 }
 
+def nginx_created(channel, distro):
+    """Per-(channel, distro) `created` timestamp source.
+
+    Hummingbird derives from its repomd.xml revision. Debian (nginx.org
+    apt doesn't snapshot) and wolfi (APKINDEX has no single repo-revision
+    anchor) both return None — "missing > misleading" per ADR 0007.
+
+    Args:
+        channel: "stable" or "mainline".
+        distro: "debian" / "hummingbird" / "wolfi".
+    """
+    if distro == "hummingbird":
+        return "//oci/distroless/nginx:created_{}_hummingbird".format(channel)
+    return None
+
 def nginx_layers(version_label):
-    """Composition: static + (busybox if debug) + cc + nginx + conf + one rpmdb.
+    """Composition: static + (busybox if debug) + cc + nginx + conf + one db.
 
     No base inheritance — explicit layer list. Branches on ctx.mode for
     busybox in debug variants.
@@ -74,6 +95,11 @@ def nginx_layers(version_label):
                 layers.append(":rpmdb_nginx_debug_{}_{}_hummingbird".format(version_label, ctx.arch))
             else:
                 layers.append(":rpmdb_nginx_{}_{}_hummingbird".format(version_label, ctx.arch))
+        elif ctx.distro == "wolfi":
+            if ctx.mode == "_debug":
+                layers.append(":apkdb_nginx_debug_{}_{}_wolfi".format(version_label, ctx.arch))
+            else:
+                layers.append(":apkdb_nginx_{}_{}_wolfi".format(version_label, ctx.arch))
         return layers
 
     return _layers

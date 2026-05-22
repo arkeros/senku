@@ -1,13 +1,14 @@
-BASH_DISTROS = ["debian", "hummingbird"]
+BASH_DISTROS = ["debian", "hummingbird", "wolfi"]
 
 BASH_ARCHITECTURES = {
     # "debian12": ["amd64", "arm64", "arm", "s390x", "ppc64le"],
     "debian": ["amd64", "arm64"],
     "hummingbird": ["amd64", "arm64"],
+    "wolfi": ["amd64", "arm64"],
 }
 
 def bash_layers(ctx):
-    """Composition: static + (busybox if debug) + cc + bash + one rpmdb."""
+    """Composition: static + (busybox if debug) + cc + bash + one db."""
     layers = [
         "//oci/distroless/static:static_{}_{}_layer".format(ctx.arch, ctx.distro),
     ]
@@ -20,4 +21,7 @@ def bash_layers(ctx):
     if ctx.distro == "hummingbird":
         rpmdb = ":rpmdb_bash_debug_{}_hummingbird" if ctx.mode == "_debug" else ":rpmdb_bash_{}_hummingbird"
         layers.append(rpmdb.format(ctx.arch))
+    elif ctx.distro == "wolfi":
+        apkdb = ":apkdb_bash_debug_{}_wolfi" if ctx.mode == "_debug" else ":apkdb_bash_{}_wolfi"
+        layers.append(apkdb.format(ctx.arch))
     return layers
