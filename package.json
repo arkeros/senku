@@ -25,7 +25,7 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router": "^7.14.1",
-    "relay-runtime": "^20.1.1",
+    "relay-runtime": "^21.0.0",
     "set-cookie-parser": "^2.7.2"
   },
   "devDependencies": {
@@ -42,7 +42,7 @@
     "esbuild": "^0.28.0",
     "mime": "^4.1.0",
     "ramda": "^0.32.0",
-    "relay-compiler": "^20.1.1",
+    "relay-compiler": "^21.0.0",
     "typescript": "6.0.2"
   }
 }

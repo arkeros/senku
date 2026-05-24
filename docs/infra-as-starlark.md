@@ -89,7 +89,7 @@ Each constructor returns a `struct` with two layers: the JSON body keyed under
 `.tf`, and one field per attribute that downstream resources can reference.
 
 ```python
-# devtools/build/tools/tf/defs.bzl
+# bazel/modules/terraform.bzl/terraform/defs.bzl
 
 def _resource(rtype, name, body, attrs = ()):
     return struct(
@@ -150,7 +150,7 @@ def tf_root(name, docs, backend_prefix, pre_apply = [], visibility = None):
     for verb in ("plan", "apply", "destroy"):
         native.sh_binary(
             name = "%s.%s" % (name, verb),
-            srcs = ["//devtools/build/tools/tf:run.sh"],
+            srcs = ["@terraform.bzl//terraform:run.sh"],
             args = [verb, "$(rootpath %s)" % generated[0]],
             data = generated + pre_apply + ["@terraform//:terraform"],
             env = {
@@ -170,8 +170,10 @@ substitutes the `@@MIRROR_PATH@@` placeholder in `.terraformrc` to a
 sibling runtime file, then `terraform init` + the requested verb.
 `init` resolves providers from the sibling `_providers/` filesystem
 mirror (no network); state stays in GCS — Bazel never tries to own
-it. See [`devtools/build/tools/tf/README.md`](../devtools/build/tools/tf/README.md)
-for the full per-root layout and provider workflow.
+it. The full Starlark layer (rules + toolchain + resource constructors
++ provider lockfile flow) lives as a standalone Bazel module at
+[`bazel/modules/terraform.bzl/`](../bazel/modules/terraform.bzl/),
+consumed via `bazel_dep(name = "terraform.bzl")`.
 
 ## Cross-root orchestration (Aspect CLI, not Bazel)
 
@@ -208,8 +210,10 @@ comments, per-root retries). Same source of truth, two surfaces.
 `oci/cmd/registry/BUILD` after migration:
 
 ```python
-load("//devtools/build/tools/tf:defs.bzl",
-     "service_account", "service_cloudrun", "tf_root", "var")
+load("@terraform.bzl", "var")
+load("@terraform.bzl//:gcp.bzl", "service_account")
+load("//devtools/bifrost/modules:cloudrun.bzl", "service_cloudrun")
+load("//devtools/build/tools/tf:render.bzl", "IMAGE_URI", "tf_root_with_image")
 
 REGIONS = ["us-central1", "europe-west3", "asia-northeast1"]
 
@@ -225,7 +229,10 @@ services = [
         name = "registry_%s" % r.replace("-", "_"),
         project = var("project_id"),
         region = r,
-        image = var("image"),
+        # Sentinel substituted with `<registry>/<repo>@sha256:<digest>` at
+        # Bazel build time — see `tf_root_with_image.image_push` below. No
+        # `var.image` round-trip via `*.auto.tfvars.json`.
+        image = IMAGE_URI,
         service_account_email = sa.email,         # <-- the cross-resource ref
         args = [
             "--upstream=ghcr.io",
@@ -237,9 +244,10 @@ services = [
     for r in REGIONS
 ]
 
-tf_root(
+tf_root_with_image(
     name = "terraform",
-    backend_prefix = "oci/cmd/registry/terraform",
+    backend_bucket = "senku-prod-terraform-state",
+    image_push = ":image_push_gar",   # auto-prepended to pre_apply
     docs = [sa] + services + [
         # outputs consumed by //infra/cloud/gcp/lb
         {"output": {"lb_backends": {"value": {
@@ -250,15 +258,12 @@ tf_root(
             },
         }}}},
     ],
-    pre_apply = [
-        ":image_push_gar",   # already exists in BUILD
-        ":image_tfvars",     # already exists in BUILD
-    ],
 )
 ```
 
-`bazel run //oci/cmd/registry:terraform.apply` replaces `deploy.sh`. The push
-+ tfvars + apply chain is encoded in `pre_apply`, no separate shell script.
+`bazel run //oci/cmd/registry:terraform.apply` replaces `deploy.sh`. The image
+push + apply chain is encoded by `tf_root_with_image` (it auto-prepends
+`image_push` to `pre_apply`); no separate shell script, no tfvars round-trip.
 
 ## Migration plan
 
@@ -550,6 +555,12 @@ win from CDKTF is real but smaller than the consistency win from staying in
 one language.
 
 ## File layout (proposed)
+
+> Historical note: this is the layout as originally proposed. Post-migration,
+> the rules + toolchain + resource constructors live in the standalone
+> `bazel/modules/terraform.bzl/` module; the senku-side `render.bzl`
+> (IMAGE_URI + `tf_root_with_image`) is the only piece still under
+> `devtools/build/tools/tf/`.
 
 ```
 devtools/build/tools/tf/

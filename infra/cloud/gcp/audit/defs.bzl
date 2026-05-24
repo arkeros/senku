@@ -70,13 +70,9 @@ Not enabled (deliberately):
   a security ask, and is handled separately when needed.
 """
 
+load("@terraform.bzl", "var", "variable")
 load(
-    "//devtools/build/tools/tf:defs.bzl",
-    "var",
-    "variable",
-)
-load(
-    "//devtools/build/tools/tf/resources:gcp.bzl",
+    "@terraform.bzl//:gcp.bzl",
     "logging_metric",
     "logging_project_exclusion",
     "monitoring_alert_policy_log_match",
