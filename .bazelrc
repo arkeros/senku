@@ -52,11 +52,12 @@ common:buildbuddy --experimental_profile_include_primary_output
 common:rbe --config=buildbuddy
 common:rbe --remote_executor=grpcs://remote.buildbuddy.io
 common:rbe --jobs=50
-build:rbe --crosstool_top=@buildbuddy_toolchain//:toolchain
-build:rbe --extra_toolchains=@buildbuddy_toolchain//:cc_toolchain
-build:rbe --host_platform=@buildbuddy_toolchain//:platform
-build:rbe --platforms=@buildbuddy_toolchain//:platform
-build:rbe --extra_execution_platforms=@buildbuddy_toolchain//:platform
+# Schedule actions on the BuildBuddy worker pool via our local @rbe_platform
+# (see //bazel/toolchains:rbe.bzl). Cc toolchain selection happens through
+# the registered @llvm toolchains, not via crosstool_top.
+build:rbe --host_platform=@rbe_platform//:rbe_platform
+build:rbe --platforms=@rbe_platform//:rbe_platform
+build:rbe --extra_execution_platforms=@rbe_platform//:rbe_platform
 build:rbe --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 # With RBE, tar outputs should be cached so remote workers can stage them
 build:rbe --modify_execution_info=Tar=-no-remote-cache
