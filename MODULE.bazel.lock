@@ -155,8 +155,8 @@
     "https://bcr.bazel.build/modules/jsoncpp/1.9.6.bcr.2/source.json": "13199fa0a267ca46814e9e6ab313a71890c8f1822e57376fdc23a2d2cd384051",
     "https://bcr.bazel.build/modules/jsoncpp/1.9.6/MODULE.bazel": "2f8d20d3b7d54143213c4dfc3d98225c42de7d666011528dc8fe91591e2e17b0",
     "https://bcr.bazel.build/modules/libpfm/4.11.0/MODULE.bazel": "45061ff025b301940f1e30d2c16bea596c25b176c8b6b3087e92615adbd52902",
-    "https://bcr.bazel.build/modules/llvm/0.8.1/MODULE.bazel": "775ff54de29bae0f5f3f5d6235b620fbbb019f7baa77e1fdf9559a73d92f25fc",
-    "https://bcr.bazel.build/modules/llvm/0.8.1/source.json": "76f217ade23a9c1220472c88f6c7c7ab4c91143a35757eec6b195df726cabd24",
+    "https://bcr.bazel.build/modules/llvm/0.8.3/MODULE.bazel": "dbc1bc13171f8f9980a75524883abef1c491613e8d8d805cd4ffa3767ba9708e",
+    "https://bcr.bazel.build/modules/llvm/0.8.3/source.json": "4b11874c26a9de53c03a25a517ebc36dee6b458c920fe9ed65e3ca279ff19775",
     "https://bcr.bazel.build/modules/nlohmann_json/3.6.1/MODULE.bazel": "6f7b417dcc794d9add9e556673ad25cb3ba835224290f4f848f8e2db1e1fca74",
     "https://bcr.bazel.build/modules/package_metadata/0.0.10/MODULE.bazel": "cb66e0ce830e01bc00cd9edc984963704f2759ca893a649996e2b1c5c1ea7271",
     "https://bcr.bazel.build/modules/package_metadata/0.0.10/source.json": "8fc6bece244828a69b3cc608f381118d67fa3cc2aa1a2851dfe8d99a8076d7d0",
@@ -319,8 +319,8 @@
     "https://bcr.bazel.build/modules/rules_python/1.4.1/MODULE.bazel": "8991ad45bdc25018301d6b7e1d3626afc3c8af8aaf4bc04f23d0b99c938b73a6",
     "https://bcr.bazel.build/modules/rules_python/1.6.0/MODULE.bazel": "7e04ad8f8d5bea40451cf80b1bd8262552aa73f841415d20db96b7241bd027d8",
     "https://bcr.bazel.build/modules/rules_python/1.7.0/MODULE.bazel": "d01f995ecd137abf30238ad9ce97f8fc3ac57289c8b24bd0bf53324d937a14f8",
-    "https://bcr.bazel.build/modules/rules_python/2.0.1/MODULE.bazel": "294fbfe4dc3b24a925172e5487e1e8d3c2927cf4fba1eaddd7bad0ce50701da1",
-    "https://bcr.bazel.build/modules/rules_python/2.0.1/source.json": "f2bacc75d3fc496dfd3e6a5986200b10e70169aaaf4ee5f1cea573c8d347e7c4",
+    "https://bcr.bazel.build/modules/rules_python/2.0.2/MODULE.bazel": "9d26ecb43f248c2663fb29f3c9b833aa86c31e736096e58c7077f80038f8d32f",
+    "https://bcr.bazel.build/modules/rules_python/2.0.2/source.json": "36a74dedc1498bfbf72855568a24e6aa30c70b5ac7e114bc244c62b3a58b47fc",
     "https://bcr.bazel.build/modules/rules_python_gazelle_plugin/2.0.1/MODULE.bazel": "1960981607e24b295fd89fb89af4b7c1d2ab5700cc0dd0abf6557a060f7799e9",
     "https://bcr.bazel.build/modules/rules_python_gazelle_plugin/2.0.1/source.json": "63003d00fb17da459b6aa3aef18d42d9d235444cb75b6ab9d70188e3a2505a0b",
     "https://bcr.bazel.build/modules/rules_robolectric/4.14.1.2/MODULE.bazel": "d44fec647d0aeb67b9f3b980cf68ba634976f3ae7ccd6c07d790b59b87a4f251",
@@ -801,6 +801,69 @@
         }
       }
     },
+    "@@llvm+//3rd_party/gcc/extension:gcc.bzl%gcc": {
+      "general": {
+        "bzlTransitiveDigest": "gykRc3tHzRAj9AQDFto1xub/o6YDfygSDtGdX1YZV6c=",
+        "usagesDigest": "9IP/e++b81Ga1zICxzXu+yqfe5i4DX5F/SsrgV5a568=",
+        "recordedInputs": [
+          "REPO_MAPPING:llvm+,bazel_lib bazel_lib+",
+          "REPO_MAPPING:llvm+,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "gcc": {
+            "repoRuleId": "@@llvm+//:http_bsdtar_archive.bzl%http_bsdtar_archive",
+            "attributes": {
+              "build_file": "@@llvm+//3rd_party/gcc:gcc.BUILD.bazel",
+              "includes": [
+                "gcc/BASE-VER",
+                "gcc/DATESTAMP",
+                "gcc/ginclude/unwind-arm-common.h",
+                "config/acx.m4",
+                "config/cet.m4",
+                "config/futex.m4",
+                "config/gc++filt.m4",
+                "config/gthr.m4",
+                "config/hwcaps.m4",
+                "config/iconv.m4",
+                "config/lthostflags.m4",
+                "config/multi.m4",
+                "config/no-executables.m4",
+                "config/tls.m4",
+                "config/toolexeclibdir.m4",
+                "config/unwind_ipinfo.m4",
+                "include/ansidecl.h",
+                "include/demangle.h",
+                "include/dyn-string.h",
+                "include/getopt.h",
+                "include/libiberty.h",
+                "libgcc/gthr-posix.h",
+                "libgcc/gthr-single.h",
+                "libgcc/gthr.h",
+                "libgcc/config/arm/unwind-arm.h",
+                "libgcc/unwind-generic.h",
+                "libgcc/unwind-pe.h",
+                "libiberty/cp-demangle.c",
+                "libiberty/cp-demangle.h",
+                "libstdc++-v3/acinclude.m4",
+                "libstdc++-v3/config/**",
+                "libstdc++-v3/configure.ac",
+                "libstdc++-v3/configure.host",
+                "libstdc++-v3/crossconfig.m4",
+                "libstdc++-v3/linkage.m4",
+                "libstdc++-v3/include/**",
+                "libstdc++-v3/libsupc++/**",
+                "libstdc++-v3/src/**"
+              ],
+              "sha256": "dc033fdfd79caf199113446af6d082004534437b6ebd276f9732815d86cbe723",
+              "strip_prefix": "gcc-2bfd402f8569511901ec8fe7628f57471e6d240a",
+              "urls": [
+                "https://github.com/gcc-mirror/gcc/archive/2bfd402f8569511901ec8fe7628f57471e6d240a.tar.gz"
+              ]
+            }
+          }
+        }
+      }
+    },
     "@@protobuf+//python/dist:system_python.bzl%system_python_extension": {
       "general": {
         "bzlTransitiveDigest": "XIzUjPrPvfZw+ee/BZaUhkKywlpB0qAKyTi/+DyC/XI=",
@@ -1021,7 +1084,7 @@
     "@@rules_python+//python/uv:uv.bzl%uv": {
       "general": {
         "bzlTransitiveDigest": "FweP0zel1F17xmT6aBZ3Itw1ogP5QPaaka1Bzndy0Wk=",
-        "usagesDigest": "KI88AZslgI1K52IZ7PfBqhuXb5hke0gUD9N73XeVqaI=",
+        "usagesDigest": "R0pij/Kri0Z/7GcM2UBot6XmOqgduje0j8y9wNMWjLA=",
         "recordedInputs": [
           "REPO_MAPPING:rules_python+,bazel_tools bazel_tools",
           "REPO_MAPPING:rules_python+,platforms platforms"
