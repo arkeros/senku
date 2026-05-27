@@ -23,16 +23,15 @@ WORKSTATION_IGNORE_CVES = [
     # network-supplied data; it's a fish dependency.
     "CVE-2026-4786",
     "CVE-2026-7210",
-    # docker-cli 28.5.2+dfsg4-1 — BuildKit CVEs unfixed in sid as of
-    # the snapshot date. Threat model is the same as the image-level one
-    # (developer-interactive VM, operator-chosen inputs); BuildKit only
-    # sees Dockerfiles the user wrote or pulled themselves. Re-evaluate
-    # when Debian ships a patched build; _stale_ignores will tell us
-    # when these stop matching.
+    # docker-cli — BuildKit CVEs unfixed in sid as of the snapshot date.
+    # Threat model is the same as the image-level one (developer-
+    # interactive VM, operator-chosen inputs); BuildKit only sees
+    # Dockerfiles the user wrote or pulled themselves. Re-evaluate when
+    # Debian ships a patched build; _stale_ignores will tell us when
+    # these stop matching (CVE-2026-33997 and CVE-2026-34040 dropped off
+    # in docker.io 28.5.2+dfsg4-2).
     "CVE-2026-33747",
     "CVE-2026-33748",
-    "CVE-2026-33997",
-    "CVE-2026-34040",
 ]
 
 # libxml2-16 CVE-2026-6732 — type confusion in XSD-validated documents
