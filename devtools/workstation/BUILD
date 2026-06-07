@@ -7,7 +7,7 @@ load("@tar.bzl", "tar")
 load("//oci:mirror_push.bzl", "mirror_push")
 load("//oci:oci_image.bzl", "oci_image")
 load("//oci:supply_chain.bzl", "image_sbom")
-load("//oci:vex.bzl", "vex_document", "vex_statement")
+load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:platforms.bzl", "ARCHITECTURE_PLATFORMS")
 load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
 load(":config.bzl", "WORKSTATION_ARCHITECTURES", "WORKSTATION_PACKAGES_BY_ARCH")
@@ -23,6 +23,8 @@ WORKSTATION_IGNORE_CVES = [
     # network-supplied data; it's a fish dependency.
     "CVE-2026-4786",
     "CVE-2026-7210",
+    "CVE-2025-13462",
+    "CVE-2026-3644",
     # docker-cli — BuildKit CVEs unfixed in sid as of the snapshot date.
     # Threat model is the same as the image-level one (developer-
     # interactive VM, operator-chosen inputs); BuildKit only sees
@@ -32,33 +34,31 @@ WORKSTATION_IGNORE_CVES = [
     # in docker.io 28.5.2+dfsg4-2).
     "CVE-2026-33747",
     "CVE-2026-33748",
+    # perl 5.40.1-8 — pulled transitively by `git` (via liberror-perl).
+    # All unfixed in sid as of the snapshot date. Same threat model as
+    # docker-cli above: perl only runs git's own helper scripts and
+    # operator-chosen inputs, never network-supplied data. Re-evaluate
+    # when Debian ships a patched build; _stale_ignores fires when any
+    # of these stop matching.
+    "CVE-2026-8376",
+    "CVE-2026-9538",
+    "CVE-2026-42496",
+    "CVE-2026-42497",
+    "CVE-2026-48959",
+    "CVE-2026-48961",
+    "CVE-2026-48962",
 ]
 
-# libxml2-16 CVE-2026-6732 — type confusion in XSD-validated documents
-# containing internal entity references; impact is a DoS crash, no RCE.
-# libxml2 enters the image only as a transitive dependency of
-# bind9-dnsutils (dig/host/nslookup/nsupdate). Those tools link libxml2
-# for XML *output* formatting (e.g. `dig +xml`); none of them invoke
-# the XSD schema validation code path that triggers the bug. Debian
-# flags this as no-dsa Minor and ships no fix in sid.
-_LIBXML2_VEX = [
-    vex_statement(
-        expires = "2026-06-06",
-        impact_statement = "bind9-dnsutils is the sole consumer of libxml2 in this image and uses it only for XML output formatting; xmlSchemaValidateDoc and the XSD-validation code path are never reached.",
-        justification = "vulnerable_code_not_in_execute_path",
-        products = ["pkg:oci/workstation"],
-        status = "not_affected",
-        vulnerability = "CVE-2026-6732",
-    ),
-]
-
+# No statements: the libxml2-16 CVE-2026-6732 VEX (XSD type confusion
+# never reached via bind9-dnsutils) was dropped when the lockfile bump
+# pulled the fixed 2.15.3+dfsg-1 and the statement went stale.
 vex_document(
     name = "vex",
     author = "rafael@arquero.cat",
     id = "https://github.com/arkeros/senku/blob/main/devtools/workstation/BUILD",
-    statements = _LIBXML2_VEX,
-    timestamp = "2026-05-07T00:00:00Z",
-    version = 3,
+    statements = [],
+    timestamp = "2026-06-07T00:00:00Z",
+    version = 4,
 )
 
 exports_files([
