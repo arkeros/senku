@@ -18,14 +18,6 @@ package(default_visibility = ["//visibility:public"])
 # VM running only code its operator chooses to run; not exposed to
 # untrusted input on the affected components.
 WORKSTATION_IGNORE_CVES = [
-    # python3.13 — pulled transitively by `fish` for its runtime helpers.
-    # The Python interpreter in this image is not invoked on
-    # network-supplied data; it's a fish dependency.
-    "CVE-2026-4786",
-    "CVE-2026-7210",
-    "CVE-2025-13462",
-    "CVE-2026-3644",
-    "CVE-2026-9669",
     # docker-cli — BuildKit CVEs unfixed in sid as of the snapshot date.
     # Threat model is the same as the image-level one (developer-
     # interactive VM, operator-chosen inputs); BuildKit only sees
