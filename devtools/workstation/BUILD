@@ -9,7 +9,7 @@ load("//oci:oci_image.bzl", "oci_image")
 load("//oci:supply_chain.bzl", "image_sbom")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:platforms.bzl", "ARCHITECTURE_PLATFORMS")
-load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "OPENSSL_WONTFIX_CVES")
 load(":config.bzl", "WORKSTATION_ARCHITECTURES", "WORKSTATION_PACKAGES_BY_ARCH")
 
 package(default_visibility = ["//visibility:public"])
@@ -25,6 +25,7 @@ WORKSTATION_IGNORE_CVES = [
     "CVE-2026-7210",
     "CVE-2025-13462",
     "CVE-2026-3644",
+    "CVE-2026-9669",
     # docker-cli — BuildKit CVEs unfixed in sid as of the snapshot date.
     # Threat model is the same as the image-level one (developer-
     # interactive VM, operator-chosen inputs); BuildKit only sees
@@ -40,13 +41,9 @@ WORKSTATION_IGNORE_CVES = [
     # operator-chosen inputs, never network-supplied data. Re-evaluate
     # when Debian ships a patched build; _stale_ignores fires when any
     # of these stop matching.
-    "CVE-2026-8376",
     "CVE-2026-9538",
     "CVE-2026-42496",
     "CVE-2026-42497",
-    "CVE-2026-48959",
-    "CVE-2026-48961",
-    "CVE-2026-48962",
 ]
 
 # No statements: the libxml2-16 CVE-2026-6732 VEX (XSD type confusion
@@ -305,7 +302,7 @@ package_metadata(
             "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/devtools/workstation/BUILD",
         },
         cmd = ["/usr/local/bin/init"],
-        ignore_cves = WORKSTATION_IGNORE_CVES + DEBIAN_WONTFIX_CVES,
+        ignore_cves = WORKSTATION_IGNORE_CVES + DEBIAN_WONTFIX_CVES + OPENSSL_WONTFIX_CVES,
         # exe.dev's shelley reads this to choose the SSH login user;
         # the image itself runs as root (needed for systemd PID 1).
         labels = {"exe.dev/login-user": "exedev"},
