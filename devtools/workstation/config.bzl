@@ -201,7 +201,7 @@ _SHARED = [
     "libtinfo6",
     "libtirpc-common",
     "libtirpc3t64",
-    "libtree-sitter0.25",
+    "libtree-sitter0.26",
     "libtsan2",
     "libubsan1",
     "libuchardet0",
