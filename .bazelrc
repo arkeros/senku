@@ -37,20 +37,6 @@ common --registry=https://bcr.bazel.build
 # alternative `--linkopt=-no-pie` workaround.
 common --@rules_go//go/config:linkmode=pie
 
-# Disable cgo so every Go link uses Go's internal linker (pie is not in
-# rules_go's LINKMODES_REQUIRING_EXTERNAL_LINKING, so pie + pure is fine).
-# External linking through the hermetic LLVM toolchain is broken for Go:
-# the Go stdlib and cgo archives bake `#cgo LDFLAGS` whose compiler-rt
-# archive path carries the configuration hash of the config they were
-# compiled in (`bazel-out/…-ST-xxxx/…/libclang_rt.builtins.static.a`),
-# which doesn't match the path staged into the GoLink sandbox whenever
-# the consuming config differs. Links then fail with `clang++: no such
-# file` in a config-alignment-dependent (whack-a-mole) way: every darwin
-# go_test (rules_go ≥0.60 resolves linkmode `auto` to pie on darwin ⇒
-# external linking) and cgo-bearing exec tools like grype. Pure Go also
-# gives static, netgo binaries — the right shape for distroless images.
-common --@rules_go//go/config:pure=true
-
 # Enforce ADR 0006 at analysis time: any `image_push` to the public mirror
 # surface (`ghcr.io/arkeros/senku/*`) without the `mirror_push_managed` tag
 # fails the build. Wired here (not as a `--config=`) so the policy is

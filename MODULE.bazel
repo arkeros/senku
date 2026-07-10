@@ -16,6 +16,15 @@ bazel_dep(name = "rules_shell", version = "0.8.0")
 # previous toolchains_buildbuddy split, modeled on openai/codex's setup.
 bazel_dep(name = "llvm", version = "0.8.11")
 
+# FIXME: drop once upstream links compiler-rt builtins via -L/-l on macOS
+# (or otherwise stops baking config-hash archive paths into Go stdlib cgo
+# metadata) — see //bazel/patches:llvm_compiler_rt_search_dir.patch.
+single_version_override(
+    module_name = "llvm",
+    patch_strip = 1,
+    patches = ["//bazel/patches:llvm_compiler_rt_search_dir.patch"],
+)
+
 register_toolchains("@llvm//toolchain:all")
 
 # Patched busybox built via //bazel/registry. Consumed lazily — no compile
