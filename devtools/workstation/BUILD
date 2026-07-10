@@ -9,7 +9,7 @@ load("//oci:oci_image.bzl", "oci_image")
 load("//oci:supply_chain.bzl", "image_sbom")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:platforms.bzl", "ARCHITECTURE_PLATFORMS")
-load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "OPENSSL_WONTFIX_CVES")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
 load(":config.bzl", "WORKSTATION_ARCHITECTURES", "WORKSTATION_PACKAGES_BY_ARCH")
 
 package(default_visibility = ["//visibility:public"])
@@ -294,7 +294,7 @@ package_metadata(
             "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/devtools/workstation/BUILD",
         },
         cmd = ["/usr/local/bin/init"],
-        ignore_cves = WORKSTATION_IGNORE_CVES + DEBIAN_WONTFIX_CVES + OPENSSL_WONTFIX_CVES,
+        ignore_cves = WORKSTATION_IGNORE_CVES + DEBIAN_WONTFIX_CVES,
         # exe.dev's shelley reads this to choose the SSH login user;
         # the image itself runs as root (needed for systemd PID 1).
         labels = {"exe.dev/login-user": "exedev"},
