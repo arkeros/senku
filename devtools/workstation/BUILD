@@ -9,7 +9,7 @@ load("//oci:oci_image.bzl", "oci_image")
 load("//oci:supply_chain.bzl", "image_sbom")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:platforms.bzl", "ARCHITECTURE_PLATFORMS")
-load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "OPENSSL_WONTFIX_CVES")
+load("//oci/distroless/common:variables.bzl", "COMPRESSION", "DEBIAN_WONTFIX_CVES")
 load(":config.bzl", "WORKSTATION_ARCHITECTURES", "WORKSTATION_PACKAGES_BY_ARCH")
 
 package(default_visibility = ["//visibility:public"])
@@ -18,24 +18,33 @@ package(default_visibility = ["//visibility:public"])
 # VM running only code its operator chooses to run; not exposed to
 # untrusted input on the affected components.
 WORKSTATION_IGNORE_CVES = [
-    # docker-cli — BuildKit CVEs unfixed in sid as of the snapshot date.
-    # Threat model is the same as the image-level one (developer-
-    # interactive VM, operator-chosen inputs); BuildKit only sees
-    # Dockerfiles the user wrote or pulled themselves. Re-evaluate when
-    # Debian ships a patched build; _stale_ignores will tell us when
-    # these stop matching (CVE-2026-33997 and CVE-2026-34040 dropped off
-    # in docker.io 28.5.2+dfsg4-2).
-    "CVE-2026-33747",
-    "CVE-2026-33748",
+    # containerd 2.1.9+ds1-1 — unfixed in sid as of the snapshot date.
+    # Same threat model as the retired docker-cli BuildKit entries
+    # (CVE-2026-33747/33748, fixed in docker.io 28.5.2+dfsg4-3):
+    # developer-interactive VM, containerd only runs images the
+    # operator pulls or builds. _stale_ignores fires when this stops
+    # matching.
+    "CVE-2026-46680",
+    # gzip 1.13-1 — unfixed in sid as of the snapshot date. gzip only
+    # decompresses operator-chosen archives, never network-supplied
+    # data.
+    "CVE-2026-41992",
     # perl 5.40.1-8 — pulled transitively by `git` (via liberror-perl).
     # All unfixed in sid as of the snapshot date. Same threat model as
-    # docker-cli above: perl only runs git's own helper scripts and
+    # containerd above: perl only runs git's own helper scripts and
     # operator-chosen inputs, never network-supplied data. Re-evaluate
     # when Debian ships a patched build; _stale_ignores fires when any
     # of these stop matching.
     "CVE-2026-9538",
     "CVE-2026-42496",
     "CVE-2026-42497",
+    "CVE-2026-7017",
+    "CVE-2026-12087",
+    # python3.14 3.14.6-1 — unfixed in sid as of the snapshot date.
+    # Python ships as a developer tool; it only runs code the operator
+    # writes or installs, never network-supplied input.
+    "CVE-2026-11940",
+    "CVE-2026-11972",
 ]
 
 # No statements: the libxml2-16 CVE-2026-6732 VEX (XSD type confusion
@@ -237,7 +246,8 @@ package_metadata(
 # node.js:*:*` (verified empirically: 18 grype matches against 1.0.105,
 # 0 against 2.1.118 = scanned clean). Bump version and CPE in lock-step
 # with the http_file URLs in //bazel/include:oci.MODULE.bazel.
-_CLAUDE_VERSION = "2.1.118"
+# 2.1.197 clears CVE-2026-54316 / CVE-2026-55607 (fixed in 2.1.163).
+_CLAUDE_VERSION = "2.1.197"
 
 package_metadata(
     name = "claude_metadata",
@@ -294,7 +304,7 @@ package_metadata(
             "org.opencontainers.image.source": "https://github.com/arkeros/senku/blob/main/devtools/workstation/BUILD",
         },
         cmd = ["/usr/local/bin/init"],
-        ignore_cves = WORKSTATION_IGNORE_CVES + DEBIAN_WONTFIX_CVES + OPENSSL_WONTFIX_CVES,
+        ignore_cves = WORKSTATION_IGNORE_CVES + DEBIAN_WONTFIX_CVES,
         # exe.dev's shelley reads this to choose the SSH login user;
         # the image itself runs as root (needed for systemd PID 1).
         labels = {"exe.dev/login-user": "exedev"},
