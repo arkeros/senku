@@ -16,6 +16,7 @@ bzl_library(
     srcs = ["defs.bzl"],
     visibility = ["//visibility:public"],
     deps = [
+        "//apps/cluedo-bayes:defs",
         "//apps/dino-meteor:defs",
         "//apps/napkin-battle:defs",
         "//apps/table-for-two:defs",

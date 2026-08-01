@@ -8,6 +8,7 @@ content, no runtime indirection.
 """
 
 load("@terraform.bzl", "output", "resource")
+load("//apps/cluedo-bayes:defs.bzl", _CLUEDO_LB_BACKEND = "LB_BACKEND")
 load("//apps/dino-meteor:defs.bzl", _DINO_LB_BACKEND = "LB_BACKEND")
 load("//apps/napkin-battle:defs.bzl", _NAPKIN_LB_BACKEND = "LB_BACKEND")
 load("//apps/table-for-two:defs.bzl", _TABLE_LB_BACKEND = "LB_BACKEND")
@@ -58,6 +59,7 @@ def _normalize(backend):
     )
 
 BACKENDS = {
+    "cluedo": _normalize(_CLUEDO_LB_BACKEND),
     "dino": _normalize(_DINO_LB_BACKEND),
     "napkin": _normalize(_NAPKIN_LB_BACKEND),
     "registry": _normalize(_REGISTRY_LB_BACKEND),
