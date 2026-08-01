@@ -18,6 +18,7 @@ bzl_library(
     deps = [
         "//apps/dino-meteor:defs",
         "//apps/napkin-battle:defs",
+        "//apps/table-for-two:defs",
         "//oci/cmd/registry:defs",
         "@terraform.bzl//:terraform",
     ],
