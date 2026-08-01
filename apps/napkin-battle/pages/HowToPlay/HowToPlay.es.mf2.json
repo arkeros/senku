@@ -1,0 +1,8 @@
+{
+  "howToPlay.tiles": "Cada jugador tiene sus fichas numeradas y solo puede usar cada una una vez. Por turnos: elige un número y escríbelo en una casilla libre.",
+  "howToPlay.scoring": "Cada vez que dos casillas vecinas (arriba, abajo, izquierda, derecha) son de jugadores distintos, el número más alto se lleva 1 punto. Empate a números, nadie puntúa.",
+  "howToPlay.extremes": "El 7 arrasa con todo lo que toca, pero en una esquina solo pelea contra dos vecinos. El 1 es basura… salvo que lo escondas rodeado de los tuyos, donde no regala nada.",
+  "howToPlay.stain": "La mancha de café cae cada partida en un sitio distinto y ahí no se escribe. Está para eso: sin ella el tablero es simétrico y el segundo jugador empata siempre copiando las jugadas giradas. Con la mancha esa copia se rompe, y además queda una casilla vacía al final, así que también se elige qué hueco dejar.",
+  "howToPlay.ending": "Cuando se acaban las fichas, gana quien tenga más puntos en la cuenta.",
+  "howToPlay.back": "Volver a la mesa"
+}

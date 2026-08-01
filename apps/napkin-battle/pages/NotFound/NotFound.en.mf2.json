@@ -1,0 +1,5 @@
+{
+  "notFound.heading": "Blank napkin",
+  "notFound.body": "Nothing written here: {$pathname} does not exist.",
+  "notFound.back": "Back to the table"
+}

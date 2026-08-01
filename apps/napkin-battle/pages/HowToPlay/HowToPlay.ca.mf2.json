@@ -1,0 +1,8 @@
+{
+  "howToPlay.tiles": "Cada jugador té les seves fitxes numerades i només pot fer servir cadascuna una vegada. Per torns: tria un número i escriu-lo en una casella lliure.",
+  "howToPlay.scoring": "Cada cop que dues caselles veïnes (amunt, avall, esquerra, dreta) són de jugadors diferents, el número més alt s'emporta 1 punt. Empat de números, ningú puntua.",
+  "howToPlay.extremes": "El 7 arrasa amb tot el que toca, però en un racó només lluita contra dos veïns. L'1 és brossa… tret que l'amaguis envoltat dels teus, on no regala res.",
+  "howToPlay.stain": "La taca de cafè cau cada partida en un lloc diferent i allà no s'hi escriu. Hi és per això: sense ella el tauler és simètric i el segon jugador empata sempre copiant les jugades girades. Amb la taca aquella còpia es trenca, i a més queda una casella buida al final, així que també es tria quin forat deixar.",
+  "howToPlay.ending": "Quan s'acaben les fitxes, guanya qui tingui més punts al compte.",
+  "howToPlay.back": "Tornar a la taula"
+}

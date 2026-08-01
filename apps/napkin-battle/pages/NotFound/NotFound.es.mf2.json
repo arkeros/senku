@@ -1,0 +1,5 @@
+{
+  "notFound.heading": "Servilleta en blanco",
+  "notFound.body": "Aquí no hay nada escrito: {$pathname} no existe.",
+  "notFound.back": "Volver a la mesa"
+}
