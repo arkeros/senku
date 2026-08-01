@@ -1,7 +1,7 @@
 """Runfiles-aware spawn helper for Bazel-built binaries.
 
-Vendored from https://github.com/aspect-extensions/run via astrograde's
-copy. Local deviations:
+Originally vendored from https://github.com/aspect-extensions/run via
+astrograde's copy. Local deviations:
 
 - `command(entrypoint, args, env)` returns the un-spawned
   `std.process.Command` so callers can chain `.stdout("piped")` etc.
@@ -14,36 +14,48 @@ copy. Local deviations:
   resolve files via a Bazel runfiles library (RUNFILES_DIR /
   RUNFILES_MANIFEST_FILE are still exported here) rather than via cwd.
   Inherits the caller's cwd instead, which matches `BUILD_WORKING_DIRECTORY`.
+- The entrypoint is resolved with `bazel cquery --output=files` instead
+  of by consuming the Build Event Protocol. The upstream version reads
+  `named_set_of_files` / `target_completed` events off
+  `ctx.bazel.build(build_events = True).build_events()`, but
+  `bazel.build.Build` no longer exposes `build_events` (as of Aspect CLI
+  v2026.31.12 it carries only `wait`, `try_wait`, `execution_logs` and
+  `workspace_events`), so that stream is simply not reachable from a
+  task any more. cquery answers the only question we asked BES: which
+  file in the default output group is the executable.
 """
 
-def _process_bes(state, event):
-    filesets = state.filesets
-    target_fileset = state.target_fileset
-    targets = state.targets
-    if event.kind == "named_set_of_files":
-        filesets[event.id.id] = event.payload.files
-    elif event.kind == "target_completed":
-        if event.id.label in targets:
-            for og in event.payload.output_group:
-                if og.name == "default":
-                    target_fileset[event.id.label] = og.file_sets
-
 def _determine_entrypoint(state, target):
-    filesets = state.filesets
-    target_fileset = state.target_fileset
-    if target not in target_fileset:
+    """First file in `target`'s default output group, or None.
+
+    Runs under the same flags as the preceding build so the answer comes
+    from the same configuration — a config-affecting flag on one and not
+    the other would resolve a path in a different `bazel-out` tree.
+
+    Paths come back workspace-relative (`bazel-out/<config>/bin/...`),
+    which `_command` turns absolute against the caller's cwd; that
+    resolves through the `bazel-out` convenience symlink at the
+    workspace root.
+    """
+    ctx = state.ctx
+    result = ctx.std.process.command("bazel") \
+        .args([
+            "cquery",
+            "--output=files",
+            "--ui_event_filters=-info",
+            "--noshow_progress",
+        ] + state.flags + [target]) \
+        .stdout("piped") \
+        .stderr("piped") \
+        .spawn() \
+        .wait_with_output()
+    if result.status.code != 0:
+        ctx.std.io.stderr.write(result.stderr)
         return None
-    targetfs = target_fileset[target][0].id
-    files = filesets[targetfs]
-    for file in files:
-        if len(file.path_prefix):
-            # file.file is a local path under a `bazel build`; under
-            # remote execution it can come back as a `bytestream://`
-            # URL — fall back to the canonical bazel-bin layout in
-            # that case (matches astrograde's vendored copy).
-            if file.file.startswith("bytestream://"):
-                return "bazel-bin/{}".format(file.name)
-            return file.file.removeprefix("file://")
+    for line in result.stdout.splitlines():
+        candidate = line.strip()
+        if candidate:
+            return candidate
     return None
 
 def _command(ctx, entrypoint, args, env = {}):
@@ -74,15 +86,11 @@ def _command(ctx, entrypoint, args, env = {}):
 def _spawn(ctx, entrypoint, args, env = {}):
     return _command(ctx, entrypoint, args, env).spawn()
 
-def runnable(ctx, targets):
-    state = struct(
-        ctx = ctx,
-        targets = targets,
-        filesets = {},
-        target_fileset = {},
-    )
+def runnable(ctx, flags = []):
+    """`flags` must match the flags the target was built with — see
+    `_determine_entrypoint`."""
+    state = struct(ctx = ctx, flags = flags)
     return struct(
-        event = lambda event: _process_bes(state, event),
         determine_entrypoint = lambda target: _determine_entrypoint(state, target),
         command = lambda entrypoint, args, env = {}: _command(ctx, entrypoint, args, env),
         spawn = lambda entrypoint, args, env = {}: _spawn(ctx, entrypoint, args, env),
