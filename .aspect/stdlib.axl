@@ -17,6 +17,7 @@ TF_ROOTS = [
     struct(target = "//oci/cmd/registry:terraform", bootstrap = False),
     struct(target = "//apps/napkin-battle:terraform", bootstrap = False),
     struct(target = "//apps/dino-meteor:terraform", bootstrap = False),
+    struct(target = "//apps/table-for-two:terraform", bootstrap = False),
     struct(target = "//infra/cloud/gcp/lb:terraform", bootstrap = False),
 ]
 
