@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="Dino Meteoro">
+  <title>Dino Meteoro</title>
+  <!--
+    Source art for every raster icon in this directory. Opaque and full-bleed:
+    iOS masks the corners itself and turns transparency black.
+
+    Just the meteor. A dino at 60px collapses into a green smudge, whereas a
+    burning rock reads instantly and is the thing both players are chasing.
+  -->
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="34%" r="72%">
+      <stop offset="0" stop-color="#1D2340"/>
+      <stop offset="1" stop-color="#0C0718"/>
+    </radialGradient>
+    <radialGradient id="heat" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#FFC24B" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#F2762E" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="180" height="180" fill="url(#sky)"/>
+
+  <!-- Trail, thinning as it recedes. -->
+  <g fill="#F2762E">
+    <circle cx="41" cy="41" r="5" opacity=".22"/>
+    <circle cx="53" cy="53" r="8" opacity=".34"/>
+    <circle cx="66" cy="66" r="11" opacity=".5"/>
+  </g>
+
+  <circle cx="99" cy="99" r="62" fill="url(#heat)"/>
+
+  <!-- Molten rim, then the cold rock over it. -->
+  <circle cx="99" cy="99" r="38" fill="#FFC24B"/>
+  <path d="M99 63 116 71 131 88 129 111 114 130 94 135 76 126 66 108 70 85 82 69Z" fill="#2A1B3D"/>
+  <g fill="#FFC24B">
+    <circle cx="88" cy="88" r="11" opacity=".55"/>
+    <circle cx="110" cy="112" r="7" opacity=".45"/>
+    <circle cx="105" cy="83" r="4" opacity=".35"/>
+  </g>
+</svg>

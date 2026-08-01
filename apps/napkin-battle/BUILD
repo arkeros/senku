@@ -103,6 +103,7 @@ frontend_images_all_arch(
     statics_layer = [
         ":app_layer_statics",
         ":app_layer_conf",
+        "//apps/napkin-battle/icons:icons_layer",
     ],
     vex = [":vex"],
 )

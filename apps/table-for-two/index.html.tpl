@@ -11,8 +11,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="description" content="Un juego para dos en un solo móvil: reflejos, cuentas y colores. Gana quien responda primero." />
     <meta name="theme-color" content="#0E1A17" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Mesa para dos</title>
     <style>
       html,
@@ -25,6 +23,25 @@
         overscroll-behavior: none;
       }
     </style>
+    <!--
+      Home-screen icons. iOS reads `apple-touch-icon` (a raster PNG — it
+      ignores SVG here) and `apple-mobile-web-app-title` for the label under
+      it. The manifest covers Android and, since iOS 16.4, Safari too.
+      Everything referenced here is generated from icons/icon.svg by
+      //devtools/build/icons and shipped as its own image layer.
+    -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="Mesa" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!--
+      `black`, not `black-translucent`: translucent lets content slide under
+      the clock, and only the bottom inset is accounted for in these layouts.
+    -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     {{HEAD}}
   </head>
   <body>
