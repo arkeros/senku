@@ -12,7 +12,8 @@ user → LB IP (anycast)  ── :443 ──► URL map (HTTPS)        ── ho
 
 - **Per backend**: one `google_compute_backend_service` + one `google_compute_region_network_endpoint_group` **per region** the backend declares. NEGs are emitted as one resource per `(backend_key, region)` pair via Starlark expansion of `BACKENDS` in `defs.bzl`.
 - **Regional fan-out** is first-class: a service root's `LB_BACKEND` constant declares `service_name = "<name>"` and `regions = ["us-central1", "europe-west3", …]` — one Cloud Run service name, many regions — and Google's global LB does the geo-steering.
-- **Per-domain fan-out** = add a `google_certificate_manager_certificate_map_entry` with a matcher clause and a new `host_rule`/`path_matcher` on the HTTPS URL map.
+- **Per-domain fan-out** is derived, not hand-written. A backend's `LB_BACKEND` may name a `host`; anything that doesn't defaults to `DOMAIN`. `HOSTS` is the deduplicated result, and each host gets a managed certificate, a cert-map entry and a `host_rule`/`path_matcher` pair automatically.
+- **Path rules vs. whole hosts**: within a host, a backend declaring `paths` becomes a `path_rule`; a backend declaring none becomes that host's `default_service` — the shape an SPA needs, since it owns every path and renders its own 404. At most one backend per host may omit `paths`, enforced with a `fail()` at load time.
 
 ## Certificate Manager, not classic managed certs
 
@@ -24,6 +25,11 @@ The stack uses `google_certificate_manager_certificate` + certificate map indire
 - Free for the first 100 certs per project; ~$0.20/cert/month beyond that.
 
 Same operational behaviour (auto-renewal, Google-managed private key) for the common case, strictly more capability when the stack grows.
+
+Two things to know when adding a host:
+
+- Issuance is **LB-authorized**, so a certificate stays `PROVISIONING` until that host's `A` record resolves to `lb_ip` and reaches this LB directly. A proxying CDN in front of the record (Cloudflare's orange cloud) terminates TLS itself, the validation never arrives, and the certificate never activates. DNS lives outside this repo — Cloud DNS isn't even enabled on the project.
+- A cert map holds exactly **one `PRIMARY` entry** (the certificate served when SNI matches nothing else). `DOMAIN` claims it; every other host selects by `hostname`. That is the only place the primary domain is special-cased — plus a legacy-name shim so `DOMAIN`'s live certificate keeps the resource address and GCP name it was created under, since renaming either would destroy and recreate a working certificate.
 
 ## 404 default
 
