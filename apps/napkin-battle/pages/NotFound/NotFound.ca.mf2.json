@@ -1,0 +1,5 @@
+{
+  "notFound.heading": "Tovalló en blanc",
+  "notFound.body": "Aquí no hi ha res escrit: {$pathname} no existeix.",
+  "notFound.back": "Tornar a la taula"
+}

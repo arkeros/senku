@@ -15,6 +15,7 @@ TF_ROOTS = [
     struct(target = "//infra/cloud/gcp/audit:terraform", bootstrap = True),
     struct(target = "//infra/cloud/gcp/gar:terraform", bootstrap = False),
     struct(target = "//oci/cmd/registry:terraform", bootstrap = False),
+    struct(target = "//apps/napkin-battle:terraform", bootstrap = False),
     struct(target = "//infra/cloud/gcp/lb:terraform", bootstrap = False),
 ]
 

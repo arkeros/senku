@@ -1,0 +1,8 @@
+{
+  "howToPlay.tiles": "Each player holds their own numbered tiles and may use each one only once. Take turns: pick a number and write it on any empty square.",
+  "howToPlay.scoring": "Whenever two neighbouring squares (up, down, left, right) belong to different players, the higher number takes 1 point. Equal numbers score nothing.",
+  "howToPlay.extremes": "The 7 flattens everything it touches — but in a corner it only fights two neighbours. The 1 is junk… unless you bury it among your own, where it gives nothing away.",
+  "howToPlay.stain": "The coffee stain lands somewhere different every game, and nothing can be written on it. That is the point: without it the board is symmetric and the second player draws every time by copying the first player's moves, turned around. The stain breaks the copy, and it also leaves one square empty at the end — so choosing which gap to leave is part of the game.",
+  "howToPlay.ending": "When the tiles run out, whoever has more points on the bill wins.",
+  "howToPlay.back": "Back to the table"
+}

@@ -1,0 +1,23 @@
+{
+  "play.pen.blue": "Blue pen",
+  "play.pen.red": "Red pen",
+  "play.colour.blue": "blue",
+  "play.colour.red": "red",
+  "play.turn.chooseNumber": "{$pen}'s turn · pick a number",
+  "play.turn.tapCell": "{$pen}'s turn · tap a square",
+  "play.turn.finished": "Game over",
+  "play.bill.heading": "The bill",
+  "play.bill.leading": "The {$colour} pen is ahead",
+  "play.bill.tied": "Level so far",
+  "play.bill.win": "The {$colour} pen wins by {$margin}",
+  "play.bill.draw": "{$points} all · the house is buying",
+  "play.cell.free": "Square {$row}-{$col}, empty",
+  "play.cell.written": "Square {$row}-{$col}: {$value}, {$pen}",
+  "play.tile": "{$pen} tile {$value}",
+  "play.cell.stain": "Coffee stain: nothing can be written here",
+  "play.tile.spent": "{$pen} tile {$value}, already used",
+  "play.action.undo": "Undo",
+  "play.action.new": "New game",
+  "play.mode.classic": "4×4 · tiles 1–7",
+  "play.mode.lightning": "3×3 · lightning"
+}

@@ -1,0 +1,23 @@
+{
+  "play.pen.blue": "Bolígrafo azul",
+  "play.pen.red": "Bolígrafo rojo",
+  "play.colour.blue": "azul",
+  "play.colour.red": "rojo",
+  "play.turn.chooseNumber": "Turno del {$colour} · elige un número",
+  "play.turn.tapCell": "Turno del {$colour} · toca una casilla",
+  "play.turn.finished": "Partida terminada",
+  "play.bill.heading": "La cuenta",
+  "play.bill.leading": "Va por delante el {$colour}",
+  "play.bill.tied": "Empate de momento",
+  "play.bill.win": "Gana el {$colour} por {$margin}",
+  "play.bill.draw": "Empate a {$points} · invita la casa",
+  "play.cell.free": "Casilla {$row}-{$col}, libre",
+  "play.cell.written": "Casilla {$row}-{$col}: {$value} de {$pen}",
+  "play.cell.stain": "Mancha de café: aquí no se puede escribir",
+  "play.tile": "Ficha {$value} de {$pen}",
+  "play.tile.spent": "Ficha {$value} de {$pen}, ya usada",
+  "play.action.undo": "Deshacer",
+  "play.action.new": "Otra partida",
+  "play.mode.classic": "4×4 · fichas 1–7",
+  "play.mode.lightning": "3×3 · relámpago"
+}
