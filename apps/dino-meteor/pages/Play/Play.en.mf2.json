@@ -1,0 +1,12 @@
+{
+  "dino.title": "METEOR DINOS",
+  "dino.tagline": "Phone on the table, one player each side",
+  "dino.howTo": "Drag your dino · 5 eggs to win",
+  "dino.tapToStart": "TAP TO START",
+  "dino.go": "GO!",
+  "dino.playAgain": "Tap to play again",
+  "dino.name.rex": "REX",
+  "dino.name.trike": "TRIKE",
+  "dino.goal": "{$name} SCORES",
+  "dino.win": "{$name} WINS!"
+}

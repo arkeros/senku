@@ -1,0 +1,12 @@
+{
+  "dino.title": "DINO METEORIT",
+  "dino.tagline": "Mòbil a la taula, un a cada costat",
+  "dino.howTo": "Arrossega el teu dino · 5 ous guanyen",
+  "dino.tapToStart": "TOCA PER COMENÇAR",
+  "dino.go": "JA!",
+  "dino.playAgain": "Toca per jugar un altre cop",
+  "dino.name.rex": "REX",
+  "dino.name.trike": "TRICO",
+  "dino.goal": "PUNT DE {$name}",
+  "dino.win": "GUANYA {$name}!"
+}
