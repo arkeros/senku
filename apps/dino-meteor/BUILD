@@ -1,8 +1,8 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@rules_img//img:push.bzl", "image_push")
-load("@terraform.bzl", "output")
 load("@terraform.bzl//:gcp.bzl", "google_provider", "service_account")
+load("@terraform.bzl", "output")
 load("//devtools/bifrost/modules:cloudrun.bzl", "service_cloudrun")
 load("//devtools/build/react_component:react_app.bzl", "react_app", "route")
 load("//devtools/build/react_component:react_static_layer.bzl", "react_static_layer")
@@ -13,6 +13,8 @@ load(
     "GAR_REPOSITORY_PREFIX",
 )
 load("//oci:frontend_image.bzl", "frontend_images_all_arch")
+load("//oci:vex.bzl", "vex_document")
+load("//oci/distroless/common:debian_fixed_vex.bzl", "NGINX_FIXED_VEX_STATEMENTS")
 load("//oci/distroless/common:variables.bzl", "DEBIAN_WONTFIX_CVES")
 load(
     ":defs.bzl",
@@ -73,6 +75,17 @@ react_static_layer(
     app = ":app",
 )
 
+# Inherited from the nginx base: the nginx.org .deb this image serves
+# from is flagged against Debian's own nginx package. See
+# //oci/distroless/common:debian_fixed_vex.bzl.
+vex_document(
+    name = "vex",
+    author = "rafael@arquero.cat",
+    id = "https://github.com/arkeros/senku/blob/main/apps/dino-meteor/BUILD",
+    statements = NGINX_FIXED_VEX_STATEMENTS,
+    timestamp = "2026-08-01T00:00:00Z",
+)
+
 frontend_images_all_arch(
     name = "image",
     ignore_cves = DEBIAN_WONTFIX_CVES,
@@ -80,6 +93,7 @@ frontend_images_all_arch(
         ":app_layer_statics",
         ":app_layer_conf",
     ],
+    vex = [":vex"],
 )
 
 image_push(
