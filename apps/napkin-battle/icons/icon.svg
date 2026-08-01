@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="Batalla de servilleta">
+  <title>Batalla de servilleta</title>
+  <!--
+    Source art for every raster size, rasterized by //devtools/build/icons.
+
+    Two constraints shape it. iOS masks the corners of an apple-touch-icon
+    itself and renders transparency as black, so this is full-bleed and fully
+    opaque with no rounding of its own. And the digits are stroked paths, not
+    `<text>`: resvg would need a font to lay out text, which would make the
+    PNGs depend on whatever fonts the build machine happens to have. Drawing
+    them by hand is also closer to the game, where the numbers are written
+    with a biro.
+
+    The napkin fills the icon rather than sitting on the dark table — at the
+    ~60px iOS actually displays, the table would be a border eating the art.
+  -->
+  <rect width="180" height="180" fill="#F7F3E8"/>
+
+  <!-- Pencil grid. Straight, not wobbly: the jitter the game draws is
+       invisible below ~120px and only muddies the lines. -->
+  <g stroke="#3C4F49" stroke-width="3" stroke-linecap="round" opacity=".85">
+    <path d="M60 22V158M120 22V158M22 60H158M22 120H158"/>
+  </g>
+
+  <!-- A 7 in blue and a 3 in red: two pens, no text needed to say so. -->
+  <g fill="none" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M27 34H53L38 66" stroke="#2440B5" transform="rotate(-6 40 50)"/>
+    <path d="M127 92q17-5 17 6t-12 10q14 0 14 11t-18 8" stroke="#C4362E" transform="rotate(4 137 110)"/>
+  </g>
+
+  <!-- The coffee stain, bottom-left cell. -->
+  <ellipse cx="42" cy="139" rx="21" ry="19" fill="#764A26" opacity=".28"/>
+  <ellipse cx="38" cy="134" rx="9" ry="8" fill="#764A26" opacity=".2"/>
+</svg>

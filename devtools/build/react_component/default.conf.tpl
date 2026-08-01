@@ -7,6 +7,18 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # nginx's bundled mime.types has no entry for .webmanifest, so the file
+    # would go out as application/octet-stream and some browsers decline to
+    # install the app.
+    #
+    # Set with `default_type` on this one path rather than a `types` block: a
+    # `types` block inside `server` *replaces* the inherited mime.types
+    # wholesale, which silently turns every .png and .css into
+    # application/octet-stream.
+    location = /manifest.webmanifest {
+        default_type application/manifest+json;
+    }
+
     # Unhashed JS entry: revalidate via ETag on every request so a
     # deploy that changes bundle contents is picked up immediately.
     # Declared before the broader /{{APP_NAME}}_bundle/ rule so it

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="Mesa para dos">
+  <title>Mesa para dos</title>
+  <!--
+    Source art for every raster size, rasterized by //devtools/build/icons.
+    Opaque and full-bleed, and free of `<text>` — see the note in
+    //apps/napkin-battle/icons/icon.svg for why both matter.
+
+    This is the game's own layout used as a mark: one player's colour above,
+    the other's below, and the order slip between them. It reads as a
+    distinctive three-band shape at icon size, which the game's actual dark
+    green halves would not.
+  -->
+  <rect width="180" height="180" fill="#0E1A17"/>
+
+  <!-- Mustard sits at the top of the phone, chilli at the bottom. -->
+  <rect y="0" width="180" height="72" fill="#F5B72E"/>
+  <rect y="108" width="180" height="72" fill="#FF4D5E"/>
+
+  <!-- The ticket, torn top and bottom. -->
+  <rect y="72" width="180" height="36" fill="#E9DFC7"/>
+  <g fill="#0E1A17">
+    <path d="M0 72h180v4H0z"/>
+    <path d="M0 104h180v4H0z"/>
+  </g>
+
+  <!-- Score boxes: three taken on the chilli side, two still open on the
+       mustard side. A frozen moment mid-match rather than a blank slip. -->
+  <g>
+    <rect x="20" y="85" width="11" height="11" rx="2" fill="#F5B72E"/>
+    <rect x="37" y="85" width="11" height="11" rx="2" fill="#F5B72E"/>
+    <rect x="54" y="85" width="11" height="11" rx="2" fill="none" stroke="#0E1A17" stroke-width="2" opacity=".35"/>
+    <rect x="115" y="85" width="11" height="11" rx="2" fill="#FF4D5E"/>
+    <rect x="132" y="85" width="11" height="11" rx="2" fill="#FF4D5E"/>
+    <rect x="149" y="85" width="11" height="11" rx="2" fill="#FF4D5E"/>
+  </g>
+</svg>

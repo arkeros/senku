@@ -89,6 +89,7 @@ frontend_images_all_arch(
     statics_layer = [
         ":app_layer_statics",
         ":app_layer_conf",
+        "//apps/table-for-two/icons:icons_layer",
     ],
     vex = [":vex"],
 )
