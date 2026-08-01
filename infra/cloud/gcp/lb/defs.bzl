@@ -8,6 +8,7 @@ content, no runtime indirection.
 """
 
 load("@terraform.bzl", "output", "resource")
+load("//apps/dino-meteor:defs.bzl", _DINO_LB_BACKEND = "LB_BACKEND")
 load("//apps/napkin-battle:defs.bzl", _NAPKIN_LB_BACKEND = "LB_BACKEND")
 load("//oci/cmd/registry:defs.bzl", _REGISTRY_LB_BACKEND = "LB_BACKEND")
 
@@ -56,6 +57,7 @@ def _normalize(backend):
     )
 
 BACKENDS = {
+    "dino": _normalize(_DINO_LB_BACKEND),
     "napkin": _normalize(_NAPKIN_LB_BACKEND),
     "registry": _normalize(_REGISTRY_LB_BACKEND),
 }
