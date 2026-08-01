@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="Cluedo vs. Bayes">
+  <title>Cluedo vs. Bayes</title>
+  <!--
+    Source art for every raster size, rasterized by //devtools/build/icons.
+    Opaque, full-bleed, and free of `<text>` — see the note in
+    //apps/napkin-battle/icons/icon.svg for why both matter.
+
+    A posterior distribution drawn as a bar chart on case-file paper: one bar
+    has collapsed to certainty in gold while the rest are still red and
+    uncertain. It is the notepad the game is actually about, and three bars of
+    different heights stay legible at 60px where a magnifying glass would not.
+  -->
+  <rect width="180" height="180" fill="#12100E"/>
+
+  <!-- The file card the chart is drawn on. -->
+  <rect x="16" y="16" width="148" height="148" rx="3" fill="#1B1815"/>
+  <rect x="16" y="16" width="148" height="7" fill="#C24437"/>
+
+  <!-- Baseline. -->
+  <rect x="34" y="140" width="112" height="2" fill="#332C24"/>
+
+  <!-- Four bars: three still in doubt, one resolved. Heights read as a
+       distribution rather than decoration. -->
+  <g>
+    <rect x="36" y="104" width="20" height="36" fill="#8E2F25"/>
+    <rect x="64" y="86" width="20" height="54" fill="#C24437"/>
+    <rect x="92" y="120" width="20" height="20" fill="#8E2F25"/>
+    <!-- The one that has collapsed to certainty. -->
+    <rect x="120" y="44" width="20" height="96" fill="#C9A968"/>
+  </g>
+
+  <!-- A tick above the certain bar: the deduction is closed. -->
+  <path d="M122 34l6 7 11-13" fill="none" stroke="#C9A968" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,5 @@
+{
+  "notFound.heading": "Expediente inexistente",
+  "notFound.body": "Este caso no consta en el archivo.",
+  "notFound.back": "Volver al caso"
+}
