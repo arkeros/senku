@@ -16,6 +16,7 @@ bzl_library(
     srcs = ["defs.bzl"],
     visibility = ["//visibility:public"],
     deps = [
+        "//apps/napkin-battle:defs",
         "//oci/cmd/registry:defs",
         "@terraform.bzl//:terraform",
     ],

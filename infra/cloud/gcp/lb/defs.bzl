@@ -8,6 +8,7 @@ content, no runtime indirection.
 """
 
 load("@terraform.bzl", "output", "resource")
+load("//apps/napkin-battle:defs.bzl", _NAPKIN_LB_BACKEND = "LB_BACKEND")
 load("//oci/cmd/registry:defs.bzl", _REGISTRY_LB_BACKEND = "LB_BACKEND")
 
 PROJECT = "senku-prod"
@@ -17,9 +18,12 @@ PROJECT = "senku-prod"
 # service so the LB is identifiable on its own.
 NAME = "senku"
 
-# Fully-qualified domain served by this LB. Create an A record pointing at
-# the `lb_ip` output so the managed cert's LB-authorized issuance can
-# complete.
+# Primary domain. It answers the cert map's PRIMARY entry — the certificate
+# served when SNI matches no other entry — and is the default host for
+# backends that don't name one. Additional hosts come from the backends
+# themselves (see `_normalize`), each getting its own certificate and path
+# matcher. Create an A record pointing at the `lb_ip` output for every host
+# so the managed certs' LB-authorized issuance can complete.
 DOMAIN = "distroless.io"
 
 # Multi-region location for the empty bucket that serves the URL map's 404
@@ -31,20 +35,49 @@ BUCKET_LOCATION = "EU"
 # add an entry here and an `LB_BACKEND` constant in their root.
 
 def _normalize(backend):
-    """Sort the regions list so contributors don't have to.
+    """Fill in the defaults contributors shouldn't have to think about.
 
-    `google_compute_backend_service.backend[]` is order-significant in
-    Terraform state, so an unsorted regions list at the source would
-    silently churn the LB plan whenever a new region is appended. Sorting
-    here makes the invariant the LB's responsibility — services can
-    declare regions in any order (geographic, deploy-date, etc.) without
-    knowing it matters downstream.
+    Regions get sorted because `google_compute_backend_service.backend[]`
+    is order-significant in Terraform state, so an unsorted regions list at
+    the source would silently churn the LB plan whenever a new region is
+    appended. Sorting here makes the invariant the LB's responsibility —
+    services can declare regions in any order (geographic, deploy-date,
+    etc.) without knowing it matters downstream.
+
+    `host` defaults to `DOMAIN`. Backends can't load it from here (this
+    module already loads *them*, so importing back would be a cycle), which
+    is why the default lives on this side: a service names a host only when
+    it wants one of its own.
     """
-    return dict(backend, regions = sorted(backend["regions"]))
+    return dict(
+        backend,
+        host = backend.get("host", DOMAIN),
+        regions = sorted(backend["regions"]),
+    )
 
 BACKENDS = {
+    "napkin": _normalize(_NAPKIN_LB_BACKEND),
     "registry": _normalize(_REGISTRY_LB_BACKEND),
 }
+
+def _host_slug(host):
+    """Hostname → a name fragment valid in GCP resource names."""
+    return host.replace(".", "-")
+
+def _host_tf_name(host):
+    """Hostname → a Terraform resource identifier."""
+    return host.replace(".", "_").replace("-", "_")
+
+def _backends_on(host):
+    return {k: b for k, b in BACKENDS.items() if b["host"] == host}
+
+# Every host this LB serves, `DOMAIN` first. Dict-keys rather than a set so
+# the order is deterministic across Starlark evaluations.
+HOSTS = [DOMAIN] + sorted([
+    h
+    for h in {b["host"]: None for b in BACKENDS.values()}
+    if h != DOMAIN
+])
 
 # Flattened {slug → entry} for one NEG per (backend, region). The slug is a
 # valid Terraform identifier (no hyphens) so each NEG gets a non-bracketed
@@ -171,6 +204,43 @@ _BACKEND_SERVICES = {
 }
 
 # --- URL map (HTTPS) ---------------------------------------------------------
+# One path matcher per host. Within a host, a backend that declares `paths`
+# becomes a path rule; a backend that declares none owns the host's
+# `default_service` — which is what an SPA needs, since it serves its own
+# 404 page on any unrecognised path and can't be hung off a path prefix
+# without teaching it a base path.
+
+def _path_matcher(name, host):
+    on_host = _backends_on(host)
+    owners = sorted([k for k, b in on_host.items() if not b.get("paths")])
+    if len(owners) > 1:
+        fail(
+            ("host %r has %d backends claiming its whole path space (%s); " +
+             "at most one may omit `paths`") % (host, len(owners), ", ".join(owners)),
+        )
+
+    matcher = {
+        "name": name,
+        # No owner → unmatched paths on this host fall to the 404 bucket.
+        "default_service": (
+            _BACKEND_SERVICES[owners[0]].id if owners else _DEFAULT_404_BACKEND_BUCKET.id
+        ),
+    }
+    rules = [
+        {
+            "paths": b["paths"],
+            "service": _BACKEND_SERVICES[k].id,
+        }
+        for k, b in sorted(on_host.items())
+        if b.get("paths")
+    ]
+    if rules:
+        matcher["path_rule"] = rules
+    return matcher
+
+def _matcher_name(host):
+    return "routes-" + _host_slug(host)
+
 _URL_MAP_HTTPS = resource(
     rtype = "google_compute_url_map",
     name = "https",
@@ -178,21 +248,17 @@ _URL_MAP_HTTPS = resource(
         "project": PROJECT,
         "name": "{}-lb".format(NAME),
         "default_service": _DEFAULT_404_BACKEND_BUCKET.id,
-        "host_rule": [{
-            "hosts": [DOMAIN],
-            "path_matcher": "routes",
-        }],
-        "path_matcher": [{
-            "name": "routes",
-            "default_service": _DEFAULT_404_BACKEND_BUCKET.id,
-            "path_rule": [
-                {
-                    "paths": backend["paths"],
-                    "service": _BACKEND_SERVICES[backend_key].id,
-                }
-                for backend_key, backend in BACKENDS.items()
-            ],
-        }],
+        "host_rule": [
+            {
+                "hosts": [host],
+                "path_matcher": _matcher_name(host),
+            }
+            for host in HOSTS
+        ],
+        "path_matcher": [
+            _path_matcher(_matcher_name(host), host)
+            for host in HOSTS
+        ],
     },
     attrs = ["id", "name", "self_link"],
 )
@@ -219,18 +285,6 @@ _URL_MAP_HTTP_REDIRECT = resource(
 # cert be shared across multiple LBs via cert maps. Free for the first 100
 # certs per project.
 
-_CERT = resource(
-    rtype = "google_certificate_manager_certificate",
-    name = "this",
-    body = {
-        "project": PROJECT,
-        "name": "{}-lb-cert".format(NAME),
-        "scope": "DEFAULT",
-        "managed": [{"domains": [DOMAIN]}],
-    },
-    attrs = ["id", "name"],
-)
-
 _CERT_MAP = resource(
     rtype = "google_certificate_manager_certificate_map",
     name = "this",
@@ -241,18 +295,63 @@ _CERT_MAP = resource(
     attrs = ["id", "name"],
 )
 
-_CERT_MAP_ENTRY = resource(
-    rtype = "google_certificate_manager_certificate_map_entry",
-    name = "primary",
-    body = {
-        "project": PROJECT,
-        "name": "{}-lb-cert-default".format(NAME),
-        "map": _CERT_MAP.name,
-        "certificates": [_CERT.id],
-        "matcher": "PRIMARY",
-    },
-    attrs = ["id", "name"],
-)
+# `DOMAIN`'s certificate predates multi-host support and is live, so it keeps
+# the resource address and GCP name it was created under. Renaming either
+# would destroy and recreate a working certificate, and the replacement is
+# unusable until Google finishes issuing it. Every other host is named after
+# itself. This is the only place the primary host is a special case.
+def _cert_tf_name(host):
+    return "this" if host == DOMAIN else _host_tf_name(host)
+
+def _cert_gcp_name(host):
+    if host == DOMAIN:
+        return "{}-lb-cert".format(NAME)
+    return "{}-lb-cert-{}".format(NAME, _host_slug(host))
+
+# One managed certificate per host.
+#
+# Issuance is LB-authorized, so a certificate stays PROVISIONING until its
+# host's A record resolves to `lb_ip` and reaches this LB directly. A proxying
+# CDN in front of the record (Cloudflare's orange cloud, say) terminates TLS
+# itself, so the validation request never lands here and the certificate sits
+# PROVISIONING indefinitely.
+_CERTS = {
+    host: resource(
+        rtype = "google_certificate_manager_certificate",
+        name = _cert_tf_name(host),
+        body = {
+            "project": PROJECT,
+            "name": _cert_gcp_name(host),
+            "scope": "DEFAULT",
+            "managed": [{"domains": [host]}],
+        },
+        attrs = ["id", "name"],
+    )
+    for host in HOSTS
+}
+
+# A map holds exactly one PRIMARY entry — the certificate served when SNI
+# matches nothing else — so `DOMAIN` claims it and every other host selects by
+# `hostname`. That asymmetry is the Certificate Manager API's, not ours.
+_CERT_MAP_ENTRIES = [
+    resource(
+        rtype = "google_certificate_manager_certificate_map_entry",
+        name = "primary" if host == DOMAIN else _host_tf_name(host),
+        body = dict(
+            {
+                "project": PROJECT,
+                "name": (
+                    "{}-lb-cert-default".format(NAME) if host == DOMAIN else _cert_gcp_name(host)
+                ),
+                "map": _CERT_MAP.name,
+                "certificates": [_CERTS[host].id],
+            },
+            **({"matcher": "PRIMARY"} if host == DOMAIN else {"hostname": host})
+        ),
+        attrs = ["id", "name"],
+    )
+    for host in HOSTS
+]
 
 # --- Frontend: HTTPS (443) ---------------------------------------------------
 _TARGET_HTTPS_PROXY = resource(
@@ -346,12 +445,12 @@ LB_DOCS = (
     [_DEFAULT_404_BUCKET, _DEFAULT_404_BUCKET_PUBLIC, _DEFAULT_404_BACKEND_BUCKET] +
     list(_NEGS.values()) +
     list(_BACKEND_SERVICES.values()) +
+    [_CERTS[host] for host in HOSTS] +
+    _CERT_MAP_ENTRIES +
     [
         _URL_MAP_HTTPS,
         _URL_MAP_HTTP_REDIRECT,
-        _CERT,
         _CERT_MAP,
-        _CERT_MAP_ENTRY,
         _TARGET_HTTPS_PROXY,
         _GLOBAL_ADDRESS,
         _FORWARDING_RULE_HTTPS,
