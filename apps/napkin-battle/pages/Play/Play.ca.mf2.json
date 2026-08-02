@@ -1,0 +1,23 @@
+{
+  "play.pen.blue": "Bolígraf blau",
+  "play.pen.red": "Bolígraf vermell",
+  "play.colour.blue": "blau",
+  "play.colour.red": "vermell",
+  "play.turn.chooseNumber": "Torn del {$colour} · tria un número",
+  "play.turn.tapCell": "Torn del {$colour} · toca una casella",
+  "play.turn.finished": "Partida acabada",
+  "play.bill.heading": "El compte",
+  "play.bill.leading": "Va al davant el {$colour}",
+  "play.bill.tied": "Empat de moment",
+  "play.bill.win": "Guanya el {$colour} per {$margin}",
+  "play.bill.draw": "Empat a {$points} · convida la casa",
+  "play.cell.free": "Casella {$row}-{$col}, lliure",
+  "play.cell.written": "Casella {$row}-{$col}: {$value} del {$pen}",
+  "play.cell.stain": "Taca de cafè: aquí no s'hi pot escriure",
+  "play.tile": "Fitxa {$value} del {$pen}",
+  "play.tile.spent": "Fitxa {$value} del {$pen}, ja gastada",
+  "play.action.undo": "Desfés",
+  "play.action.new": "Una altra partida",
+  "play.mode.classic": "4×4 · fitxes 1–7",
+  "play.mode.lightning": "3×3 · llamp"
+}

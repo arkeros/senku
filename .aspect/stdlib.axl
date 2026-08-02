@@ -15,6 +15,10 @@ TF_ROOTS = [
     struct(target = "//infra/cloud/gcp/audit:terraform", bootstrap = True),
     struct(target = "//infra/cloud/gcp/gar:terraform", bootstrap = False),
     struct(target = "//oci/cmd/registry:terraform", bootstrap = False),
+    struct(target = "//apps/napkin-battle:terraform", bootstrap = False),
+    struct(target = "//apps/dino-meteor:terraform", bootstrap = False),
+    struct(target = "//apps/table-for-two:terraform", bootstrap = False),
+    struct(target = "//apps/cluedo-bayes:terraform", bootstrap = False),
     struct(target = "//infra/cloud/gcp/lb:terraform", bootstrap = False),
 ]
 
@@ -62,8 +66,8 @@ def select_targets(ctx, requested) -> list:
     return [r.target for r in TF_ROOTS]
 
 def build_runnable(ctx, target, build_flags = []):
-    """Build `target` and resolve its runtime entrypoint via BES, so the
-    binary can be spawned directly (with the runfiles env wired up by
+    """Build `target` and resolve its runtime entrypoint, so the binary
+    can be spawned directly (with the runfiles env wired up by
     `runnable`) instead of round-tripping through `bazel run`.
 
     Returns `(entrypoint, runnable)` on success, or `(None, None)` on
@@ -95,18 +99,19 @@ def build_runnable(ctx, target, build_flags = []):
     flags.extend(build_flags)
 
     out.write("==> bazel build {}\n".format(target))
-    build = ctx.bazel.build(target, build_events = True, flags = flags)
-    r = runnable(ctx, [target])
-    for event in build.build_events():
-        if event.kind == "progress":
-            out.write(event.payload.stdout)
-            err.write(event.payload.stderr)
-        else:
-            r.event(event)
-
-    if not build.wait().success:
+    # No `build_events = True`: the returned Build no longer exposes the
+    # BEP stream (see runnable.axl), and asking for events nothing reads
+    # just leaves the build blocked. Bazel inherits our stdio, so its
+    # progress reaches the terminal directly instead of being relayed
+    # through `progress` events.
+    if not ctx.bazel.build(target, flags = flags).wait().success:
         err.write("ERROR: build failed for {}\n".format(target))
         return None, None
+
+    # Only the caller's flags go to the entrypoint lookup: `--isatty` and
+    # `--remote_download_outputs` shape this invocation, not the output
+    # tree, so cquery doesn't need (or necessarily accept) them.
+    r = runnable(ctx, build_flags)
 
     entrypoint = r.determine_entrypoint(target)
     if entrypoint == None:

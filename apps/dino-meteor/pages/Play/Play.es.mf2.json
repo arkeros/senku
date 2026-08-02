@@ -1,0 +1,12 @@
+{
+  "dino.title": "DINO METEORO",
+  "dino.tagline": "Móvil en la mesa, uno a cada lado",
+  "dino.howTo": "Arrastra tu dino · 5 huevos ganan",
+  "dino.tapToStart": "TOCA PARA EMPEZAR",
+  "dino.go": "¡YA!",
+  "dino.playAgain": "Toca para jugar otra vez",
+  "dino.name.rex": "REX",
+  "dino.name.trike": "TRICO",
+  "dino.goal": "PUNTO DE {$name}",
+  "dino.win": "¡GANA {$name}!"
+}
