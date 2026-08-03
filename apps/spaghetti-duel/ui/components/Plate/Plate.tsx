@@ -77,7 +77,9 @@ export function Plate({ labels }: PlateProps) {
   // The loop reads labels through a ref so a locale change never restarts the
   // game — the effect below is deliberately mounted once.
   const labelsRef = useRef(labels);
-  labelsRef.current = labels;
+  useEffect(() => {
+    labelsRef.current = labels;
+  }, [labels]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
