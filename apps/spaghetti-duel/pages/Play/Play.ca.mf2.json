@@ -1,0 +1,18 @@
+{
+  "pasta.title": "DUEL D'ESPAGUETI",
+  "pasta.tagline": "Mòbil a la taula · mandonguilles per créixer",
+  "pasta.solo": "SOL",
+  "pasta.duel": "DUEL",
+  "pasta.soloHint": "Un fil, el teu rècord",
+  "pasta.duelHint": "Dos fils, un a cada costat",
+  "pasta.go": "JA!",
+  "pasta.score": "PUNTS",
+  "pasta.best": "RÈCORD",
+  "pasta.gameOver": "T'HAS EMBOLICAT",
+  "pasta.playAgain": "Toca per tornar al menú",
+  "pasta.draw": "EMPAT",
+  "pasta.name.pesto": "PESTO",
+  "pasta.name.carbonara": "CARBONARA",
+  "pasta.round": "RONDA DE {$name}",
+  "pasta.win": "GUANYA {$name}!"
+}
