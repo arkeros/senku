@@ -19,6 +19,10 @@ TF_ROOTS = [
     struct(target = "//apps/dino-meteor:terraform", bootstrap = False),
     struct(target = "//apps/table-for-two:terraform", bootstrap = False),
     struct(target = "//apps/cluedo-bayes:terraform", bootstrap = False),
+    struct(target = "//apps/spaghetti-duel:terraform", bootstrap = False),
+    # Last: its serverless NEGs name Cloud Run services by string, and a NEG
+    # whose service does not exist yet resolves to a 404 rather than an error.
+    # Every app root above must have run first.
     struct(target = "//infra/cloud/gcp/lb:terraform", bootstrap = False),
 ]
 
