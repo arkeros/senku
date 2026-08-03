@@ -19,6 +19,7 @@ import {
   type Mode,
   type Seat,
 } from "../../../game/rules";
+import { keyAction } from "../../../game/keys";
 import { seatAt, swipeDir } from "../../../game/swipe";
 import { PALETTE, sauceFor } from "../../../render/palette";
 import {
@@ -44,22 +45,6 @@ const styles = stylex.create({
 
 /** Solo high score. Namespaced because the origin serves only this app today. */
 const BEST_KEY = "spaghetti-duel.best";
-
-/** Desktop keys, so the game can be driven without two thumbs on glass. */
-const KEYS: Readonly<Record<string, { seat: Seat; dir: Dir }>> = {
-  ArrowUp: { seat: "bottom", dir: "up" },
-  ArrowDown: { seat: "bottom", dir: "down" },
-  ArrowLeft: { seat: "bottom", dir: "left" },
-  ArrowRight: { seat: "bottom", dir: "right" },
-  w: { seat: "bottom", dir: "up" },
-  s: { seat: "bottom", dir: "down" },
-  a: { seat: "bottom", dir: "left" },
-  d: { seat: "bottom", dir: "right" },
-  i: { seat: "top", dir: "up" },
-  k: { seat: "top", dir: "down" },
-  j: { seat: "top", dir: "left" },
-  l: { seat: "top", dir: "right" },
-};
 
 const between = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -265,17 +250,18 @@ export function Plate({ labels }: PlateProps) {
     const onMouseUp = (e: MouseEvent) => up("mouse", e.clientX, e.clientY);
 
     const onKeyDown = (e: KeyboardEvent) => {
-      const key = KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
-      if (key) {
-        e.preventDefault();
-        steer(key.seat, key.dir);
+      const action = keyAction(e.key);
+      if (!action) return;
+      e.preventDefault();
+      if (action.kind === "steer") {
+        steer(action.seat, action.dir);
         return;
       }
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        const buttons = modeButtons(w, h);
-        tap(buttons.solo.x + buttons.solo.w / 2, buttons.solo.y + buttons.solo.h / 2);
-      }
+      // Press the drawn button rather than call `begin` directly, so a key and
+      // a thumb go through one set of rules: only the title card starts a
+      // game, and the game-over card reads any press as "back to the title".
+      const button = modeButtons(w, h)[action.mode];
+      tap(button.x + button.w / 2, button.y + button.h / 2);
     };
 
     // ---- frame -----------------------------------------------------------

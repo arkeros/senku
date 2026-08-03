@@ -35,3 +35,21 @@ js_test(
     data = [":swipe_ts"],
     entry_point = "swipe_test.mjs",
 )
+
+# What a key press means, kept beside `swipe` for the same reason: it is
+# about the hands rather than the plate. Out of the component because the
+# keyboard is the one input a test can state exhaustively — every seat can
+# steer, and every mode can be started.
+react_component(
+    name = "keys",
+    srcs = ["keys.ts"],
+    _export_test = False,
+    visibility = ["//apps/spaghetti-duel:__subpackages__"],
+    deps = [":rules"],
+)
+
+js_test(
+    name = "keys_test",
+    data = [":keys_ts"],
+    entry_point = "keys_test.mjs",
+)
