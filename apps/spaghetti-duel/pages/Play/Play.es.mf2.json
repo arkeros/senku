@@ -1,0 +1,18 @@
+{
+  "pasta.title": "DUELO DE ESPAGUETI",
+  "pasta.tagline": "Móvil en la mesa · albóndigas para crecer",
+  "pasta.solo": "SOLO",
+  "pasta.duel": "DUELO",
+  "pasta.soloHint": "Una hebra, tu récord",
+  "pasta.duelHint": "Dos hebras, uno a cada lado",
+  "pasta.go": "¡YA!",
+  "pasta.score": "PUNTOS",
+  "pasta.best": "RÉCORD",
+  "pasta.gameOver": "TE ENREDASTE",
+  "pasta.playAgain": "Toca para volver al menú",
+  "pasta.draw": "EMPATE",
+  "pasta.name.pesto": "PESTO",
+  "pasta.name.carbonara": "CARBONARA",
+  "pasta.round": "RONDA DE {$name}",
+  "pasta.win": "¡GANA {$name}!"
+}

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="Duelo de Espagueti">
+  <title>Duelo de Espagueti</title>
+  <!--
+    Source art for every raster icon in this directory. Opaque and full-bleed:
+    iOS masks the corners itself and turns transparency black.
+
+    A twirl seen from above, not two strands duelling. At 60px a duel is two
+    indistinguishable squiggles, whereas one coil of spaghetti with a
+    meatball on it is legible at any size and says what the app is.
+  -->
+  <defs>
+    <radialGradient id="cloth" cx="50%" cy="36%" r="74%">
+      <stop offset="0" stop-color="#241D18"/>
+      <stop offset="1" stop-color="#14100D"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="180" height="180" fill="url(#cloth)"/>
+
+  <!-- The plate. -->
+  <circle cx="90" cy="90" r="70" fill="#1F1916"/>
+  <circle cx="90" cy="90" r="70" fill="none" stroke="#F4EEE2" stroke-opacity=".13" stroke-width="2"/>
+
+  <!--
+    One spiral, stroked three times: a dark under-noodle, the sauce, then a
+    thin highlight — the same three passes the canvas renderer makes.
+  -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M42 90A46 46 0 0 1 134 90A42 42 0 0 1 50 90A38 38 0 0 1 126 90A34 34 0 0 1 58 90A30 30 0 0 1 118 90A26 26 0 0 1 66 90A22 22 0 0 1 110 90"
+          stroke="#2B6E28" stroke-width="13"/>
+    <path d="M42 90A46 46 0 0 1 134 90A42 42 0 0 1 50 90A38 38 0 0 1 126 90A34 34 0 0 1 58 90A30 30 0 0 1 118 90A26 26 0 0 1 66 90A22 22 0 0 1 110 90"
+          stroke="#6FCF57" stroke-width="9"/>
+    <path d="M42 90A46 46 0 0 1 134 90A42 42 0 0 1 50 90A38 38 0 0 1 126 90A34 34 0 0 1 58 90A30 30 0 0 1 118 90A26 26 0 0 1 66 90A22 22 0 0 1 110 90"
+          stroke="#CBF5BB" stroke-opacity=".45" stroke-width="2.4"/>
+  </g>
+
+  <!-- The meatball, sitting in the middle of the coil. -->
+  <circle cx="88" cy="90" r="17" fill="#B0552C" stroke="#66301A" stroke-width="4"/>
+  <circle cx="82" cy="84" r="4.6" fill="#E8946A"/>
+</svg>

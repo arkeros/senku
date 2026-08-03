@@ -1,0 +1,18 @@
+{
+  "pasta.title": "SPAGHETTI DUEL",
+  "pasta.tagline": "Phone on the table · meatballs to grow",
+  "pasta.solo": "SOLO",
+  "pasta.duel": "DUEL",
+  "pasta.soloHint": "One strand, your own best",
+  "pasta.duelHint": "Two strands, one player each side",
+  "pasta.go": "GO!",
+  "pasta.score": "SCORE",
+  "pasta.best": "BEST",
+  "pasta.gameOver": "ALL TANGLED UP",
+  "pasta.playAgain": "Tap for the menu",
+  "pasta.draw": "DRAW",
+  "pasta.name.pesto": "PESTO",
+  "pasta.name.carbonara": "CARBONARA",
+  "pasta.round": "{$name} TAKES IT",
+  "pasta.win": "{$name} WINS!"
+}
