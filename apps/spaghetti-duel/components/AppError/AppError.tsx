@@ -1,4 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
+import { useEffect } from "react";
 import { useRouteError } from "react-router";
 import { Trans } from "@panellet/i18n-runtime";
 import { color, font } from "../../ui/theme/tokens.stylex";
@@ -28,21 +29,27 @@ const styles = stylex.create({
     fontSize: 12,
     lineHeight: 1.5,
     opacity: 0.75,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
   },
 });
 
 export function AppError() {
   const error = useRouteError();
+
+  // The page says nothing about what broke: a route error can carry internal
+  // details, and this plate is public. Diagnostics go to the console, which is
+  // the only reporting channel this app has.
+  useEffect(() => {
+    console.error("spaghetti-duel route error", error);
+  }, [error]);
+
   return (
     <div {...stylex.props(styles.wrap)}>
       <h1 {...stylex.props(styles.heading)}>
         <Trans id="appError.heading" />
       </h1>
-      <pre {...stylex.props(styles.detail)}>
-        {error instanceof Error ? error.message : String(error)}
-      </pre>
+      <p {...stylex.props(styles.detail)}>
+        <Trans id="appError.body" />
+      </p>
     </div>
   );
 }
