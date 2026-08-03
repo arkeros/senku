@@ -365,7 +365,7 @@ function drawHud(
   const y = h - band / 2;
 
   if (world.mode === "solo") {
-    const size = Math.min(band * 0.5, 30);
+    const size = Math.max(12, Math.min(band * 0.5, 30));
     text(ctx, String(world.match.eaten), w / 2, y - size * 0.24, size, DISPLAY_FONT, C.bone);
     text(
       ctx,
