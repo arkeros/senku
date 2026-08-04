@@ -61,21 +61,26 @@ state. Exits non-zero if the graph has a cycle, naming the nodes involved.
 
 ## The deploy DAG
 
-There is no list. Both tasks discover the graph by querying the build graph
-for tags each node publishes about itself, then topologically sort it:
+There is no list. Both tasks discover the graph with one `bazel query` and
+topologically sort it. A node is a target of a node rule, and everything
+needed to walk it is an attribute of that target:
 
-| Tag | Meaning |
+| | Meaning |
 | --- | --- |
-| `tf-root` | Is a Terraform root. Marks every one, deployable or not. |
-| `tf-deploy` | Is a node in the graph. Present unless `deploy = False`. |
-| `tf-kind=root\|task` | A root runs via `.apply`; a task is simply run. |
-| `tf-bootstrap` | Skipped under `$CI`; applied locally only. |
-| `tf-after=<label>` | One per edge. That node must finish first. |
+| `tf_root_node` | A deployable Terraform root. Run via its `.apply`. |
+| `tf_deploy_task` | Any other node. Run the target itself. |
+| `bootstrap` | Skipped under `$CI`; applied locally only. |
+| `deploy_after` | Nodes that must finish first. |
+
+Membership is the rule class: `deploy = False` emits a plain `filegroup`, so
+it is not a node at all. Edges are checked by Bazel — `deploy_after` requires
+`TfDeployInfo`, so a bad label fails the *build*, citing the BUILD line.
 
 ```bash
-aspect dag                                        # the order, without running it
-CI=1 aspect dag                                   # what CI would walk
-bazel query 'attr(tags, "tf-after=//x:y", //...)' # what waits on //x:y
+aspect dag                                          # the order, without running it
+CI=1 aspect dag                                     # what CI would walk
+bazel query 'attr(deploy_after, "//x:y", //...)'    # what waits on //x:y
+bazel query 'kind("tf_root_node|tf_deploy_task", //...)'  # every node
 ```
 
 Nodes are **operations, not roots** — a container-image push is a node in its
@@ -101,9 +106,9 @@ only applies when `$CI` is set.
 
 ## Adding a root
 
-Nothing. A new `tf_root` is in the graph by default, and `registry_push` +
-`tf_root_with_image` already wire an app's push behind the registry and its
-Terraform behind its push. Run `aspect dag` to see where it landed.
+Nothing. A new `tf_root` is in the graph by default, `registry_push` puts its
+push behind the registry, and naming the digest with `image_uri()` puts the
+root behind its push. Run `aspect dag` to see where it landed.
 
 You only declare something when the default is wrong:
 
@@ -111,10 +116,10 @@ You only declare something when the default is wrong:
   bucket that cannot resolve, so a hand-run apply dies in `terraform init`
   rather than relying on the orchestrator to exclude it.
 - **It provisions CI's own credentials** → `bootstrap = True`.
-- **Its GCP resources must exist before another node's** → add a
-  `deploy_after` edge on that other node. Derive it from data the node
-  already holds where you can; a hand-maintained edge is the kind of thing
-  that goes stale.
+- **Its GCP resources must exist before another node's** → have the other
+  node `ref()` the value it needs. The reference is the edge, so nothing is
+  declared twice. Fall back to a hand-written `deploy_after` only for a
+  dependency no value passes through.
 
 Note the last one is about *resources*, not `load()`: importing a constant
 from another root is a build dependency, not a deploy one. See

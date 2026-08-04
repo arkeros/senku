@@ -5,6 +5,8 @@ Same shape as `//apps/napkin-battle:defs.bzl` — the LB root reads
 `terraform_remote_state` data source.
 """
 
+load("@terraform.bzl", "ref")
+
 PROJECT = "senku-prod"
 
 # Matches napkin-battle. The CDN edge that actually talks to this origin sits
@@ -18,11 +20,10 @@ SERVICE_NAME = "dino-meteor"
 # Its own host with no `paths`: an SPA that owns every path under the
 # hostname. See //infra/cloud/gcp/lb for how this is consumed.
 LB_BACKEND = {
-    "service_name": SERVICE_NAME,
-    # The root that creates the Cloud Run service named above. The LB
-    # turns this into a deploy edge, so a backend is always running
-    # before anything routes to it.
-    "root": "//apps/dino-meteor:terraform",
+    # The service this root creates, named by reference so the LB's deploy
+    # edge and the value it routes to are the same token — they cannot come
+    # to disagree. Published by this package's `tf_root` as an export.
+    "service_name": ref("//apps/dino-meteor:terraform", "service_name"),
     "regions": [REGION],
     "host": "dino.arquero.dev",
 }
