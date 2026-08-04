@@ -1,16 +1,16 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@terraform.bzl//:gcp.bzl", "google_provider")
 load("@terraform.bzl", "tf_root")
-load(":defs.bzl", "DEPLOY_AFTER", "LB_DOCS", "PROJECT")
+load(":defs.bzl", "LB_DOCS", "PROJECT")
 
 tf_root(
     name = "terraform",
     backend_bucket = "senku-prod-terraform-state",
-    # Every backend this routes to must already be running: a serverless NEG
-    # names its Cloud Run service by string, and a NEG whose service does not
-    # exist serves a bare 404 rather than failing, so a wrong order here is
-    # silent. Derived from BACKENDS — see DEPLOY_AFTER in defs.bzl.
-    deploy_after = DEPLOY_AFTER,
+    # No `deploy_after`. Every backend this routes to must already be running
+    # — a serverless NEG names its Cloud Run service by string, and a NEG
+    # whose service does not exist serves a bare 404 rather than failing — and
+    # those names are `ref()`s, so the edges come from the references
+    # themselves. `aspect dag` shows the result.
     docs = [google_provider(project = PROJECT)] + LB_DOCS,
     providers = ["@terraform_providers//:google"],
     visibility = ["//visibility:public"],

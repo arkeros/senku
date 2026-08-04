@@ -57,13 +57,6 @@ def _normalize(backend):
         backend,
         host = backend.get("host", DOMAIN),
         regions = sorted(backend["regions"]),
-        # No `.get`: a backend must name the root that creates its Cloud Run
-        # service, because that is what `DEPLOY_AFTER` turns into a deploy
-        # edge. A serverless NEG naming a service that does not exist serves a
-        # bare 404 rather than failing, so the one thing we cannot afford is
-        # for this to be optional — a missing key is a Starlark error at build
-        # time instead.
-        root = backend["root"],
     )
 
 BACKENDS = {
@@ -75,14 +68,11 @@ BACKENDS = {
     "table": _normalize(_TABLE_LB_BACKEND),
 }
 
-# Deploy edges, derived rather than declared: every backend's root must have
-# applied before this one, because a serverless NEG names its Cloud Run service
-# by string and a NEG whose service is missing serves a bare 404 instead of
-# failing. Nobody maintains this list — a backend that routes here necessarily
-# appears in `BACKENDS`, and `_normalize` rejects one that omits its root.
-#
-# Sorted for a deterministic tag order across Starlark evaluations.
-DEPLOY_AFTER = sorted([b["root"] for b in BACKENDS.values()])
+# No deploy-edge list here. Each backend's `service_name` is a `ref()` at the
+# contributing root's `defs.bzl`, so `tf_root` reads the edges out of the
+# serverless NEGs those names end up in. The value routed to and the root
+# waited on are one token; there is no second list that could disagree with
+# the first, and nothing to update when a backend is added.
 
 def _host_slug(host):
     """Hostname → a name fragment valid in GCP resource names."""

@@ -1,5 +1,7 @@
 """Identity constants for the cluedo-bayes deploy."""
 
+load("@terraform.bzl", "ref")
+
 PROJECT = "senku-prod"
 
 # Matches the other games; see //apps/dino-meteor:defs.bzl for why the origin
@@ -9,11 +11,10 @@ REGION = "europe-west1"
 SERVICE_NAME = "cluedo-bayes"
 
 LB_BACKEND = {
-    "service_name": SERVICE_NAME,
-    # The root that creates the Cloud Run service named above. The LB
-    # turns this into a deploy edge, so a backend is always running
-    # before anything routes to it.
-    "root": "//apps/cluedo-bayes:terraform",
+    # The service this root creates, named by reference so the LB's deploy
+    # edge and the value it routes to are the same token — they cannot come
+    # to disagree. Published by this package's `tf_root` as an export.
+    "service_name": ref("//apps/cluedo-bayes:terraform", "service_name"),
     "regions": [REGION],
     "host": "cluedo.arquero.dev",
 }

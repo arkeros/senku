@@ -6,6 +6,8 @@ Starlark evaluation time instead of through a `terraform_remote_state`
 data source.
 """
 
+load("@terraform.bzl", "ref")
+
 PROJECT = "senku-prod"
 
 # One region. This is a static napkin behind a CDN-enabled LB — regional
@@ -24,11 +26,10 @@ SERVICE_NAME = "napkin-battle"
 # own 404 for unknown paths, so it can't be hung off a path prefix under the
 # primary domain without teaching react_app a base path.
 LB_BACKEND = {
-    "service_name": SERVICE_NAME,
-    # The root that creates the Cloud Run service named above. The LB
-    # turns this into a deploy edge, so a backend is always running
-    # before anything routes to it.
-    "root": "//apps/napkin-battle:terraform",
+    # The service this root creates, named by reference so the LB's deploy
+    # edge and the value it routes to are the same token — they cannot come
+    # to disagree. Published by this package's `tf_root` as an export.
+    "service_name": ref("//apps/napkin-battle:terraform", "service_name"),
     "regions": [REGION],
     "host": "napkin.arquero.dev",
 }

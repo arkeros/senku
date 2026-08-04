@@ -50,7 +50,7 @@ aspect apply //apps/napkin-battle:terraform # pushes to GAR, then applies
 
 The image is nginx serving `/var/www/html` from two layers (webroot and
 nginx conf, split so a cache-header change doesn't invalidate the bundle).
-`tf_root_with_image` substitutes the pushed digest into `main.tf.json` at
+`image_uri()` resolves to the pushed digest in `main.tf.json` at
 build time, so the Cloud Run service is always digest-pinned — there is no
 `var.image` round-trip and no floating tag in the deploy path.
 

@@ -4,11 +4,18 @@ load("./runnable.axl", "runnable")
 
 # The deploy DAG is a query, not a list.
 #
-# Every node publishes what it is and what it waits for as tags (see
-# `deploy_tags` in the terraform.bzl module), so joining the graph *is*
-# declaring the target. There is nothing here to keep in sync: a new root
-# deploys by default, and an example opts out with `deploy = False` at its own
-# call site.
+# A node is a target of one of the two node rules in the terraform.bzl module,
+# and what it waits for is an ordinary `deploy_after` label attribute. Joining
+# the graph *is* declaring the target: a new root deploys by default, an
+# example opts out with `deploy = False` at its own call site (which emits a
+# plain filegroup, so it isn't a node at all), and there is nothing here to
+# keep in sync.
+#
+# Everything below reads what Bazel already validated. A `deploy_after` label
+# that doesn't parse, or names nothing, fails at load time; one naming a
+# target that isn't a deploy node fails at analysis on the missing
+# `TfDeployInfo`. This file cannot see a broken edge because a broken edge
+# cannot get this far.
 #
 # Nodes are operations, not roots. A `tf_root` is one kind; a plain runnable —
 # senku pushes container images — is another. That distinction is what lets an
@@ -21,17 +28,44 @@ load("./runnable.axl", "runnable")
 # Cloud Run service nothing would ever create. See
 # docs/adr/0008-derived-terraform-deploy-set.md.
 
-# Mirrors the tag vocabulary emitted by the terraform.bzl module.
-_TAG_DEPLOY = "tf-deploy"
+# The rule classes that are deploy nodes, and the attributes they carry. This
+# is the coupling to the terraform.bzl module: rule classes and attribute
+# names rather than a tag vocabulary, so the module cannot rename one without
+# a query here returning nothing — which `deploy_nodes` treats as an error.
+_KIND_ROOT = "tf_root_node"
 
-_TAG_BOOTSTRAP = "tf-bootstrap"
+_KIND_TASK = "tf_deploy_task"
 
-_TAG_KIND_ROOT = "tf-kind=root"
+_ATTR_AFTER = "deploy_after"
 
-_TAG_AFTER = "tf-after="
+_ATTR_BOOTSTRAP = "bootstrap"
 
-def _query(ctx, expr):
-    """Labels matching a `bazel query` expression, or None if it failed.
+_NODES_QUERY = 'kind("{}|{}", //...)'.format(_KIND_ROOT, _KIND_TASK)
+
+def _xml_attr(line, attr):
+    """Value of `attr` in an XML start tag, or None."""
+    marker = " {}=\"".format(attr)
+    start = line.find(marker)
+    if start < 0:
+        return None
+    start += len(marker)
+    end = line.find("\"", start)
+    if end < 0:
+        return None
+    return line[start:end]
+
+def _query_nodes(ctx, expr):
+    """Every deploy node matching a query, or None if the query failed.
+
+    Returns `{label: struct(is_root, bootstrap, after)}` — one loading-phase
+    query answers all of it, because rule class and attributes are all the
+    graph is made of.
+
+    `--output=xml` is the query output that carries attribute values. It is
+    scraped by tracking the enclosing `<rule class=... name=...>` and reading
+    the two attributes we care about; `<label value=.../>` entries only count
+    while inside that rule's `<list name="deploy_after">`, since `srcs` and
+    `visibility` have the same element shape.
 
     Shells out rather than using `ctx.bazel`, which exposes `build` but no
     query verb — the same reason `runnable.axl` spawns `bazel cquery`
@@ -41,7 +75,7 @@ def _query(ctx, expr):
         .args([
             "query",
             expr,
-            "--output=label",
+            "--output=xml",
             "--ui_event_filters=-info",
             "--noshow_progress",
         ]) \
@@ -52,7 +86,44 @@ def _query(ctx, expr):
     if result.status.code != 0:
         ctx.std.io.stderr.write(result.stderr)
         return None
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+    nodes = {}
+    label = None
+    is_root = False
+    bootstrap = False
+    after = []
+    in_after = False
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("<rule "):
+            label = _xml_attr(line, "name")
+            is_root = _xml_attr(line, "class") == _KIND_ROOT
+            bootstrap = False
+            after = []
+            in_after = False
+        elif line.startswith("</rule>"):
+            if label != None:
+                nodes[label] = struct(
+                    label = label,
+                    is_root = is_root,
+                    bootstrap = bootstrap,
+                    after = after,
+                )
+            label = None
+            in_after = False
+        elif line.startswith("<boolean ") and _xml_attr(line, "name") == _ATTR_BOOTSTRAP:
+            bootstrap = _xml_attr(line, "value") == "true"
+        elif line.startswith("<list ") and _xml_attr(line, "name") == _ATTR_AFTER:
+            # Self-closing (`<list name="deploy_after"/>`) when the list is
+            # empty, in which case there is no `</list>` to match.
+            in_after = not line.endswith("/>")
+        elif line.startswith("</list>"):
+            in_after = False
+        elif in_after and line.startswith("<label "):
+            value = _xml_attr(line, "value")
+            if value != None:
+                after.append(value)
+    return nodes
 
 def _topo_sort(ctx, nodes, predecessors):
     """Kahn's algorithm. None (after reporting a cycle) if one exists.
@@ -60,8 +131,11 @@ def _topo_sort(ctx, nodes, predecessors):
     Ready nodes are taken in sorted order, so a graph with slack always
     linearises the same way — an ordering that shifts between runs would make
     a deploy log impossible to compare against the previous one.
+
+    Every predecessor must be in `nodes`; dropping an edge is a decision the
+    caller makes out loud, not something this quietly absorbs.
     """
-    waiting = {n: [p for p in predecessors[n] if p in nodes] for n in nodes}
+    waiting = {n: list(predecessors[n]) for n in nodes}
     ordered = []
 
     for _ in range(len(nodes)):
@@ -96,50 +170,60 @@ def deploy_nodes(ctx):
 
     Bootstrap roots are dropped under `$CI` and the skip is announced on
     stderr, so a CI log explains its own gaps rather than leaving a reader to
-    wonder why a node is missing. Their edges go with them — nothing else
-    depends on a bootstrap root, and `_topo_sort` ignores predecessors that
-    aren't in the set.
+    wonder why a node is missing. Edges into them are dropped with them and
+    announced too — nothing depends on a bootstrap root today, and if
+    something starts to, the log says so rather than quietly reordering.
     """
     err = ctx.std.io.stderr
 
-    nodes = _query(ctx, 'attr(tags, "{}", //...)'.format(_TAG_DEPLOY))
-    if nodes == None:
+    graph = _query_nodes(ctx, _NODES_QUERY)
+    if graph == None:
         return None
-    if not nodes:
-        err.write("ERROR: no deploy nodes found; is the tag vocabulary wired up?\n")
+    if not graph:
+        err.write(
+            "ERROR: no deploy nodes found; did the node rule classes ({}, {}) get renamed?\n".format(
+                _KIND_ROOT,
+                _KIND_TASK,
+            ),
+        )
         return None
 
+    # Belt and braces. `deploy_after` requires `TfDeployInfo`, so an edge to a
+    # non-node is already an analysis error — but analysis of a given node
+    # happens when `aspect apply` reaches it, which is after earlier nodes have
+    # applied. Checking the set here moves that failure to before anything runs.
+    dangling = sorted([
+        "  {} -> {}".format(n, after)
+        for n in graph
+        for after in graph[n].after
+        if after not in graph
+    ])
+    if dangling:
+        err.write(
+            "ERROR: deploy edge names a target that is not a deploy node:\n{}\n".format(
+                "\n".join(dangling),
+            ),
+        )
+        err.write("Is that target a tf_root with `deploy = False`?\n")
+        return None
+
+    nodes = sorted(graph)
     if is_ci(ctx):
-        bootstrap = _query(ctx, 'attr(tags, "{}", //...)'.format(_TAG_BOOTSTRAP))
-        if bootstrap == None:
-            return None
-        for node in sorted(bootstrap):
+        skipped = [n for n in nodes if graph[n].bootstrap]
+        for node in skipped:
             err.write("skipping {} (bootstrap-tier; apply locally only)\n".format(node))
-        nodes = [n for n in nodes if n not in bootstrap]
+        for n in nodes:
+            for after in sorted(graph[n].after):
+                if after in skipped and n not in skipped:
+                    err.write("  dropping edge {} -> {} with it\n".format(n, after))
+        nodes = [n for n in nodes if n not in skipped]
 
-    # Scope every follow-up query to the set we already have, so each is a
-    # lookup over a dozen known targets rather than another sweep of `//...`.
-    scope = "set({})".format(" ".join(nodes))
-
-    roots = _query(ctx, 'attr(tags, "{}", {})'.format(_TAG_KIND_ROOT, scope))
-    if roots == None:
-        return None
-
-    # Edges are stored on the dependent ("I come after X"), so ask, for each
-    # node, who declared themselves after it. One query per node, and no tag
-    # parsing — `--output=label` answers directly.
-    predecessors = {n: [] for n in nodes}
-    for node in nodes:
-        dependents = _query(ctx, 'attr(tags, "{}{}", {})'.format(_TAG_AFTER, node, scope))
-        if dependents == None:
-            return None
-        for dependent in dependents:
-            predecessors[dependent].append(node)
+    predecessors = {n: [p for p in graph[n].after if p in nodes] for n in nodes}
 
     ordered = _topo_sort(ctx, nodes, predecessors)
     if ordered == None:
         return None
-    return [struct(label = n, is_root = n in roots) for n in ordered]
+    return [graph[n] for n in ordered]
 
 def is_ci(ctx) -> bool:
     return ctx.std.env.var("CI") != None
@@ -159,18 +243,29 @@ def normalize_root(target) -> str:
 def select_nodes(ctx, requested):
     """Resolve the nodes to act on, in dependency order. None if that failed.
 
-    If the caller passed explicit targets, honor them verbatim and treat each
-    as a root — the bootstrap filter is bypassed, so an explicit `aspect plan
+    If the caller passed explicit targets, honor them verbatim and in the
+    order given — no filtering, no reordering. An explicit `aspect plan
     //infra/cloud/gcp/ci:terraform` still works in CI for the rare case a
     maintainer wants it, and a `deploy = False` example can still be planned
     by name.
+
+    Each named target is looked up in the graph to learn how to run it, so
+    naming a task (`//apps/x:image_push_gar.deploy`) works rather than
+    reaching for an `.apply` it doesn't have. Anything the graph doesn't know
+    is assumed to be a root, which is what a target named by hand almost
+    always is — a `deploy = False` example is the whole reason this path
+    bypasses the graph.
 
     With no targets, discover the graph. Returns None (not an empty list) when
     a query fails, so callers can tell "nothing to do" apart from "we don't
     know what to do" and fail instead of quietly succeeding.
     """
     if len(requested) > 0:
-        return [struct(label = normalize_root(t), is_root = True) for t in requested]
+        graph = _query_nodes(ctx, _NODES_QUERY) or {}
+        return [
+            graph.get(t) or struct(label = t, is_root = True, bootstrap = False, after = [])
+            for t in [normalize_root(r) for r in requested]
+        ]
 
     return deploy_nodes(ctx)
 

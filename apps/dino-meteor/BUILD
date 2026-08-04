@@ -1,11 +1,11 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@terraform.bzl//:gcp.bzl", "google_provider", "service_account")
-load("@terraform.bzl", "output")
+load("@terraform.bzl", "output", "tf_root")
 load("//devtools/bifrost/modules:cloudrun.bzl", "service_cloudrun")
 load("//devtools/build/react_component:react_app.bzl", "react_app", "route")
 load("//devtools/build/react_component:react_static_layer.bzl", "react_static_layer")
-load("//devtools/build/tools/tf:render.bzl", "IMAGE_URI", "registry_push", "tf_root_with_image")
+load("//devtools/build/tools/tf:render.bzl", "image_uri", "registry_push")
 load("//infra/cloud/gcp/gar:defs.bzl", "REGISTRY")
 load("//oci:frontend_image.bzl", "frontend_images_all_arch")
 load("//oci:vex.bzl", "vex_document")
@@ -113,7 +113,7 @@ sa = service_account(
 # also the gen2 floor, so stating it would just repeat the platform default.
 dino_service = service_cloudrun(
     name = "dino_meteor",
-    image = IMAGE_URI,
+    image = image_uri(":image_push_gar"),
     ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER",
     probes = {
         "startup_path": "/index.html",
@@ -130,9 +130,13 @@ dino_service = service_cloudrun(
     service_name = SERVICE_NAME,
 )
 
-tf_root_with_image(
+tf_root(
     name = "terraform",
     backend_bucket = "senku-prod-terraform-state",
+    # Published for other roots to `ref`. The LB names this to build its
+    # serverless NEG, and takes its deploy edge from the same reference —
+    # so a backend is always running before anything routes to it.
+    exports = {"service_name": SERVICE_NAME},
     docs = [
         google_provider(project = PROJECT),
         sa,
@@ -148,7 +152,10 @@ tf_root_with_image(
             value = sa.email,
         ),
     ],
-    image_push = ":image_push_gar",
+    # The digest in `main.tf.json` is baked in at build time; the push is what
+    # makes it real. Keeping it here means a bare `bazel run :terraform.apply`
+    # is correct on its own, not only under `aspect apply`.
+    pre_apply = [":image_push_gar"],
     providers = ["@terraform_providers//:google"],
     visibility = ["//visibility:public"],
 )
