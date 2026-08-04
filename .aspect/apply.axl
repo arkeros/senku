@@ -16,7 +16,7 @@ Auto-approves Terraform when running non-interactively (`$CI` is set);
 locally you'll get the y/n confirmation prompt per root.
 """
 
-load("./stdlib.axl", "build_and_run", "is_ci", "select_targets")
+load("./stdlib.axl", "build_and_run", "is_ci", "select_nodes")
 load("./terraform.axl", "TF_ARGS", "build_tf_args")
 
 def impl(ctx) -> int:
@@ -25,17 +25,24 @@ def impl(ctx) -> int:
     env = {"TF_AUTO_APPROVE": "1"} if is_ci(ctx) else {}
     tf_args = build_tf_args(ctx)
 
-    roots = select_targets(ctx, ctx.args.root)
-    if roots == None:
+    nodes = select_nodes(ctx, ctx.args.root)
+    if nodes == None:
         err.write("ERROR: could not determine the deploy set\n")
         return 1
 
-    for root in roots:
-        result = build_and_run(ctx, root + ".apply", args = tf_args, env = env)
+    for node in nodes:
+        # A root is driven through its `.apply` runnable and takes the
+        # terraform flags; any other node is a plain runnable — an image push
+        # — that would not understand them.
+        if node.is_root:
+            result = build_and_run(ctx, node.label + ".apply", args = tf_args, env = env)
+        else:
+            result = build_and_run(ctx, node.label, env = env)
+
         if result == None:
             return 1
         if not result.success:
-            err.write("ERROR: apply failed for {} (exit {})\n".format(root, result.code))
+            err.write("ERROR: {} failed (exit {})\n".format(node.label, result.code))
             return result.code
     return 0
 

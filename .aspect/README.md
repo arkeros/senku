@@ -47,26 +47,45 @@ underlying runnable:
 bazel run //x:terraform.plan -- -lock-timeout=5m
 ```
 
-## The deploy set
+## dag
 
-There is no list. Both tasks discover which roots to walk by querying the
-build graph for tags that each `tf_root` publishes about itself:
+Print the deploy order without running any of it.
+
+```bash
+aspect dag        # what `aspect apply` would walk, in order
+CI=1 aspect dag   # the same, as CI would see it (bootstrap roots dropped)
+```
+
+Read-only: `bazel query` and nothing else — no terraform, no credentials, no
+state. Exits non-zero if the graph has a cycle, naming the nodes involved.
+
+## The deploy DAG
+
+There is no list. Both tasks discover the graph by querying the build graph
+for tags each node publishes about itself, then topologically sort it:
 
 | Tag | Meaning |
 | --- | --- |
 | `tf-root` | Is a Terraform root. Marks every one, deployable or not. |
-| `tf-deploy` | Belongs to the deploy set. Present unless `deploy = False`. |
+| `tf-deploy` | Is a node in the graph. Present unless `deploy = False`. |
+| `tf-kind=root\|task` | A root runs via `.apply`; a task is simply run. |
 | `tf-bootstrap` | Skipped under `$CI`; applied locally only. |
-| `tf-tier=<n>` | Deploy-order bucket, ascending. Single digit. |
+| `tf-after=<label>` | One per edge. That node must finish first. |
 
 ```bash
-bazel query 'attr(tags, "tf-deploy", //...)'    # what would be applied
-bazel query 'attr(tags, "tf-tier=2", //...)'    # what goes last
+aspect dag                                        # the order, without running it
+CI=1 aspect dag                                   # what CI would walk
+bazel query 'attr(tags, "tf-after=//x:y", //...)' # what waits on //x:y
 ```
 
-Roots apply tier by tier. Within a tier the order is alphabetical and must
-not matter — if two roots in a tier ever depend on each other, the fix is a
-tier boundary between them, not a lucky sort.
+Nodes are **operations, not roots** — a container-image push is a node in its
+own right, which is what lets an edge name the thing that actually holds the
+dependency. An app's push needs the registry to exist; the app's Terraform
+does not. It also means every push sorts ahead of every apply, so a registry
+problem fails before any infrastructure is touched.
+
+`aspect apply` walks the whole graph. `aspect plan` walks only the roots —
+there is no plan for pushing an image.
 
 ## Bootstrap roots
 
@@ -82,8 +101,9 @@ only applies when `$CI` is set.
 
 ## Adding a root
 
-Nothing. A new `tf_root` is in the deploy set by default, and
-`tf_root_with_image` already places image-pushing roots after the registry.
+Nothing. A new `tf_root` is in the graph by default, and `registry_push` +
+`tf_root_with_image` already wire an app's push behind the registry and its
+Terraform behind its push. Run `aspect dag` to see where it landed.
 
 You only declare something when the default is wrong:
 
@@ -91,7 +111,11 @@ You only declare something when the default is wrong:
   bucket that cannot resolve, so a hand-run apply dies in `terraform init`
   rather than relying on the orchestrator to exclude it.
 - **It provisions CI's own credentials** → `bootstrap = True`.
-- **Its GCP resources must exist before another root's** → raise that other
-  root's `deploy_tier`. Note this is about *resources*, not `load()`:
-  importing a constant from another root is a build dependency, not a deploy
-  one. See [ADR 0008](../docs/adr/0008-derived-terraform-deploy-set.md).
+- **Its GCP resources must exist before another node's** → add a
+  `deploy_after` edge on that other node. Derive it from data the node
+  already holds where you can; a hand-maintained edge is the kind of thing
+  that goes stale.
+
+Note the last one is about *resources*, not `load()`: importing a constant
+from another root is a build dependency, not a deploy one. See
+[ADR 0008](../docs/adr/0008-derived-terraform-deploy-set.md).

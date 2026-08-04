@@ -16,6 +16,10 @@ SERVICE_NAME = "table-for-two"
 # Its own host with no `paths`: an SPA owning every path under the hostname.
 LB_BACKEND = {
     "service_name": SERVICE_NAME,
+    # The root that creates the Cloud Run service named above. The LB
+    # turns this into a deploy edge, so a backend is always running
+    # before anything routes to it.
+    "root": "//apps/table-for-two:terraform",
     "regions": [REGION],
     "host": "mesa.arquero.dev",
 }

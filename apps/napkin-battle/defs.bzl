@@ -25,6 +25,10 @@ SERVICE_NAME = "napkin-battle"
 # primary domain without teaching react_app a base path.
 LB_BACKEND = {
     "service_name": SERVICE_NAME,
+    # The root that creates the Cloud Run service named above. The LB
+    # turns this into a deploy edge, so a backend is always running
+    # before anything routes to it.
+    "root": "//apps/napkin-battle:terraform",
     "regions": [REGION],
     "host": "napkin.arquero.dev",
 }

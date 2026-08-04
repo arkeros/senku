@@ -2,13 +2,18 @@
 
 load("./runnable.axl", "runnable")
 
-# The deploy set is a query, not a list.
+# The deploy DAG is a query, not a list.
 #
-# Every `tf_root` publishes its own membership, tier and bootstrap status as
-# tags (see `_deploy_tags` in the terraform.bzl module), so joining the deploy
-# DAG *is* declaring the root. There is nothing here to keep in sync: a new
-# root deploys by default, and an example opts out with `deploy = False` at
-# its own call site.
+# Every node publishes what it is and what it waits for as tags (see
+# `deploy_tags` in the terraform.bzl module), so joining the graph *is*
+# declaring the target. There is nothing here to keep in sync: a new root
+# deploys by default, and an example opts out with `deploy = False` at its own
+# call site.
+#
+# Nodes are operations, not roots. A `tf_root` is one kind; a plain runnable —
+# senku pushes container images — is another. That distinction is what lets an
+# edge point at the thing that genuinely has the dependency: an app's image
+# push needs the registry to exist, while the app's Terraform does not.
 #
 # This used to be a hand-maintained ordered list. It drifted — an app was
 # added without an entry, so it built, merged and passed CI while never
@@ -16,17 +21,14 @@ load("./runnable.axl", "runnable")
 # Cloud Run service nothing would ever create. See
 # docs/adr/0008-derived-terraform-deploy-set.md.
 
-# Mirrors the tag vocabulary emitted by the `tf_root` macro.
+# Mirrors the tag vocabulary emitted by the terraform.bzl module.
 _TAG_DEPLOY = "tf-deploy"
 
 _TAG_BOOTSTRAP = "tf-bootstrap"
 
-_TAG_TIER = "tf-tier="
+_TAG_KIND_ROOT = "tf-kind=root"
 
-# Tags are matched as substrings, which is why tiers are single-digit:
-# `tf-tier=1` would otherwise also select `tf-tier=10`. The macro rejects
-# anything outside this range.
-_MAX_TIER = 9
+_TAG_AFTER = "tf-after="
 
 def _query(ctx, expr):
     """Labels matching a `bazel query` expression, or None if it failed.
@@ -52,52 +54,92 @@ def _query(ctx, expr):
         return None
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
-def deploy_roots(ctx):
-    """Every deployable root, ordered by tier. None if a query failed.
+def _topo_sort(ctx, nodes, predecessors):
+    """Kahn's algorithm. None (after reporting a cycle) if one exists.
+
+    Ready nodes are taken in sorted order, so a graph with slack always
+    linearises the same way — an ordering that shifts between runs would make
+    a deploy log impossible to compare against the previous one.
+    """
+    waiting = {n: [p for p in predecessors[n] if p in nodes] for n in nodes}
+    ordered = []
+
+    for _ in range(len(nodes)):
+        ready = sorted([n for n in waiting if not waiting[n]])
+        if not ready:
+            break
+        ordered.extend(ready)
+
+        # Rebuilt rather than mutated: Starlark refuses to change a dict while
+        # something is iterating it, and both the drop and the edge-clearing
+        # would be doing exactly that.
+        waiting = {
+            n: [p for p in ps if p not in ready]
+            for n, ps in waiting.items()
+            if n not in ready
+        }
+
+    if waiting:
+        ctx.std.io.stderr.write(
+            "ERROR: cycle in the deploy graph among: {}\n".format(
+                ", ".join(sorted(waiting)),
+            ),
+        )
+        return None
+    return ordered
+
+def deploy_nodes(ctx):
+    """Every deploy node in dependency order. None if discovery failed.
+
+    Returns structs of `label` and `is_root`: a root is driven through its
+    `.apply` runnable, anything else is simply run.
 
     Bootstrap roots are dropped under `$CI` and the skip is announced on
-    stderr, so a CI log explains its own gaps rather than leaving a reader
-    to wonder why a root is missing.
-
-    Within a tier the order is alphabetical — deliberately arbitrary. Roots
-    sharing a tier must be independent; if two ever aren't, the fix is a tier
-    boundary between them, not a lucky sort.
+    stderr, so a CI log explains its own gaps rather than leaving a reader to
+    wonder why a node is missing. Their edges go with them — nothing else
+    depends on a bootstrap root, and `_topo_sort` ignores predecessors that
+    aren't in the set.
     """
-    members = _query(ctx, 'attr(tags, "{}", //...)'.format(_TAG_DEPLOY))
-    if members == None:
+    err = ctx.std.io.stderr
+
+    nodes = _query(ctx, 'attr(tags, "{}", //...)'.format(_TAG_DEPLOY))
+    if nodes == None:
+        return None
+    if not nodes:
+        err.write("ERROR: no deploy nodes found; is the tag vocabulary wired up?\n")
         return None
 
     if is_ci(ctx):
         bootstrap = _query(ctx, 'attr(tags, "{}", //...)'.format(_TAG_BOOTSTRAP))
         if bootstrap == None:
             return None
-        err = ctx.std.io.stderr
-        for root in sorted(bootstrap):
-            err.write("skipping {} (bootstrap-tier; apply locally only)\n".format(root))
-        members = [m for m in members if m not in bootstrap]
+        for node in sorted(bootstrap):
+            err.write("skipping {} (bootstrap-tier; apply locally only)\n".format(node))
+        nodes = [n for n in nodes if n not in bootstrap]
 
-    # Re-query per tier, scoped to the set we already have, so each pass is a
-    # lookup over ~10 known targets instead of another sweep of `//...`.
-    scope = "set({})".format(" ".join(members))
-    ordered = []
-    for tier in range(_MAX_TIER + 1):
-        if len(ordered) == len(members):
-            break
-        at_tier = _query(ctx, 'attr(tags, "{}{}", {})'.format(_TAG_TIER, tier, scope))
-        if at_tier == None:
-            return None
-        ordered.extend(sorted(at_tier))
+    # Scope every follow-up query to the set we already have, so each is a
+    # lookup over a dozen known targets rather than another sweep of `//...`.
+    scope = "set({})".format(" ".join(nodes))
 
-    if len(ordered) != len(members):
-        ctx.std.io.stderr.write(
-            "ERROR: {} deployable root(s) carry no {}<n> tag: {}\n".format(
-                len(members) - len(ordered),
-                _TAG_TIER,
-                ", ".join([m for m in members if m not in ordered]),
-            ),
-        )
+    roots = _query(ctx, 'attr(tags, "{}", {})'.format(_TAG_KIND_ROOT, scope))
+    if roots == None:
         return None
-    return ordered
+
+    # Edges are stored on the dependent ("I come after X"), so ask, for each
+    # node, who declared themselves after it. One query per node, and no tag
+    # parsing — `--output=label` answers directly.
+    predecessors = {n: [] for n in nodes}
+    for node in nodes:
+        dependents = _query(ctx, 'attr(tags, "{}{}", {})'.format(_TAG_AFTER, node, scope))
+        if dependents == None:
+            return None
+        for dependent in dependents:
+            predecessors[dependent].append(node)
+
+    ordered = _topo_sort(ctx, nodes, predecessors)
+    if ordered == None:
+        return None
+    return [struct(label = n, is_root = n in roots) for n in ordered]
 
 def is_ci(ctx) -> bool:
     return ctx.std.env.var("CI") != None
@@ -114,24 +156,35 @@ def normalize_root(target) -> str:
         return target
     return target + ":terraform"
 
-def select_targets(ctx, requested):
-    """Resolve the roots to act on, in deploy order. None if discovery failed.
+def select_nodes(ctx, requested):
+    """Resolve the nodes to act on, in dependency order. None if that failed.
 
-    If the caller passed explicit targets, honor them verbatim — the
-    bootstrap filter is bypassed, so an explicit `aspect plan
+    If the caller passed explicit targets, honor them verbatim and treat each
+    as a root — the bootstrap filter is bypassed, so an explicit `aspect plan
     //infra/cloud/gcp/ci:terraform` still works in CI for the rare case a
     maintainer wants it, and a `deploy = False` example can still be planned
     by name.
 
-    With no targets, discover the deploy set from the build graph. Returns
-    None (not an empty list) when a query fails, so callers can tell "nothing
-    to do" apart from "we don't know what to do" and fail instead of quietly
-    succeeding.
+    With no targets, discover the graph. Returns None (not an empty list) when
+    a query fails, so callers can tell "nothing to do" apart from "we don't
+    know what to do" and fail instead of quietly succeeding.
     """
     if len(requested) > 0:
-        return [normalize_root(t) for t in requested]
+        return [struct(label = normalize_root(t), is_root = True) for t in requested]
 
-    return deploy_roots(ctx)
+    return deploy_nodes(ctx)
+
+def select_roots(ctx, requested):
+    """`select_nodes`, narrowed to Terraform roots.
+
+    For `aspect plan`, which has nothing to say about a node that isn't a
+    Terraform root: there is no plan for pushing an image. Apply walks the
+    whole graph; plan walks the part of it that can be planned.
+    """
+    nodes = select_nodes(ctx, requested)
+    if nodes == None:
+        return None
+    return [n.label for n in nodes if n.is_root]
 
 def build_runnable(ctx, target, build_flags = []):
     """Build `target` and resolve its runtime entrypoint, so the binary
