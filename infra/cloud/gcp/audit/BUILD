@@ -7,6 +7,14 @@ load(":defs.bzl", "AUDIT_DOCS", "PROJECT")
 tf_root(
     name = "terraform",
     backend_bucket = "senku-prod-terraform-state",
+    # Project-level audit config and log sinks — same reasoning as
+    # //infra/cloud/gcp/ci: applied locally, never by CI.
+    #
+    # Tier 0 despite loading //infra/cloud/gcp/lb:defs.bzl. That import is
+    # for `DEFAULT_404_BUCKET_NAME`, a *string* interpolated into a log
+    # filter; nothing here needs the bucket to exist. A build dependency is
+    # not a deploy dependency.
+    bootstrap = True,
     docs = [google_provider(project = PROJECT)] + AUDIT_DOCS,
     providers = ["@terraform_providers//:google"],
     visibility = ["//visibility:public"],

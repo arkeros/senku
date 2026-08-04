@@ -25,7 +25,12 @@ def impl(ctx) -> int:
     env = {"TF_AUTO_APPROVE": "1"} if is_ci(ctx) else {}
     tf_args = build_tf_args(ctx)
 
-    for root in select_targets(ctx, ctx.args.root):
+    roots = select_targets(ctx, ctx.args.root)
+    if roots == None:
+        err.write("ERROR: could not determine the deploy set\n")
+        return 1
+
+    for root in roots:
         result = build_and_run(ctx, root + ".apply", args = tf_args, env = env)
         if result == None:
             return 1
