@@ -13,7 +13,7 @@ import {
 } from "../../../game/field";
 import { HOLD_MS, holdVerdict, isTap, startKey } from "../../../game/input";
 import {
-  SHAPES,
+  CELLS_ACROSS,
   finish,
   newMatch,
   passTurn,
@@ -83,7 +83,7 @@ export function Plancha({ labels }: PlanchaProps) {
       }
     };
 
-    const firstBoard = layout(w, h, SHAPES.solo);
+    const firstBoard = layout(w, h, CELLS_ACROSS.solo);
     const world: World = {
       board: firstBoard,
       field: layPeppers(firstBoard.cols, firstBoard.rows, 0, Math.random),
@@ -123,7 +123,7 @@ export function Plancha({ labels }: PlanchaProps) {
 
     // ---- setting the board -----------------------------------------------
     function begin(mode: Mode) {
-      const board = layout(w, h, SHAPES[mode]);
+      const board = layout(w, h, CELLS_ACROSS[mode]);
       world.mode = mode;
       world.board = board;
       world.field = layPeppers(
@@ -388,7 +388,7 @@ export function Plancha({ labels }: PlanchaProps) {
       // Mid-game the grid is only rescaled, never re-cut — see `refit`.
       world.board = world.started
         ? refit(world.board, w, h)
-        : layout(w, h, SHAPES[world.mode]);
+        : layout(w, h, CELLS_ACROSS[world.mode]);
     }
 
     // ---- screen wake lock ------------------------------------------------

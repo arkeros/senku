@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 
 import { layout } from "./board.js";
 import {
+  CELLS_ACROSS,
   DUEL_PEPPERS,
   PEPPERS_TO_WIN,
-  SHAPES,
   finish,
   newMatch,
   other,
@@ -106,10 +106,10 @@ test("a duel always resolves: two players cannot split the peppers level", () =>
 });
 
 test("a duel is a race for the board, not away from it", () => {
-  // Five of eleven is most of the way to all of them. The floor above admits
-  // any larger count, and a much larger one would end the match while the
-  // board was still mostly face down — so the upper bound is stated too.
-  assert.ok(DUEL_PEPPERS <= PEPPERS_TO_WIN * 2 + 2);
+  // The floor above admits any larger count, so the ceiling has to be stated
+  // separately: the target must stay a large fraction of what is out there,
+  // or the match ends while most of the griddle is still face down.
+  assert.ok(PEPPERS_TO_WIN / DUEL_PEPPERS >= 0.4);
 });
 
 // ---- solo -------------------------------------------------------------------
@@ -133,9 +133,9 @@ test("touch: the first tap is remembered, so the peppers are only relaid once", 
 
 // ---- how many peppers -------------------------------------------------------
 
-test("peppersFor: a duel is always nine, whatever the screen", () => {
-  assert.equal(peppersFor("duel", layout(400, 800, SHAPES.duel)), DUEL_PEPPERS);
-  assert.equal(peppersFor("duel", layout(900, 500, SHAPES.duel)), DUEL_PEPPERS);
+test("peppersFor: a duel lays the same count whatever the screen", () => {
+  assert.equal(peppersFor("duel", layout(400, 800, CELLS_ACROSS.duel)), DUEL_PEPPERS);
+  assert.equal(peppersFor("duel", layout(900, 500, CELLS_ACROSS.duel)), DUEL_PEPPERS);
 });
 
 test("peppersFor: solo lays about one cell in six, with room left to open", () => {
@@ -147,7 +147,7 @@ test("peppersFor: solo lays about one cell in six, with room left to open", () =
     [1200, 900],
     [240, 380],
   ]) {
-    const board = layout(w, h, SHAPES.solo);
+    const board = layout(w, h, CELLS_ACROSS.solo);
     const cells = board.cols * board.rows;
     const peppers = peppersFor("solo", board);
     assert.ok(peppers > cells * 0.1 && peppers < cells * 0.25);
@@ -157,21 +157,30 @@ test("peppersFor: solo lays about one cell in six, with room left to open", () =
   }
 });
 
-test("SHAPES: a duel board is square and a solo board fills the screen", () => {
-  assert.equal(SHAPES.duel.square, true);
-  assert.equal(SHAPES.solo.square, false);
+test("CELLS_ACROSS: a duel is cut coarser than a solo board, not smaller", () => {
+  // The coarser cut is the whole mechanism: fewer cells keeps twelve peppers
+  // dense and five of them nearly half, and bigger cells are the side effect
+  // — which is the right way round for the mode two people play at speed.
+  assert.ok(CELLS_ACROSS.duel < CELLS_ACROSS.solo);
+  const duel = layout(390, 844, CELLS_ACROSS.duel);
+  const solo = layout(390, 844, CELLS_ACROSS.solo);
+  assert.ok(duel.cell > solo.cell);
+  assert.ok(duel.cols * duel.rows < solo.cols * solo.rows);
 });
 
-test("SHAPES: a duel board keeps the peppers dense enough to deduce about", () => {
+test("CELLS_ACROSS: a duel board keeps the peppers dense enough to deduce about", () => {
   // Sparse is worse than small: a scattering opens in huge floods and gives
-  // a player nothing to read between turns.
+  // a player nothing to read between turns. The short phone is the tight end
+  // — fewer rows fit, so the same twelve peppers crowd together.
   for (const [w, h] of [
     [400, 800],
     [390, 844],
+    [430, 932],
+    [375, 667],
     [360, 780],
   ]) {
-    const cells = layout(w, h, SHAPES.duel);
-    const density = DUEL_PEPPERS / (cells.cols * cells.rows);
-    assert.ok(density > 0.12 && density < 0.25);
+    const board = layout(w, h, CELLS_ACROSS.duel);
+    const density = DUEL_PEPPERS / (board.cols * board.rows);
+    assert.ok(density > 0.12 && density < 0.25, `${w}x${h} density ${density}`);
   }
 });

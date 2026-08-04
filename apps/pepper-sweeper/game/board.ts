@@ -1,18 +1,11 @@
 /**
  * Cutting a viewport into a grid, and finding the cell under a finger.
  *
- * Deliberately ignorant of peppers: the two modes hand it the shape they want
- * and it hands back a grid. That is what lets the duel be square and the solo
- * board fill the screen without either rule living in the geometry.
+ * Deliberately ignorant of peppers: a mode says how coarsely it wants the
+ * screen cut and this hands back a grid that fills it. One number is the
+ * whole interface, because how big a cell should be is the only thing about
+ * a board the rules have an opinion on.
  */
-
-/** What a mode wants its board to look like. */
-export interface Shape {
-  /** Cells across the shorter available edge. */
-  readonly edge: number;
-  /** True when the board must be as tall as it is wide. */
-  readonly square: boolean;
-}
 
 export interface Board {
   readonly cols: number;
@@ -38,24 +31,21 @@ export const MIN_CELL = 26;
 const MIN_EDGE = 5;
 
 /**
- * Cut the viewport into a grid.
+ * Cut the viewport into a grid that fills it.
  *
- * Cell size comes off the *shorter* available edge, so the board is about
- * `shape.edge` cells across on any phone and the numbers stay the same size
- * relative to a thumb. A square shape then takes the smaller of the two fits,
- * which is what keeps a duel board square on a squat window instead of
- * silently growing into a strip.
+ * Cell size comes off the *shorter* available edge, so a board is about
+ * `cellsAcross` cells wide on any phone and a number stays the same size
+ * relative to a thumb. The long edge then takes as many rows as fit, which is
+ * what a mode is really choosing between when it picks a coarser cut: fewer,
+ * bigger cells all the way down the screen, rather than a smaller board.
  */
-export function layout(width: number, height: number, shape: Shape): Board {
+export function layout(width: number, height: number, cellsAcross: number): Board {
   const { pad, band, availW, availH } = margins(width, height);
-  const cell = Math.max(MIN_CELL, Math.floor(Math.min(availW, availH) / shape.edge));
-  const across = Math.max(MIN_EDGE, Math.floor(availW / cell));
-  const down = Math.max(MIN_EDGE, Math.floor(availH / cell));
-  const side = Math.min(across, down);
+  const cell = Math.max(MIN_CELL, Math.floor(Math.min(availW, availH) / cellsAcross));
   return place(
     {
-      cols: shape.square ? side : across,
-      rows: shape.square ? side : down,
+      cols: Math.max(MIN_EDGE, Math.floor(availW / cell)),
+      rows: Math.max(MIN_EDGE, Math.floor(availH / cell)),
       cell,
       pad,
       band,

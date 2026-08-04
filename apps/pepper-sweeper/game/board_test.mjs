@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 
 import { MIN_CELL, cellAt, centerOf, layout, refit } from "./board.js";
 
-/** A portrait phone, the shape this game is actually played on. */
-const shape = { edge: 8, square: false };
-const board = layout(400, 800, shape);
+/** How solo cuts a screen, and a portrait phone — the shape this is played on. */
+const ACROSS = 8;
+const board = layout(400, 800, ACROSS);
 
 test("layout: the grid is centred inside the viewport", () => {
   // To within a pixel: an odd leftover cannot be split evenly, and origins
@@ -15,8 +15,8 @@ test("layout: the grid is centred inside the viewport", () => {
   assert.ok(evenly(800, board.rows * board.cell, board.originY));
 });
 
-test("layout: the short edge is cut into about `edge` columns", () => {
-  assert.ok(Math.abs(board.cols - shape.edge) <= 1);
+test("layout: the short edge is cut into about `cellsAcross` columns", () => {
+  assert.ok(Math.abs(board.cols - ACROSS) <= 1);
 });
 
 test("layout: the grid clears the bands the score strip is drawn in", () => {
@@ -24,26 +24,31 @@ test("layout: the grid clears the bands the score strip is drawn in", () => {
   assert.ok(board.rows * board.cell + (board.pad + board.band) * 2 <= 800);
 });
 
-test("layout: a square shape gets as many rows as columns", () => {
-  const duel = layout(400, 800, { edge: 7, square: true });
-  assert.equal(duel.rows, duel.cols);
-  assert.equal(duel.cols, 7);
+test("layout: the long edge is filled, not squared off", () => {
+  // The whole point of cutting off the short edge: a tall screen gets more
+  // rows rather than a small board floating in the middle of it.
+  assert.ok(board.rows > board.cols);
+  const spare = 800 - board.rows * board.cell - (board.pad + board.band) * 2;
+  assert.ok(spare < board.cell);
 });
 
-test("layout: a square board still fits a viewport too short for it", () => {
-  const squat = layout(400, 300, { edge: 7, square: true });
-  assert.equal(squat.rows, squat.cols);
-  assert.ok(squat.rows * squat.cell <= 300);
+test("layout: a coarser cut is bigger cells, not a smaller board", () => {
+  const coarse = layout(390, 844, 6);
+  const fine = layout(390, 844, 8);
+  assert.ok(coarse.cell > fine.cell);
+  assert.ok(coarse.cols < fine.cols);
+  // Both still reach the bottom of the same screen.
+  assert.ok(844 - coarse.rows * coarse.cell - (coarse.pad + coarse.band) * 2 < coarse.cell);
 });
 
 test("layout: cells never shrink below a thumb on a small screen", () => {
-  const tiny = layout(240, 380, shape);
+  const tiny = layout(240, 380, ACROSS);
   assert.ok(tiny.cell >= MIN_CELL);
   assert.ok(tiny.cols >= 5 && tiny.rows >= 5);
 });
 
 test("layout: a landscape window still fits inside its padding", () => {
-  const wide = layout(900, 500, shape);
+  const wide = layout(900, 500, ACROSS);
   assert.ok(wide.cols * wide.cell <= 900);
   assert.ok(wide.rows * wide.cell <= 500);
   assert.ok(wide.cols > wide.rows);

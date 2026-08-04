@@ -1,4 +1,4 @@
-import type { Board, Shape } from "./board";
+import type { Board } from "./board";
 import type { Side } from "./field";
 
 /**
@@ -29,28 +29,29 @@ export const PEPPERS_TO_WIN = 5;
  * winner and no move that would ever produce one. At or above it, one side
  * must reach the target.
  *
- * Eleven sits just over that floor rather than well above it, because the
- * fraction is what gives a duel its shape: five of eleven is nearly half the
+ * Twelve sits just over that floor rather than well above it, because the
+ * fraction is what gives a duel its shape: five of twelve is nearly half the
  * board's peppers, so the race is fought across the whole griddle. Raise this
  * much further and the match is a sprint that stops while most of the board
  * is still face down.
  */
-export const DUEL_PEPPERS = 11;
+export const DUEL_PEPPERS = 12;
 
 /** Roughly the density a classic minesweeper board is played at. */
 const SOLO_DENSITY = 0.16;
 
 /**
- * A duel board is square, which on a tall screen leaves a margin at each end
- * that a full-height board would not. That is the price of the fraction: the
- * peppers have to stay dense enough to deduce about and few enough that five
- * of them is close to half, and a board filling a phone would need three
- * times as many to keep the density, at which point the race stops covering
- * it. Solo takes the whole screen, which is the board people expect.
+ * How coarsely each mode cuts the screen, in cells across the short edge.
+ *
+ * Both boards fill the screen; a duel's is cut coarser, not smaller. That is
+ * what keeps the cell count low enough for twelve peppers to stay dense and
+ * for five of them to be nearly half — and because the cells are
+ * correspondingly bigger, it also makes the duel the easiest board in the app
+ * to hit accurately, which is the mode where two people are racing.
  */
-export const SHAPES: Readonly<Record<Mode, Shape>> = {
-  solo: { edge: 8, square: false },
-  duel: { edge: 8, square: true },
+export const CELLS_ACROSS: Readonly<Record<Mode, number>> = {
+  solo: 8,
+  duel: 6,
 };
 
 /** How many peppers to lay on a board of this size. */

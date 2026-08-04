@@ -15,8 +15,8 @@ image, one `LB_BACKEND` line to reach the internet.
 | Path | What lives there |
 | --- | --- |
 | `game/board.ts` | Cutting a viewport into a grid, absorbing a resize, and naming the cell under a finger. Knows nothing about peppers — 12 `node:test` cases. |
-| `game/field.ts` | The minefield: where the peppers are, and every way a tile changes — reveal and its flood, flags, chording, and the duel's pick. Injected randomness, 28 cases. |
-| `game/match.ts` | Whose go it is, what each side has found, and what ends a game. Also the two modes' board shapes — 17 cases. |
+| `game/field.ts` | The minefield: where the peppers are, and every way a tile changes — reveal and its flood, flags, chording, and the duel's pick. Injected randomness, 33 cases. |
+| `game/match.ts` | Whose go it is, what each side has found, and what ends a game. Also how coarsely each mode cuts the screen — 21 cases. |
 | `game/input.ts` | What a press means. Separate because a long press is the one gesture with no event of its own — 8 cases. |
 | `render/` | Every `ctx` call, driven by a `World` snapshot plus a `Labels` bag. Knows nothing about React, i18n or the rules. |
 | `ui/components/Plancha/` | The only stateful component. Owns the canvas, the RAF loop and the fingers. |
@@ -49,16 +49,17 @@ has a top. Two players at opposite ends of a table would mean one of them
 doing arithmetic upside down all game, so this one is played side by side,
 with the score strip lighting up whoever's go it is.
 
-**A duel board is square, and leaves a margin at each end of a tall screen.**
-Two constants hold it there. Eleven peppers is just over the floor of
-`PEPPERS_TO_WIN * 2 - 1`, below which the race can end level with nothing left
-to find; and five of eleven is nearly half of them, which is what makes the
-match a race across the whole griddle rather than a sprint that stops while
-most of it is still face down. A board filling a phone would need three times
-as many peppers to keep the density worth deducing about, and five of thirty
-is not a race for anything. Both bounds are asserted in `match_test.mjs`, on
-the constants themselves. The margin is what that costs; it reads as a board
-game on a table, which is what a duel is.
+**A duel board is cut coarser than a solo one, not made smaller.** Both fill
+the screen; the duel's is six cells across where solo is eight. What the
+coarser cut buys is a low cell count, and the cell count is what the two
+constants need: twelve peppers is just over the floor of
+`PEPPERS_TO_WIN * 2 - 1`, below which a race can end level with nothing left
+to find, and five of twelve is nearly half of them, which keeps the match a
+race across the whole griddle rather than a sprint that stops while most of it
+is face down. Both bounds are asserted in `match_test.mjs`, on the constants
+themselves. Bigger cells are the side effect, and a welcome one — the duel is
+the mode where two people are racing, and it ends up with the largest tap
+targets in the app.
 
 **The first solo tap re-lays the peppers.** `relayAround` holds the tapped
 cell and its eight neighbours cold and deals again, so the opening move is
