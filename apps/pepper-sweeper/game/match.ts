@@ -24,24 +24,33 @@ export const PEPPERS_TO_WIN = 5;
 /**
  * Peppers on a duel board.
  *
- * Odd, and `PEPPERS_TO_WIN` is a strict majority of it: that pair is what
- * makes a duel always resolve. With an even count the race can end four-all
- * with nothing left to find, and with a target below the majority both
- * players could reach it on the same board.
+ * The floor is `PEPPERS_TO_WIN * 2 - 1`. Below it the race can end level with
+ * nothing left to find — eight peppers split four-all is a match with no
+ * winner and no move that would ever produce one. At or above it, one side
+ * must reach the target.
+ *
+ * Eleven sits just over that floor rather than well above it, because the
+ * fraction is what gives a duel its shape: five of eleven is nearly half the
+ * board's peppers, so the race is fought across the whole griddle. Raise this
+ * much further and the match is a sprint that stops while most of the board
+ * is still face down.
  */
-export const DUEL_PEPPERS = 9;
+export const DUEL_PEPPERS = 11;
 
 /** Roughly the density a classic minesweeper board is played at. */
 const SOLO_DENSITY = 0.16;
 
 /**
- * A duel board is square and small — it is a sprint, and nine peppers
- * scattered over a full phone screen would be a scattering rather than a
- * minefield. Solo takes the whole screen, which is the board people expect.
+ * A duel board is square, which on a tall screen leaves a margin at each end
+ * that a full-height board would not. That is the price of the fraction: the
+ * peppers have to stay dense enough to deduce about and few enough that five
+ * of them is close to half, and a board filling a phone would need three
+ * times as many to keep the density, at which point the race stops covering
+ * it. Solo takes the whole screen, which is the board people expect.
  */
 export const SHAPES: Readonly<Record<Mode, Shape>> = {
   solo: { edge: 8, square: false },
-  duel: { edge: 7, square: true },
+  duel: { edge: 8, square: true },
 };
 
 /** How many peppers to lay on a board of this size. */

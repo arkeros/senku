@@ -49,12 +49,16 @@ has a top. Two players at opposite ends of a table would mean one of them
 doing arithmetic upside down all game, so this one is played side by side,
 with the score strip lighting up whoever's go it is.
 
-**A duel board is square, small, and holds exactly nine peppers.** Nine is odd
-and five is a strict majority of it, and that pair is the whole guarantee that
-a duel resolves — an even count can end four-all with nothing left to find.
-Nine scattered over a full phone screen would be a scattering rather than a
-minefield, so the duel board is cut down until the density is worth deducing
-about. The assertion is in `match_test.mjs`, on the constants themselves.
+**A duel board is square, and leaves a margin at each end of a tall screen.**
+Two constants hold it there. Eleven peppers is just over the floor of
+`PEPPERS_TO_WIN * 2 - 1`, below which the race can end level with nothing left
+to find; and five of eleven is nearly half of them, which is what makes the
+match a race across the whole griddle rather than a sprint that stops while
+most of it is still face down. A board filling a phone would need three times
+as many peppers to keep the density worth deducing about, and five of thirty
+is not a race for anything. Both bounds are asserted in `match_test.mjs`, on
+the constants themselves. The margin is what that costs; it reads as a board
+game on a table, which is what a duel is.
 
 **The first solo tap re-lays the peppers.** `relayAround` holds the tapped
 cell and its eight neighbours cold and deals again, so the opening move is

@@ -98,12 +98,18 @@ test("scored: a finished match takes no more peppers", () => {
   assert.equal(scored(over, "right").found.right, 0);
 });
 
-test("a duel always resolves: five is a majority of nine", () => {
-  // The constants are the whole guarantee. With an even count, or a target
-  // that is not a majority, a duel could run out of peppers with no winner.
-  assert.equal(DUEL_PEPPERS % 2, 1);
-  assert.ok(PEPPERS_TO_WIN * 2 > DUEL_PEPPERS);
-  assert.equal(PEPPERS_TO_WIN, Math.ceil(DUEL_PEPPERS / 2));
+test("a duel always resolves: two players cannot split the peppers level", () => {
+  // The constants are the whole guarantee. One short of this and both sides
+  // can reach PEPPERS_TO_WIN - 1 with nothing left on the board — a match
+  // with no winner and no move that would produce one.
+  assert.ok(DUEL_PEPPERS >= PEPPERS_TO_WIN * 2 - 1);
+});
+
+test("a duel is a race for the board, not away from it", () => {
+  // Five of eleven is most of the way to all of them. The floor above admits
+  // any larger count, and a much larger one would end the match while the
+  // board was still mostly face down — so the upper bound is stated too.
+  assert.ok(DUEL_PEPPERS <= PEPPERS_TO_WIN * 2 + 2);
 });
 
 // ---- solo -------------------------------------------------------------------
@@ -156,7 +162,16 @@ test("SHAPES: a duel board is square and a solo board fills the screen", () => {
   assert.equal(SHAPES.solo.square, false);
 });
 
-test("SHAPES: a duel board has room for nine peppers and then some", () => {
-  const board = layout(400, 800, SHAPES.duel);
-  assert.ok(board.cols * board.rows > DUEL_PEPPERS * 4);
+test("SHAPES: a duel board keeps the peppers dense enough to deduce about", () => {
+  // Sparse is worse than small: a scattering opens in huge floods and gives
+  // a player nothing to read between turns.
+  for (const [w, h] of [
+    [400, 800],
+    [390, 844],
+    [360, 780],
+  ]) {
+    const cells = layout(w, h, SHAPES.duel);
+    const density = DUEL_PEPPERS / (cells.cols * cells.rows);
+    assert.ok(density > 0.12 && density < 0.25);
+  }
 });
