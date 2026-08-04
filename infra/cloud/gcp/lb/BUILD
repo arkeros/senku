@@ -24,6 +24,7 @@ bzl_library(
         "//apps/cluedo-bayes:defs",
         "//apps/dino-meteor:defs",
         "//apps/napkin-battle:defs",
+        "//apps/pepper-sweeper:defs",
         "//apps/spaghetti-duel:defs",
         "//apps/table-for-two:defs",
         "//oci/cmd/registry:defs",
