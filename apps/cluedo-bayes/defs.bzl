@@ -10,6 +10,10 @@ SERVICE_NAME = "cluedo-bayes"
 
 LB_BACKEND = {
     "service_name": SERVICE_NAME,
+    # The root that creates the Cloud Run service named above. The LB
+    # turns this into a deploy edge, so a backend is always running
+    # before anything routes to it.
+    "root": "//apps/cluedo-bayes:terraform",
     "regions": [REGION],
     "host": "cluedo.arquero.dev",
 }

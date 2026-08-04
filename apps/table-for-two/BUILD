@@ -1,17 +1,12 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
-load("@rules_img//img:push.bzl", "image_push")
 load("@terraform.bzl//:gcp.bzl", "google_provider", "service_account")
 load("@terraform.bzl", "output")
 load("//devtools/bifrost/modules:cloudrun.bzl", "service_cloudrun")
 load("//devtools/build/react_component:react_app.bzl", "react_app", "route")
 load("//devtools/build/react_component:react_static_layer.bzl", "react_static_layer")
-load("//devtools/build/tools/tf:render.bzl", "IMAGE_URI", "tf_root_with_image")
-load(
-    "//infra/cloud/gcp/gar:defs.bzl",
-    "GAR_REGISTRY",
-    "GAR_REPOSITORY_PREFIX",
-)
+load("//devtools/build/tools/tf:render.bzl", "IMAGE_URI", "registry_push", "tf_root_with_image")
+load("//infra/cloud/gcp/gar:defs.bzl", "REGISTRY")
 load("//oci:frontend_image.bzl", "frontend_images_all_arch")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "NGINX_FIXED_VEX_STATEMENTS")
@@ -94,18 +89,11 @@ frontend_images_all_arch(
     vex = [":vex"],
 )
 
-image_push(
+registry_push(
     name = "image_push_gar",
     image = ":image",
-    registry = GAR_REGISTRY,
-    repository = GAR_REPOSITORY_PREFIX + "/" + SERVICE_NAME,
-    stamp = "force",
-    tag_list = [
-        "latest",
-        "{{.STABLE_MONOREPO_IMAGE_TAG_VERSION}}",
-        "{{.STABLE_MONOREPO_SHORT_VERSION}}",
-    ],
-    tags = ["manual"],
+    registry = REGISTRY,
+    repository = SERVICE_NAME,
 )
 
 sa = service_account(

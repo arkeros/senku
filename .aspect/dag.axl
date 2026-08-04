@@ -1,0 +1,34 @@
+"""
+Print the deploy DAG in the order `aspect apply` would walk it.
+
+    aspect dag
+
+Read-only: it runs `bazel query` and nothing else — no terraform, no
+credentials, no state. Useful for answering "what would a deploy do, and in
+what order" without doing it, and for checking that a new node landed where
+you expected.
+
+Honours `$CI` the same way the real thing does, so running it with `CI=1`
+shows the set CI would walk (bootstrap roots dropped).
+"""
+
+load("./stdlib.axl", "deploy_nodes")
+
+def impl(ctx) -> int:
+    nodes = deploy_nodes(ctx)
+    if nodes == None:
+        return 1
+
+    out = ctx.std.io.stdout
+    position = 0
+    for node in nodes:
+        position += 1
+        out.write("{}. [{}] {}\n".format(
+            position,
+            "root" if node.is_root else "task",
+            node.label,
+        ))
+    out.write("\n{} node(s)\n".format(len(nodes)))
+    return 0
+
+dag = task(implementation = impl)

@@ -34,7 +34,7 @@ Local mode: no comment side-effects, output streams to the terminal as
 usual.
 """
 
-load("./stdlib.axl", "build_runnable", "is_ci", "select_targets")
+load("./stdlib.axl", "build_runnable", "is_ci", "select_roots")
 load("./terraform.axl", "TF_ARGS", "build_tf_args")
 
 # Bazel target for the comment-poster Go binary. Built once at the top
@@ -116,7 +116,9 @@ def _post_pr_comment(comment_ep, comment_r, pr_ctx, target, plan_file = None, pl
 def impl(ctx) -> int:
     err = ctx.std.io.stderr
 
-    targets = select_targets(ctx, ctx.args.root)
+    # Roots only: a deploy node that is not a Terraform root (an image push)
+    # has nothing to plan.
+    targets = select_roots(ctx, ctx.args.root)
     if targets == None:
         err.write("ERROR: could not determine the deploy set\n")
         return 1

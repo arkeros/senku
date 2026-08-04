@@ -19,6 +19,10 @@ SERVICE_NAME = "spaghetti-duel"
 # hostname. See //infra/cloud/gcp/lb for how this is consumed.
 LB_BACKEND = {
     "service_name": SERVICE_NAME,
+    # The root that creates the Cloud Run service named above. The LB
+    # turns this into a deploy edge, so a backend is always running
+    # before anything routes to it.
+    "root": "//apps/spaghetti-duel:terraform",
     "regions": [REGION],
     "host": "pasta.arquero.dev",
 }
