@@ -47,21 +47,51 @@ underlying runnable:
 bazel run //x:terraform.plan -- -lock-timeout=5m
 ```
 
+## The deploy set
+
+There is no list. Both tasks discover which roots to walk by querying the
+build graph for tags that each `tf_root` publishes about itself:
+
+| Tag | Meaning |
+| --- | --- |
+| `tf-root` | Is a Terraform root. Marks every one, deployable or not. |
+| `tf-deploy` | Belongs to the deploy set. Present unless `deploy = False`. |
+| `tf-bootstrap` | Skipped under `$CI`; applied locally only. |
+| `tf-tier=<n>` | Deploy-order bucket, ascending. Single digit. |
+
+```bash
+bazel query 'attr(tags, "tf-deploy", //...)'    # what would be applied
+bazel query 'attr(tags, "tf-tier=2", //...)'    # what goes last
+```
+
+Roots apply tier by tier. Within a tier the order is alphabetical and must
+not matter — if two roots in a tier ever depend on each other, the fix is a
+tier boundary between them, not a lucky sort.
+
 ## Bootstrap roots
 
-`BOOTSTRAP_ROOTS` in `.aspect/stdlib.axl` is the subset of `TF_ROOTS` that
-`aspect plan` and `aspect apply` skip when running under `$CI`. Today
-that's just `//infra/cloud/gcp/ci:terraform` — the WIF + GHA SA + project
-IAM bindings every other root depends on. Apply it locally only: a
-botched CI-side apply could revoke the SA's own permissions and leave CI
-unable to recover.
+`bootstrap = True` marks a root that provisions the CI identity itself —
+the WIF binding, the GHA service account, the project IAM every other root
+depends on. `aspect plan` / `aspect apply` skip these under `$CI` and
+announce the skip on stderr, so a CI log explains its own gaps. A botched
+CI-side apply could revoke the SA's own permissions and leave CI unable to
+recover.
 
-Locally, `aspect plan` / `aspect apply` walk the full DAG (including
-bootstrap roots) — the filter only kicks in when `$CI` is set.
+Locally both tasks walk the full DAG, bootstrap roots included — the filter
+only applies when `$CI` is set.
 
 ## Adding a root
 
-1. Add the new `tf_root` target to `.aspect/stdlib.axl`'s `TF_ROOTS` list,
-   in the position that matches its GCP-level dependencies.
-2. If the root manages credentials or anything else CI shouldn't touch
-   on its own, add it to `BOOTSTRAP_ROOTS` too.
+Nothing. A new `tf_root` is in the deploy set by default, and
+`tf_root_with_image` already places image-pushing roots after the registry.
+
+You only declare something when the default is wrong:
+
+- **It's an example or fixture** → `deploy = False`. Also give it a backend
+  bucket that cannot resolve, so a hand-run apply dies in `terraform init`
+  rather than relying on the orchestrator to exclude it.
+- **It provisions CI's own credentials** → `bootstrap = True`.
+- **Its GCP resources must exist before another root's** → raise that other
+  root's `deploy_tier`. Note this is about *resources*, not `load()`:
+  importing a constant from another root is a build dependency, not a deploy
+  one. See [ADR 0008](../docs/adr/0008-derived-terraform-deploy-set.md).

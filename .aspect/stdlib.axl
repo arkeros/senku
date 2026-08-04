@@ -2,29 +2,102 @@
 
 load("./runnable.axl", "runnable")
 
-# Terraform roots in deploy order. Single source of truth for the deploy DAG.
+# The deploy set is a query, not a list.
 #
-# `bootstrap = True` marks roots that must **only** be applied locally:
-# they provision the CI service account and the project-level IAM bindings
-# that every other root needs. A botched CI-side apply could revoke the
-# SA's own permissions and leave CI unable to recover, so `aspect plan`
-# and `aspect apply` skip these when running under `$CI`. They stay in
-# the list so a developer's `aspect plan` walks the whole DAG.
-TF_ROOTS = [
-    struct(target = "//infra/cloud/gcp/ci:terraform", bootstrap = True),
-    struct(target = "//infra/cloud/gcp/audit:terraform", bootstrap = True),
-    struct(target = "//infra/cloud/gcp/gar:terraform", bootstrap = False),
-    struct(target = "//oci/cmd/registry:terraform", bootstrap = False),
-    struct(target = "//apps/napkin-battle:terraform", bootstrap = False),
-    struct(target = "//apps/dino-meteor:terraform", bootstrap = False),
-    struct(target = "//apps/table-for-two:terraform", bootstrap = False),
-    struct(target = "//apps/cluedo-bayes:terraform", bootstrap = False),
-    struct(target = "//apps/spaghetti-duel:terraform", bootstrap = False),
-    # Last: its serverless NEGs name Cloud Run services by string, and a NEG
-    # whose service does not exist yet resolves to a 404 rather than an error.
-    # Every app root above must have run first.
-    struct(target = "//infra/cloud/gcp/lb:terraform", bootstrap = False),
-]
+# Every `tf_root` publishes its own membership, tier and bootstrap status as
+# tags (see `_deploy_tags` in the terraform.bzl module), so joining the deploy
+# DAG *is* declaring the root. There is nothing here to keep in sync: a new
+# root deploys by default, and an example opts out with `deploy = False` at
+# its own call site.
+#
+# This used to be a hand-maintained ordered list. It drifted — an app was
+# added without an entry, so it built, merged and passed CI while never
+# deploying, and its load balancer backend served a silent 404 pointing at a
+# Cloud Run service nothing would ever create. See
+# docs/adr/0008-derived-terraform-deploy-set.md.
+
+# Mirrors the tag vocabulary emitted by the `tf_root` macro.
+_TAG_DEPLOY = "tf-deploy"
+
+_TAG_BOOTSTRAP = "tf-bootstrap"
+
+_TAG_TIER = "tf-tier="
+
+# Tags are matched as substrings, which is why tiers are single-digit:
+# `tf-tier=1` would otherwise also select `tf-tier=10`. The macro rejects
+# anything outside this range.
+_MAX_TIER = 9
+
+def _query(ctx, expr):
+    """Labels matching a `bazel query` expression, or None if it failed.
+
+    Shells out rather than using `ctx.bazel`, which exposes `build` but no
+    query verb — the same reason `runnable.axl` spawns `bazel cquery`
+    directly to resolve entrypoints.
+    """
+    result = ctx.std.process.command("bazel") \
+        .args([
+            "query",
+            expr,
+            "--output=label",
+            "--ui_event_filters=-info",
+            "--noshow_progress",
+        ]) \
+        .stdout("piped") \
+        .stderr("piped") \
+        .spawn() \
+        .wait_with_output()
+    if result.status.code != 0:
+        ctx.std.io.stderr.write(result.stderr)
+        return None
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+def deploy_roots(ctx):
+    """Every deployable root, ordered by tier. None if a query failed.
+
+    Bootstrap roots are dropped under `$CI` and the skip is announced on
+    stderr, so a CI log explains its own gaps rather than leaving a reader
+    to wonder why a root is missing.
+
+    Within a tier the order is alphabetical — deliberately arbitrary. Roots
+    sharing a tier must be independent; if two ever aren't, the fix is a tier
+    boundary between them, not a lucky sort.
+    """
+    members = _query(ctx, 'attr(tags, "{}", //...)'.format(_TAG_DEPLOY))
+    if members == None:
+        return None
+
+    if is_ci(ctx):
+        bootstrap = _query(ctx, 'attr(tags, "{}", //...)'.format(_TAG_BOOTSTRAP))
+        if bootstrap == None:
+            return None
+        err = ctx.std.io.stderr
+        for root in sorted(bootstrap):
+            err.write("skipping {} (bootstrap-tier; apply locally only)\n".format(root))
+        members = [m for m in members if m not in bootstrap]
+
+    # Re-query per tier, scoped to the set we already have, so each pass is a
+    # lookup over ~10 known targets instead of another sweep of `//...`.
+    scope = "set({})".format(" ".join(members))
+    ordered = []
+    for tier in range(_MAX_TIER + 1):
+        if len(ordered) == len(members):
+            break
+        at_tier = _query(ctx, 'attr(tags, "{}{}", {})'.format(_TAG_TIER, tier, scope))
+        if at_tier == None:
+            return None
+        ordered.extend(sorted(at_tier))
+
+    if len(ordered) != len(members):
+        ctx.std.io.stderr.write(
+            "ERROR: {} deployable root(s) carry no {}<n> tag: {}\n".format(
+                len(members) - len(ordered),
+                _TAG_TIER,
+                ", ".join([m for m in members if m not in ordered]),
+            ),
+        )
+        return None
+    return ordered
 
 def is_ci(ctx) -> bool:
     return ctx.std.env.var("CI") != None
@@ -41,33 +114,24 @@ def normalize_root(target) -> str:
         return target
     return target + ":terraform"
 
-def select_targets(ctx, requested) -> list:
-    """Resolve the list of targets to act on.
+def select_targets(ctx, requested):
+    """Resolve the roots to act on, in deploy order. None if discovery failed.
 
-    If the caller passed explicit targets, honor them verbatim (the
-    bootstrap filter is bypassed — an explicit `aspect plan
-    //infra/cloud/gcp/ci:terraform` should still work in CI for the rare
-    case a maintainer wants it).
+    If the caller passed explicit targets, honor them verbatim — the
+    bootstrap filter is bypassed, so an explicit `aspect plan
+    //infra/cloud/gcp/ci:terraform` still works in CI for the rare case a
+    maintainer wants it, and a `deploy = False` example can still be planned
+    by name.
 
-    With no targets, default to all `TF_ROOTS`. Under CI, drop the
-    bootstrap-tier roots and announce the skip on stderr so the CI log
-    self-documents — a future reader scanning the log won't have to
-    cross-reference `TF_ROOTS` to figure out why a root is missing.
+    With no targets, discover the deploy set from the build graph. Returns
+    None (not an empty list) when a query fails, so callers can tell "nothing
+    to do" apart from "we don't know what to do" and fail instead of quietly
+    succeeding.
     """
     if len(requested) > 0:
         return [normalize_root(t) for t in requested]
 
-    if is_ci(ctx):
-        err = ctx.std.io.stderr
-        targets = []
-        for r in TF_ROOTS:
-            if r.bootstrap:
-                err.write("skipping {} (bootstrap-tier; apply locally only)\n".format(r.target))
-            else:
-                targets.append(r.target)
-        return targets
-
-    return [r.target for r in TF_ROOTS]
+    return deploy_roots(ctx)
 
 def build_runnable(ctx, target, build_flags = []):
     """Build `target` and resolve its runtime entrypoint, so the binary

@@ -117,6 +117,10 @@ def impl(ctx) -> int:
     err = ctx.std.io.stderr
 
     targets = select_targets(ctx, ctx.args.root)
+    if targets == None:
+        err.write("ERROR: could not determine the deploy set\n")
+        return 1
+
     tf_args = build_tf_args(ctx)
 
     # In CI on a PR, build the comment-poster binary ONCE up front and
