@@ -134,9 +134,9 @@ starts a game from the title card.
 ## Deploying
 
 ```bash
+aspect dag                    # where this app sits in the deploy order
 aspect plan  //apps/pepper-sweeper:terraform
-aspect apply //apps/pepper-sweeper:terraform
-aspect apply //infra/cloud/gcp/lb:terraform
+aspect apply                  # the whole graph, in order
 ```
 
 Served at **`padron.arquero.dev`**. Same constraints as the other panellet
@@ -145,10 +145,22 @@ and `internal-and-cloud-load-balancing`, so there is no usable `*.run.app`
 URL and the shared LB is the only way in.
 
 `defs.bzl` declares a `host` with no `paths`, meaning this backend owns every
-path on that hostname — the shape an SPA needs. The root is registered in
-`.aspect/stdlib.axl` ahead of the LB, because the LB's serverless NEG names
-this Cloud Run service by string and a NEG whose service does not exist yet
-resolves to a bare 404 rather than an error.
+path on that hostname — the shape an SPA needs.
+
+**Nothing here registers the app for deployment**, and that is the point. The
+deploy order is a query over the build graph, not a list ([ADR
+0008](../../docs/adr/0008-derived-terraform-deploy-set.md)), so declaring the
+`tf_root` is what joins it. The two edges this app needs both fall out of
+things it had to write anyway: the image push waits on the registry because it
+names `REGISTRY`, and the LB waits on this root because `LB_BACKEND` names its
+service with `ref()` rather than a string — the value routed to and the root
+waited on are one token, so they cannot come to disagree. `aspect dag` prints
+the result.
+
+That matters here more than most: the LB's serverless NEG names a Cloud Run
+service by string, and a NEG whose service does not exist serves a bare 404
+rather than failing. This app's older sibling shipped exactly that bug by
+being left out of the hand-written list.
 
 **DNS is not managed here.** Before the LB apply is useful, add an `A` record
 for `padron.arquero.dev` pointing at the LB's `lb_ip` (`34.54.227.199`),
