@@ -101,8 +101,11 @@ announce the skip on stderr, so a CI log explains its own gaps. A botched
 CI-side apply could revoke the SA's own permissions and leave CI unable to
 recover.
 
-Locally both tasks walk the full DAG, bootstrap roots included — the filter
-only applies when `$CI` is set.
+The filter is on *discovery*, and only when `$CI` is set. Both tasks walk
+the full DAG locally, bootstrap roots included. And a target named on the
+command line is honored verbatim — `CI=1 aspect apply //infra/cloud/gcp/ci:terraform`
+applies it — because asking for a root by name is a decision someone made,
+not one to second-guess.
 
 ## Adding a root
 
