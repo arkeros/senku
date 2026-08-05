@@ -1,6 +1,7 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_test")
 load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load(":cache_test.bzl", "cache_test_suite")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -158,6 +159,8 @@ exports_files(
     visibility = ["//visibility:public"],
 )
 
+cache_test_suite(name = "cache_test")
+
 bzl_library(
     name = "react_app",
     srcs = ["react_app.bzl"],
@@ -180,9 +183,11 @@ bzl_library(
     name = "react_static_layer",
     srcs = ["react_static_layer.bzl"],
     deps = [
+        ":cache",
         "//oci:frontend_image",
         "@bazel_lib//lib:copy_to_directory",
         "@bazel_lib//lib:expand_template",
+        "@bazel_skylib//rules:write_file",
     ],
 )
 
@@ -297,6 +302,11 @@ bzl_library(
 bzl_library(
     name = "asset_codegen",
     srcs = ["asset_codegen.bzl"],
+)
+
+bzl_library(
+    name = "cache",
+    srcs = ["cache.bzl"],
 )
 
 bzl_library(
