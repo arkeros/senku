@@ -261,7 +261,9 @@ def select_nodes(ctx, requested):
     know what to do" and fail instead of quietly succeeding.
     """
     if len(requested) > 0:
-        graph = _query_nodes(ctx, _NODES_QUERY) or {}
+        graph = _query_nodes(ctx, _NODES_QUERY)
+        if graph == None:
+            return None
         return [
             graph.get(t) or struct(label = t, is_root = True, bootstrap = False, after = [])
             for t in [normalize_root(r) for r in requested]
