@@ -1,0 +1,18 @@
+{
+  "padron.title": "PADRÓN PEPPERS",
+  "padron.tagline": "some sting, most don't",
+  "padron.solo": "SOLO",
+  "padron.duel": "DUEL",
+  "padron.soloHint": "Clear the whole griddle",
+  "padron.duelHint": "Five hot ones takes it",
+  "padron.holdHint": "Hold to mark · tap a number to clear around it",
+  "padron.remaining": "LEFT",
+  "padron.time": "TIME",
+  "padron.best": "BEST",
+  "padron.swept": "GRIDDLE CLEAR",
+  "padron.bitten": "THAT ONE STUNG",
+  "padron.playAgain": "Tap for the menu",
+  "padron.name.brava": "BRAVA",
+  "padron.name.alioli": "ALIOLI",
+  "padron.win": "{$name} WINS!"
+}

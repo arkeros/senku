@@ -8,7 +8,7 @@ load("//devtools/build/react_component:react_static_layer.bzl", "react_static_la
 load("//devtools/build/tools/tf:bucket_push.bzl", "bucket_push")
 load("//devtools/build/tools/tf:render.bzl", "registry_push")
 load("//infra/cloud/gcp/gar:defs.bzl", "REGISTRY")
-load("//oci:frontend_image.bzl", "frontend_images_all_arch")
+load("//oci:frontend_image.bzl", "NGINX_FRONTEND_DEFAULT_CHANNEL", "frontend_images_all_arch")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "NGINX_FIXED_VEX_STATEMENTS")
 load("//oci/distroless/common:variables.bzl", "DEBIAN_WONTFIX_CVES")
@@ -82,7 +82,7 @@ vex_document(
     name = "vex",
     author = "rafael@arquero.cat",
     id = "https://github.com/arkeros/senku/blob/main/apps/spaghetti-duel/BUILD",
-    statements = NGINX_FIXED_VEX_STATEMENTS,
+    statements = NGINX_FIXED_VEX_STATEMENTS[NGINX_FRONTEND_DEFAULT_CHANNEL],
     timestamp = "2026-08-03T00:00:00Z",
 )
 
