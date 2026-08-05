@@ -14,9 +14,9 @@ image, one `LB_BACKEND` line to reach the internet.
 
 | Path | What lives there |
 | --- | --- |
-| `game/board.ts` | Cutting a viewport into a grid, absorbing a resize, and naming the cell under a finger. Knows nothing about peppers — 12 `node:test` cases. |
+| `game/board.ts` | Cutting a viewport into a grid, absorbing a resize, and naming the cell under a finger. Knows nothing about peppers — 15 `node:test` cases. |
 | `game/field.ts` | The minefield: where the peppers are, and every way a tile changes — reveal and its flood, flags, chording, and the duel's pick. Injected randomness, 33 cases. |
-| `game/match.ts` | Whose go it is, what each side has found, and what ends a game. Also how coarsely each mode cuts the screen — 21 cases. |
+| `game/match.ts` | Whose go it is, what each side has found, and what ends a game. Also which of the two cuts each mode asks for — 22 cases. |
 | `game/input.ts` | What a press means. Separate because a long press is the one gesture with no event of its own — 8 cases. |
 | `render/` | Every `ctx` call, driven by a `World` snapshot plus a `Labels` bag. Knows nothing about React, i18n or the rules. |
 | `ui/components/Plancha/` | The only stateful component. Owns the canvas, the RAF loop and the fingers. |
@@ -49,17 +49,35 @@ has a top. Two players at opposite ends of a table would mean one of them
 doing arithmetic upside down all game, so this one is played side by side,
 with the score strip lighting up whoever's go it is.
 
-**A duel board is cut coarser than a solo one, not made smaller.** Both fill
-the screen; the duel's is six cells across where solo is eight. What the
-coarser cut buys is a low cell count, and the cell count is what the two
-constants need: twelve peppers is just over the floor of
-`PEPPERS_TO_WIN * 2 - 1`, below which a race can end level with nothing left
-to find, and five of twelve is nearly half of them, which keeps the match a
-race across the whole griddle rather than a sprint that stops while most of it
-is face down. Both bounds are asserted in `match_test.mjs`, on the constants
-themselves. Bigger cells are the side effect, and a welcome one — the duel is
-the mode where two people are racing, and it ends up with the largest tap
-targets in the app.
+**The two modes are sized by opposite rules.** A board has two properties
+that cannot both be held across screens — how big a cell is, and how many
+there are — so each mode says which one it needs and `layout` works out the
+other.
+
+Solo asks to be **filled**: cells stay about 44px and the count follows the
+screen, so a phone gets 128 cells and an iPad 483, at the same size under a
+thumb. Its pepper count is a density, so the game scales with the board.
+
+A duel asks to be **fitted**: exactly 6×12, with the biggest cells that fit.
+It has to, because `DUEL_PEPPERS` and `PEPPERS_TO_WIN` are absolute numbers,
+and a fraction of an absolute number only means something against a fixed
+board — twelve peppers is a fair minefield on seventy-two cells and a coin
+toss on thirty. Holding the *columns* alone would not be enough: rows would
+still follow the screen's shape, which is how an earlier cut of this ended up
+laying a third-hot board on a tablet and a sixth-hot one on a phone while
+looking stable across the five viewports it was tested on.
+
+The two constants are then free to mean something. Twelve is just over the
+floor of `PEPPERS_TO_WIN * 2 - 1`, below which a race can end level with
+nothing left to find; and five of twelve is nearly half, which keeps the match
+a race across the whole griddle rather than a sprint that stops while most of
+it is face down. Both bounds are asserted in `match_test.mjs`, on the
+constants themselves, alongside the invariant that every screen gets the same
+duel board.
+
+6×12 is a phone's proportions, which is what the duel therefore fills. On a
+shape nothing like it — a desktop window — the leftover shows on the other
+axis. That is the honest price of it being the same board there as here.
 
 **The first solo tap re-lays the peppers.** `relayAround` holds the tapped
 cell and its eight neighbours cold and deals again, so the opening move is
@@ -94,9 +112,13 @@ intended design lands wherever those families happen to be installed.
 ### The record
 
 `pepper-sweeper.best` in `localStorage` is the fastest solo sweep, and it is a
-per-device number rather than a comparable one: the board is cut from the
-viewport, so a tablet is playing a wider game than a phone. On one device it
-is stable, which is all a record on a puzzle you play alone needs to be.
+per-device number rather than a comparable one — emphatically so, now that a
+solo board is filled rather than fixed: an iPad is clearing 483 cells and 77
+peppers where a phone clears 128 and 20. Those are not the same puzzle and
+their times are not the same measurement. On one device the board is stable,
+which is all a record on a puzzle you play alone needs to be. A duel needs no
+such caveat: that board is the same 6×12 everywhere, which is the point of
+fitting it.
 
 ## Running it
 

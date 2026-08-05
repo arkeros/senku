@@ -4,8 +4,19 @@ import assert from "node:assert/strict";
 import { MIN_CELL, cellAt, centerOf, layout, refit } from "./board.js";
 
 /** How solo cuts a screen, and a portrait phone — the shape this is played on. */
-const ACROSS = 8;
-const board = layout(400, 800, ACROSS);
+const FILL = { kind: "fill", cell: 44 };
+const FIT = { kind: "fit", cols: 6, rows: 12 };
+const board = layout(400, 800, FILL);
+
+/** Phones, tablets and a desktop window — the range a web game actually meets. */
+const SCREENS = [
+  [375, 667],
+  [390, 844],
+  [440, 956],
+  [744, 1133],
+  [1024, 1366],
+  [1440, 900],
+];
 
 test("layout: the grid is centred inside the viewport", () => {
   // To within a pixel: an odd leftover cannot be split evenly, and origins
@@ -15,44 +26,80 @@ test("layout: the grid is centred inside the viewport", () => {
   assert.ok(evenly(800, board.rows * board.cell, board.originY));
 });
 
-test("layout: the short edge is cut into about `cellsAcross` columns", () => {
-  assert.ok(Math.abs(board.cols - ACROSS) <= 1);
-});
-
 test("layout: the grid clears the bands the score strip is drawn in", () => {
   assert.ok(board.originY >= board.pad + board.band);
   assert.ok(board.rows * board.cell + (board.pad + board.band) * 2 <= 800);
 });
 
-test("layout: the long edge is filled, not squared off", () => {
-  // The whole point of cutting off the short edge: a tall screen gets more
-  // rows rather than a small board floating in the middle of it.
-  assert.ok(board.rows > board.cols);
-  const spare = 800 - board.rows * board.cell - (board.pad + board.band) * 2;
-  assert.ok(spare < board.cell);
+// ---- fill: the cells stay put and the count moves ----------------------------
+
+test("fill: cells come out near the size asked for, on any screen", () => {
+  for (const [w, h] of SCREENS) {
+    const b = layout(w, h, FILL);
+    assert.ok(Math.abs(b.cell - FILL.cell) <= 6, `${w}x${h} gave ${b.cell}px cells`);
+  }
 });
 
-test("layout: a coarser cut is bigger cells, not a smaller board", () => {
-  const coarse = layout(390, 844, 6);
-  const fine = layout(390, 844, 8);
-  assert.ok(coarse.cell > fine.cell);
-  assert.ok(coarse.cols < fine.cols);
-  // Both still reach the bottom of the same screen.
-  assert.ok(844 - coarse.rows * coarse.cell - (coarse.pad + coarse.band) * 2 < coarse.cell);
+test("fill: nothing is left over across the screen", () => {
+  // The column count is rounded to the nearest whole board and the cell size
+  // taken from that, so a strip of unused screen down one side cannot happen.
+  for (const [w, h] of SCREENS) {
+    const b = layout(w, h, FILL);
+    assert.ok(w - b.pad * 2 - b.cols * b.cell < b.cell);
+    assert.ok(h - (b.pad + b.band) * 2 - b.rows * b.cell < b.cell);
+  }
 });
+
+test("fill: a bigger screen is more board, not a bigger board", () => {
+  const phone = layout(390, 844, FILL);
+  const tablet = layout(1024, 1366, FILL);
+  assert.ok(tablet.cols > phone.cols && tablet.rows > phone.rows);
+  assert.ok(Math.abs(tablet.cell - phone.cell) <= 4);
+});
+
+test("fill: a landscape window fills sideways", () => {
+  const wide = layout(1440, 900, FILL);
+  assert.ok(wide.cols > wide.rows);
+  assert.ok(wide.cols * wide.cell <= 1440);
+  assert.ok(wide.rows * wide.cell <= 900);
+});
+
+// ---- fit: the count stays put and the cells move -----------------------------
+
+test("fit: the board has exactly the dimensions asked for, on any screen", () => {
+  for (const [w, h] of SCREENS) {
+    const b = layout(w, h, FIT);
+    assert.equal(b.cols, FIT.cols);
+    assert.equal(b.rows, FIT.rows);
+  }
+});
+
+test("fit: the cells grow to suit the screen", () => {
+  assert.ok(layout(1024, 1366, FIT).cell > layout(390, 844, FIT).cell);
+});
+
+test("fit: the board reaches the edge on whichever axis binds", () => {
+  // A fixed board cannot fill both axes of every screen, but it must reach
+  // one of them, or it is a postage stamp in the middle of the glass.
+  for (const [w, h] of SCREENS) {
+    const b = layout(w, h, FIT);
+    const spareW = w - b.pad * 2 - b.cols * b.cell;
+    const spareH = h - (b.pad + b.band) * 2 - b.rows * b.cell;
+    assert.ok(Math.min(spareW, spareH) < b.cell, `${w}x${h} leaves a whole cell spare`);
+  }
+});
+
+// ---- the floor ---------------------------------------------------------------
 
 test("layout: cells never shrink below a thumb on a small screen", () => {
-  const tiny = layout(240, 380, ACROSS);
-  assert.ok(tiny.cell >= MIN_CELL);
-  assert.ok(tiny.cols >= 5 && tiny.rows >= 5);
+  for (const cut of [FILL, FIT]) {
+    const tiny = layout(240, 380, cut);
+    assert.ok(tiny.cell >= MIN_CELL);
+  }
+  assert.ok(layout(240, 380, FILL).cols >= 5);
 });
 
-test("layout: a landscape window still fits inside its padding", () => {
-  const wide = layout(900, 500, ACROSS);
-  assert.ok(wide.cols * wide.cell <= 900);
-  assert.ok(wide.rows * wide.cell <= 500);
-  assert.ok(wide.cols > wide.rows);
-});
+// ---- everything else ---------------------------------------------------------
 
 test("refit: a resize mid-game rescales the grid instead of recutting it", () => {
   // The URL bar collapsing on the first tap changes the height by a few

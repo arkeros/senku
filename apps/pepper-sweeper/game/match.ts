@@ -1,4 +1,4 @@
-import type { Board } from "./board";
+import type { Board, Cut } from "./board";
 import type { Side } from "./field";
 
 /**
@@ -41,17 +41,22 @@ export const DUEL_PEPPERS = 12;
 const SOLO_DENSITY = 0.16;
 
 /**
- * How coarsely each mode cuts the screen, in cells across the short edge.
+ * What each mode holds constant across screens.
  *
- * Both boards fill the screen; a duel's is cut coarser, not smaller. That is
- * what keeps the cell count low enough for twelve peppers to stay dense and
- * for five of them to be nearly half — and because the cells are
- * correspondingly bigger, it also makes the duel the easiest board in the app
- * to hit accurately, which is the mode where two people are racing.
+ * Solo is a puzzle the size of the screen, so its cells stay a thumb wide and
+ * a bigger screen holds more of them; its pepper count is a density, so the
+ * game scales with the board and stays the one people expect.
+ *
+ * A duel cannot do that. `DUEL_PEPPERS` and `PEPPERS_TO_WIN` are absolute
+ * numbers, and a fraction of an absolute number is only meaningful against a
+ * fixed board — twelve peppers is a fair minefield on seventy-two cells and a
+ * coin toss on thirty. So a duel is a 6x12 board wherever it is played, and
+ * what varies is how big the cells come out. Six by twelve is a phone's
+ * proportions, which is where this is played and what it therefore fills.
  */
-export const CELLS_ACROSS: Readonly<Record<Mode, number>> = {
-  solo: 8,
-  duel: 6,
+export const CUT: Readonly<Record<Mode, Cut>> = {
+  solo: { kind: "fill", cell: 44 },
+  duel: { kind: "fit", cols: 6, rows: 12 },
 };
 
 /** How many peppers to lay on a board of this size. */
