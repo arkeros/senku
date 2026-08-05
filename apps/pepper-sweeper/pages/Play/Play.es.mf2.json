@@ -1,0 +1,18 @@
+{
+  "padron.title": "PIMIENTOS DE PADRÓN",
+  "padron.tagline": "unos pican y otros no",
+  "padron.solo": "SOLO",
+  "padron.duel": "DUELO",
+  "padron.soloHint": "Despeja la plancha entera",
+  "padron.duelHint": "Cinco picantes y ganas",
+  "padron.holdHint": "Mantén pulsado para marcar · toca un número para despejar",
+  "padron.remaining": "QUEDAN",
+  "padron.time": "TIEMPO",
+  "padron.best": "RÉCORD",
+  "padron.swept": "PLANCHA LIMPIA",
+  "padron.bitten": "¡ESE PICABA!",
+  "padron.playAgain": "Toca para volver al menú",
+  "padron.name.brava": "BRAVA",
+  "padron.name.alioli": "ALIOLI",
+  "padron.win": "¡GANA {$name}!"
+}
