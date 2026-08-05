@@ -76,14 +76,17 @@ check a duel without two people — the game itself wants two thumbs.
 
 ```bash
 aspect plan  //apps/spaghetti-duel:terraform
-aspect apply //apps/spaghetti-duel:terraform
+aspect apply //apps/spaghetti-duel:terraform   # the bucket
+bazel  run   //apps/spaghetti-duel:bucket_push # its contents
 aspect apply //infra/cloud/gcp/lb:terraform
 ```
 
-Served at **`pasta.arquero.dev`**. Same constraints as the other panellet
-apps: org policy (`constraints/run.allowedIngress`) permits only `internal`
-and `internal-and-cloud-load-balancing`, so there is no usable `*.run.app`
-URL and the shared LB is the only way in.
+`aspect apply` walks all three in that order on its own; the split matters
+only when running a step by hand. See ADR 0009 for why the order is
+load-bearing.
+
+Served at **`pasta.arquero.dev`**. The shared LB is what serves the site;
+the bucket only ever answers a cache miss.
 
 `defs.bzl` declares a `host` with no `paths`, meaning this backend owns every
 path on that hostname — the shape an SPA needs.

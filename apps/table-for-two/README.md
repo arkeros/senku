@@ -60,14 +60,19 @@ bazel test //apps/table-for-two/...
 
 ## Deploying
 
-Served at **`mesa.arquero.dev`**. Same constraints as the other two games:
-ingress is LB-only because org policy permits nothing else, so the shared load
-balancer is the only way in.
+Served at **`mesa.arquero.dev`**. Like the other games it is a bucket behind
+the shared load balancer, which is what serves the site; the bucket only ever
+answers a cache miss.
 
 ```bash
-aspect apply //apps/table-for-two:terraform
+aspect apply //apps/table-for-two:terraform   # the bucket
+bazel  run   //apps/table-for-two:bucket_push # its contents
 aspect apply //infra/cloud/gcp/lb:terraform
 ```
+
+`aspect apply` walks all three in that order on its own; the split matters
+only when running a step by hand. See ADR 0009 for why the order is
+load-bearing.
 
 **DNS is not managed here.** Add an `A` record for `mesa.arquero.dev` →
 `34.54.227.199` (the LB's `lb_ip`), **DNS-only, not proxied** — Certificate

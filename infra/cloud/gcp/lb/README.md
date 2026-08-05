@@ -1,19 +1,21 @@
 # `infra/cloud/gcp/lb` — shared external HTTPS load balancer
 
-Singleton root stack. One global external HTTPS LB fronting Cloud Run services, with path-based routing on one configurable domain. No services are provisioned here — this stack only owns the LB. Service roots expose an `LB_BACKEND` Starlark constant from their own `defs.bzl` (see [`oci/cmd/registry/defs.bzl`](../../../../oci/cmd/registry/defs.bzl) for the canonical example), and this stack imports them directly via `load()` in [`infra/cloud/gcp/lb/defs.bzl`](./defs.bzl). No `terraform_remote_state`: cross-root coupling resolves at Bazel build time, not Terraform plan time.
+Singleton root stack. One global external HTTPS LB fronting two kinds of origin — Cloud Run services and GCS buckets — with path-based routing on one configurable domain. No services are provisioned here — this stack only owns the LB. Service roots expose an `LB_BACKEND` Starlark constant from their own `defs.bzl` (see [`oci/cmd/registry/defs.bzl`](../../../../oci/cmd/registry/defs.bzl) for the canonical example), and this stack imports them directly via `load()` in [`infra/cloud/gcp/lb/defs.bzl`](./defs.bzl). No `terraform_remote_state`: cross-root coupling resolves at Bazel build time, not Terraform plan time.
 
 ## Topology
 
 ```
-user → LB IP (anycast)  ── :443 ──► URL map (HTTPS)        ── host+path rule ─► backend_service ─┬─► NEG (region A) → Cloud Run
-                        └─ :80  ──► URL map (HTTP redirect) ── 301 ────────────► https://…       ├─► NEG (region B) → Cloud Run
-                                                            └── unmatched ────► 404 (GCS bucket) └─► NEG (region C) → Cloud Run
+user → LB IP (anycast)  ── :443 ──► URL map (HTTPS)        ── host+path rule ─┬─► backend_service ─┬─► NEG (region A) → Cloud Run
+                        └─ :80  ──► URL map (HTTP redirect) ── 301 ───────────│──► https://…      ├─► NEG (region B) → Cloud Run
+                                                            └── unmatched ────│──► 404 (bucket)   └─► NEG (region C) → Cloud Run
+                                                                              └─► backend_bucket ───► GCS bucket (static site)
 ```
 
-- **Per backend**: one `google_compute_backend_service` + one `google_compute_region_network_endpoint_group` **per region** the backend declares. NEGs are emitted as one resource per `(backend_key, region)` pair via Starlark expansion of `BACKENDS` in `defs.bzl`.
-- **Regional fan-out** is first-class: a service root's `LB_BACKEND` constant declares `service_name = "<name>"` and `regions = ["us-central1", "europe-west3", …]` — one Cloud Run service name, many regions — and Google's global LB does the geo-steering.
+- **Two drivers.** `LB_BACKEND` declares `driver`, defaulting to `"cloudrun"`. It is `driver` rather than `kind` because bifrost reserves `kind` for what an app *is* (`StaticSite` vs `Runtime`) and `driver` for how it is realised — and the LB is choosing the latter. The five games were `StaticSite`s before this migration and after it; only their driver changed. They share no mechanism — a Cloud Run origin is reached through a serverless NEG wrapped in a backend service, a bucket through a backend bucket — so collapsing them would mean a descriptor whose fields are each meaningful for only half its values. `_normalize` rejects a `gcs-cdn` backend that declares `regions` or `service_name` rather than ignoring it.
+- **`driver = "cloudrun"`**: one `google_compute_backend_service` + one `google_compute_region_network_endpoint_group` **per region** the backend declares. NEGs are emitted as one resource per `(backend_key, region)` pair via Starlark expansion of `BACKENDS` in `defs.bzl`. Regional fan-out is first-class — one service name, many regions, and Google's global LB does the geo-steering.
+- **`driver = "gcs-cdn"`**: one `google_compute_backend_bucket`, no regions and no health check, because there is nothing running to find or check. The host's path matcher also gets a `custom_error_response_policy` rewriting 404 → `/index.html` with `override_response_code = 200`: that is the SPA history-API fallback, which used to be `try_files` inside each app's nginx. See [ADR 0009](../../../../docs/adr/0009-frontends-are-served-from-buckets.md).
 - **Per-domain fan-out** is derived, not hand-written. A backend's `LB_BACKEND` may name a `host`; anything that doesn't defaults to `DOMAIN`. `HOSTS` is the deduplicated result, and each host gets a managed certificate, a cert-map entry and a `host_rule`/`path_matcher` pair automatically.
-- **Path rules vs. whole hosts**: within a host, a backend declaring `paths` becomes a `path_rule`; a backend declaring none becomes that host's `default_service` — the shape an SPA needs, since it owns every path and renders its own 404. At most one backend per host may omit `paths`, enforced with a `fail()` at load time.
+- **Path rules vs. whole hosts**: within a host, a backend declaring `paths` becomes a `path_rule`; a backend declaring none becomes that host's `default_service` — the shape an SPA needs, since it owns every path. Only that owner gets the SPA fallback, and only if it is a bucket: a Cloud Run origin answers its own unknown paths, and the 404 bucket's whole job is to 404. At most one backend per host may omit `paths`, enforced with a `fail()` at load time.
 
 ## Certificate Manager, not classic managed certs
 
@@ -30,6 +32,36 @@ Two things to know when adding a host:
 
 - Issuance is **LB-authorized**, so a certificate stays `PROVISIONING` until that host's `A` record resolves to `lb_ip` and reaches this LB directly. A proxying CDN in front of the record (Cloudflare's orange cloud) terminates TLS itself, the validation never arrives, and the certificate never activates. DNS lives outside this repo — Cloud DNS isn't even enabled on the project.
 - A cert map holds exactly **one `PRIMARY` entry** (the certificate served when SNI matches nothing else). `DOMAIN` claims it; every other host selects by `hostname`. That is the only place the primary domain is special-cased — plus a legacy-name shim so `DOMAIN`'s live certificate keeps the resource address and GCP name it was created under, since renaming either would destroy and recreate a working certificate.
+
+## Verifying a `gcs-cdn` backend
+
+`terraform validate` checks that the provider accepts the URL map; it says
+nothing about what the LB does with it. After a cutover, four commands cover
+the parts that fail silently (`dino` as the example):
+
+```bash
+# SPA fallback: an unknown route must be 200 with HTML, not 404
+curl -sI https://dino.arquero.dev/no-such-route | head -1
+curl -sI https://dino.arquero.dev/no-such-route | grep -i 'content-type\|age'
+
+# The module script's type — a wrong one makes the ESM loader refuse it and
+# the page renders blank
+curl -sI https://dino.arquero.dev/app_bundle/app_main.js | grep -i 'content-type\|cache-control'
+#   want: text/javascript; charset=utf-8  +  no-cache
+
+# Headers actually landed on the objects, not just in the plan
+gcloud storage objects describe gs://senku-prod-dino-meteor/index.html \
+  --format='value(contentType,cacheControl)'
+curl -sI https://dino.arquero.dev/manifest.webmanifest | grep -i content-type
+#   want: application/manifest+json
+```
+
+`negative_caching` is on for both drivers, and its interaction with the
+fallback is the one thing here nobody has watched in production: a bucket
+404s on every client-routed path, and those 404s are exactly what the policy
+rewrites. If it misbehaves, drop `negative_caching` from `_CDN_POLICY` for
+the `gcs-cdn` backends — caching a bucket's 404s buys little when the
+rewrite is what the client actually receives.
 
 ## 404 default
 

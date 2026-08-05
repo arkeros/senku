@@ -58,14 +58,19 @@ wants two thumbs.
 
 ```bash
 aspect plan  //apps/dino-meteor:terraform
-aspect apply //apps/dino-meteor:terraform
+aspect apply //apps/dino-meteor:terraform   # the bucket
+bazel  run   //apps/dino-meteor:bucket_push # its contents
 aspect apply //infra/cloud/gcp/lb:terraform
 ```
 
-Served at **`dino.arquero.dev`**. Same constraints as napkin-battle: org
-policy (`constraints/run.allowedIngress`) permits only `internal` and
-`internal-and-cloud-load-balancing`, so there is no usable `*.run.app` URL and
-the shared LB is the only way in.
+`aspect apply` walks all three in that order on its own; the split matters
+only when running a step by hand. The bucket has to exist before the push,
+and the push before the LB — routing to an empty bucket is a 404 with
+nothing to explain it (ADR 0009).
+
+Served at **`dino.arquero.dev`**. The bucket is not reachable by its own
+`storage.googleapis.com` URL in any way that matters — the shared LB is what
+serves the site, and the only thing the origin ever answers is a cache miss.
 
 `defs.bzl` declares a `host` with no `paths`, meaning this backend owns every
 path on that hostname — the shape an SPA needs.
