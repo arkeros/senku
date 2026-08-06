@@ -282,7 +282,7 @@ require (
 	github.com/google/certificate-transparency-go v1.3.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-containerregistry/cmd/krane v0.0.0-20260429191119-2d86301800e9 // indirect
+	github.com/google/go-containerregistry/cmd/krane v0.0.0-20260805202503-7b32099eb119 // indirect
 	github.com/google/go-github/v88 v88.0.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/licensecheck v0.3.1 // indirect
