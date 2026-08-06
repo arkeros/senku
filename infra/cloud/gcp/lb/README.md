@@ -13,7 +13,7 @@ user → LB IP (anycast)  ── :443 ──► URL map (HTTPS)        ── ho
 
 - **Two drivers.** `LB_BACKEND` declares `driver`, defaulting to `"cloudrun"`. It is `driver` rather than `kind` because bifrost reserves `kind` for what an app *is* (`StaticSite` vs `Runtime`) and `driver` for how it is realised — and the LB is choosing the latter. The five games were `StaticSite`s before this migration and after it; only their driver changed. They share no mechanism — a Cloud Run origin is reached through a serverless NEG wrapped in a backend service, a bucket through a backend bucket — so collapsing them would mean a descriptor whose fields are each meaningful for only half its values. `_normalize` rejects a `gcs-cdn` backend that declares `regions` or `service_name` rather than ignoring it.
 - **`driver = "cloudrun"`**: one `google_compute_backend_service` + one `google_compute_region_network_endpoint_group` **per region** the backend declares. NEGs are emitted as one resource per `(backend_key, region)` pair via Starlark expansion of `BACKENDS` in `defs.bzl`. Regional fan-out is first-class — one service name, many regions, and Google's global LB does the geo-steering.
-- **`driver = "gcs-cdn"`**: one `google_compute_backend_bucket`, no regions and no health check, because there is nothing running to find or check. The host's path matcher also gets a `custom_error_response_policy` rewriting 404 → `/index.html` with `override_response_code = 200`: that is the SPA history-API fallback, which used to be `try_files` inside each app's nginx. See [ADR 0009](../../../../docs/adr/0009-frontends-are-served-from-buckets.md).
+- **`driver = "gcs-cdn"`**: one `google_compute_backend_bucket`, no regions and no health check, because there is nothing running to find or check. The host's path matcher also gets a `custom_error_response_policy` serving `/index.html` as the body of the 404: that is the SPA history-API fallback, which used to be `try_files` inside each app's nginx. The status is **not** overridden — a path the bucket has no object for is one the site does not serve, so it says so, and the app's `*` route renders its own not-found page under it. A *declared* route returns 200 because the webroot holds a route object at that path, not because the policy rewrites anything. See [ADR 0009](../../../../docs/adr/0009-frontends-are-served-from-buckets.md) and [ADR 0011](../../../../docs/adr/0011-honest-status-codes.md).
 - **Per-domain fan-out** is derived, not hand-written. A backend's `LB_BACKEND` may name a `host`; anything that doesn't defaults to `DOMAIN`. `HOSTS` is the deduplicated result, and each host gets a managed certificate, a cert-map entry and a `host_rule`/`path_matcher` pair automatically.
 - **Path rules vs. whole hosts**: within a host, a backend declaring `paths` becomes a `path_rule`; a backend declaring none becomes that host's `default_service` — the shape an SPA needs, since it owns every path. Only that owner gets the SPA fallback, and only if it is a bucket: a Cloud Run origin answers its own unknown paths, and the 404 bucket's whole job is to 404. At most one backend per host may omit `paths`, enforced with a `fail()` at load time.
 
@@ -40,9 +40,15 @@ nothing about what the LB does with it. After a cutover, four commands cover
 the parts that fail silently (`dino` as the example):
 
 ```bash
-# SPA fallback: an unknown route must be 200 with HTML, not 404
+# SPA fallback: an unknown route must be 404 with the app shell as the body
 curl -sI https://dino.arquero.dev/no-such-route | head -1
+#   want: HTTP/2 404
 curl -sI https://dino.arquero.dev/no-such-route | grep -i 'content-type\|age'
+#   want: text/html; charset=utf-8 — the shell, so the router renders NotFound
+
+# A declared route is a real object, so it is a real 200
+curl -sI https://dino.arquero.dev/ | head -1
+#   want: HTTP/2 200
 
 # The module script's type — a wrong one makes the ESM loader refuse it and
 # the page renders blank
@@ -58,10 +64,11 @@ curl -sI https://dino.arquero.dev/manifest.webmanifest | grep -i content-type
 
 `negative_caching` is on for both drivers, and its interaction with the
 fallback is the one thing here nobody has watched in production: a bucket
-404s on every client-routed path, and those 404s are exactly what the policy
-rewrites. If it misbehaves, drop `negative_caching` from `_CDN_POLICY` for
-the `gcs-cdn` backends — caching a bucket's 404s buys little when the
-rewrite is what the client actually receives.
+404s on every client-routed path, and those 404s are what the policy attaches
+the shell to. The client now receives the 404 as well as the body, so a
+cached negative response is a cached *page*, not just a status. If it
+misbehaves, drop `negative_caching` from `_CDN_POLICY` for the `gcs-cdn`
+backends.
 
 ## 404 default
 

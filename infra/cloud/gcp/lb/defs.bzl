@@ -304,23 +304,26 @@ _ORIGINS = dict(_BACKEND_SERVICES, **_BACKEND_BUCKETS)
 
 # Where an SPA's history-API fallback lives now that there is no nginx to
 # hold a `try_files`. A bucket 404s on every path that is not an object it
-# holds — which for a client-routed app is most of them — so the URL map
-# rewrites that 404 into the app shell and restores a 200.
+# holds, so the URL map answers with the app shell — which is what lets the
+# app's `*` route render its own not-found page.
 #
-# `override_response_code` is what makes this the fallback rather than a
-# prettier 404: without it the browser renders the app under a 404 status,
-# which crawlers and uptime checks read as a broken page.
+# The status stays 404. There is no `override_response_code` here on
+# purpose: a path the bucket has no object for is a path this site does not
+# serve, and saying 200 about it is untrue. A 200 is what makes a soft 404 —
+# caches store the page, crawlers index it, uptime checks call it healthy,
+# and a missing chunk comes back as HTML that a module loader cannot use
+# while every 404 metric reads zero.
 #
-# The cost is the same one `try_files $uri $uri/ /index.html` already had:
-# a genuinely missing asset — a stale chunk URL from a cached index.html —
-# comes back as HTML with a 200 instead of a 404. The app's own router is
-# what distinguishes an unknown route from a broken one.
+# A *real* client-side route must therefore be a real object, so the bucket
+# answers it without this policy ever running — see `react_static_layer`,
+# which materialises one per declared route. A route whose values cannot be
+# enumerated (a dynamic segment) needs a `path_rule` here instead; none
+# exists yet.
 def _spa_fallback(origin):
     return [{
         "error_response_rule": [{
             "match_response_codes": ["404"],
             "path": "/index.html",
-            "override_response_code": 200,
         }],
         "error_service": origin.id,
     }]

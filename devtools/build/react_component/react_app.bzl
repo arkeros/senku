@@ -8,7 +8,7 @@ load(":i18n_artifacts.bzl", "i18n_artifacts")
 load(":labels.bzl", "ts_dep")
 load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
-load(":route_tree.bzl", "walk_route_tree")
+load(":route_tree.bzl", "route_objects", "walk_route_tree")
 load(":runtime_config.bzl", "runtime_config_artifacts", "validate_runtime_config")
 load(":_hash_assets.bzl", "hash_assets")
 load(":bundle_outputs.bzl", "bundle_dir", "bundle_metafile")
@@ -311,8 +311,6 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     html_args = [
         "--template",
         "$(location {})".format(tpl_name),
-        "--out",
-        "$(location {}_index.html)".format(name),
         "--metafile",
         "$(location :{}_bundle_meta)".format(name),
         "--css-manifest",
@@ -339,15 +337,17 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     if runtime_config != None:
         html_args.append("--env-script")
 
+    html_srcs = [
+        tpl_name,
+        ":" + name + "_bundle_meta",
+        ":" + css_manifest_target,
+    ]
+
     js_run_binary(
         name = name + "_html",
-        srcs = [
-            tpl_name,
-            ":" + name + "_bundle_meta",
-            ":" + css_manifest_target,
-        ],
+        srcs = html_srcs,
         outs = [name + "_index.html"],
-        args = html_args,
+        args = ["--out", "$(location {}_index.html)".format(name)] + html_args,
         tool = Label("//devtools/build/react_component:html_codegen_bin"),
         **kwargs
     )
@@ -432,6 +432,51 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     # so `bazel build :{name}` produces everything a static host would serve,
     # and downstream macros (e.g. react_static_layer) can consume the app
     # as a single Bazel label instead of a string prefix.
+    # A client-side route is only a 200 if the bucket holds an object at that
+    # path — object existence is the whole of a bucket's routing. So each
+    # declared route gets a copy of the entry document, and everything not
+    # declared falls to the URL map's fallback, which serves the shell under
+    # a 404. That keeps the route table in the build, where it is declared,
+    # rather than in a URL map shared by every host.
+    #
+    # `{path}/index.html` rather than a bare `{path}`: the bucket's
+    # `main_page_suffix` resolves the directory form, and an extensionless
+    # object would be stamped `application/octet-stream` by the closed
+    # content-type table — a download prompt instead of a page.
+    #
+    # Each is rendered rather than copied, because a route's document knows
+    # which route it serves and can say so: it preloads that route's chunk,
+    # which the entry reaches only by dynamic import and no client can
+    # discover until the router asks for it. That only helps a direct hit —
+    # navigating there in-app never fetches this document — but a direct hit
+    # is the first impression.
+    route_documents = []
+    for entry in route_objects(routes):
+        # The path goes into the target name unaltered. Bazel target names
+        # admit both `-` and `/`, and folding either into `_` would make the
+        # mapping lossy — `a-b`, `a_b` and `a/b` would all become one name
+        # and collide as duplicate targets.
+        route_target = "{}_route_{}".format(name, entry.path)
+        route_args = ["--out", "$(location {}/index.html)".format(entry.path)] + html_args
+
+        # A route that only groups children has no component of its own, so
+        # there is no chunk to name and it renders exactly like the entry
+        # document. esbuild identifies the chunk by the component's source
+        # path, which react_component fixes as `{package}/{target}.js`.
+        if entry.component:
+            component = native.package_relative_label(entry.component)
+            route_args += ["--route-entry", "{}/{}.js".format(component.package, component.name)]
+
+        js_run_binary(
+            name = route_target,
+            srcs = html_srcs,
+            outs = [entry.path + "/index.html"],
+            args = route_args,
+            tool = Label("//devtools/build/react_component:html_codegen_bin"),
+            **kwargs
+        )
+        route_documents.append(":" + route_target)
+
     # The bundle enters as `:{name}_bundle_dir`, not `:{name}_bundle`. The
     # esbuild target also carries the metafile, and everything named here is
     # served from a public bucket — see bundle_dir.bzl.
@@ -448,6 +493,6 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
             ":" + name + "_bundle_dir",
             ":" + name + "_css_dir",
             ":" + name + "_assets",
-        ],
+        ] + route_documents,
         **kwargs
     )

@@ -32,7 +32,7 @@ const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
  * tells them apart. Sourcemaps repeat their target's `entryPoint`, so they
  * are excluded rather than tie-broken.
  */
-export function resolveEntry(metafile, entry) {
+function entryOutput(metafile, entry) {
   const matches = Object.keys(metafile.outputs ?? {}).filter(
     (out) => metafile.outputs[out].entryPoint === entry && !out.endsWith(".map"),
   );
@@ -42,7 +42,58 @@ export function resolveEntry(metafile, entry) {
         `'${entry}', found ${matches.length}${matches.length ? `: ${matches.join(", ")}` : ""}`,
     );
   }
-  return matches[0].split("/").pop();
+  return matches[0];
+}
+
+export function resolveEntry(metafile, entry) {
+  return entryOutput(metafile, entry).split("/").pop();
+}
+
+/**
+ * The chunks a browser needs before the entry can finish executing.
+ *
+ * Only `import-statement` edges are followed. The other kind, `dynamic-import`,
+ * is a `lazy()` route — preloading those would fetch every route on every
+ * page and undo the code splitting that produced them. The metafile lists
+ * both in one array and only `kind` separates them.
+ *
+ * The walk is transitive because a chunk the entry imports may import further
+ * chunks, and the browser cannot discover those until it has parsed the one
+ * above. Preloading only the entry's direct imports would move the waterfall
+ * down a level rather than removing it.
+ */
+function staticClosure(metafile, root, seen, out) {
+  const queue = [root];
+  while (queue.length) {
+    const current = queue.shift();
+    for (const imported of metafile.outputs[current]?.imports ?? []) {
+      if (imported.kind !== "import-statement" || seen.has(imported.path)) continue;
+      seen.add(imported.path);
+      out.push(imported.path.split("/").pop());
+      queue.push(imported.path);
+    }
+  }
+}
+
+export function resolvePreloads(metafile, entry, routeEntry = null) {
+  const seen = new Set();
+  const out = [];
+  staticClosure(metafile, entryOutput(metafile, entry), seen, out);
+
+  // The entry itself is not preloaded — it is the `<script src>`. A route
+  // chunk is the opposite: nothing on the page names it, because the entry
+  // reaches it by dynamic import, so it has to be listed to be fetched
+  // early. Its own static imports usually overlap the entry's, and `seen`
+  // is shared so the overlap is not emitted twice.
+  if (routeEntry) {
+    const output = entryOutput(metafile, routeEntry);
+    if (!seen.has(output)) {
+      seen.add(output);
+      out.push(output.split("/").pop());
+    }
+    staticClosure(metafile, output, seen, out);
+  }
+  return out;
 }
 
 /** The hashed basenames for `names`, in the order asked for. */
@@ -67,10 +118,18 @@ export function generate({
   bundleDir,
   css,
   envScript,
+  routeEntry = null,
 }) {
-  const head = resolveCss(cssManifest, css)
-    .map((name) => `<link rel="stylesheet" href="/assets/${name}" />`)
-    .join("");
+  // Stylesheets first: they block first paint, where a preload only races
+  // the entry's own discovery of the same chunk. Both sit in the initial
+  // head, so the browser's preload scanner starts every fetch in one pass.
+  const head =
+    resolveCss(cssManifest, css)
+      .map((name) => `<link rel="stylesheet" href="/assets/${name}" />`)
+      .join("") +
+    resolvePreloads(metafile, entry, routeEntry)
+      .map((name) => `<link rel="modulepreload" href="/${bundleDir}/${name}" />`)
+      .join("");
 
   // The env bootstrap sets `window.__ENV__` and must run before any module
   // script does, so it is emitted ahead of the entry rather than beside it.
@@ -103,6 +162,7 @@ function parseArgs(argv) {
     bundleDir: null,
     css: [],
     envScript: false,
+    routeEntry: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -113,6 +173,7 @@ function parseArgs(argv) {
     else if (a === "--entry") args.entry = argv[++i];
     else if (a === "--bundle-dir") args.bundleDir = argv[++i];
     else if (a === "--css") args.css.push(argv[++i]);
+    else if (a === "--route-entry") args.routeEntry = argv[++i];
     else if (a === "--env-script") args.envScript = true;
     else throw new Error(`html_codegen: unknown arg: ${a}`);
   }
@@ -136,6 +197,7 @@ function main(argv) {
     bundleDir: args.bundleDir,
     css: args.css,
     envScript: args.envScript,
+    routeEntry: args.routeEntry,
   });
 
   writeFileSync(resolve(execroot, args.out), html);
