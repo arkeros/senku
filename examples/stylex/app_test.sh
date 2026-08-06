@@ -50,10 +50,16 @@ echo "PASS: css"
 HTML="examples/stylex/app_index.html"
 echo "=== HTML tests ==="
 
-grep -q 'app_bundle/app_main.js' "$HTML" || { echo "FAIL: missing bundle script tag"; exit 1; }
-grep -q 'app_styles.css' "$HTML" || { echo "FAIL: missing stylesheet link"; exit 1; }
+# Both names carry a content hash, so the assertions match their shape rather
+# than a literal: pinning the hash would fail on every source edit, and
+# dropping the hash from the pattern would let an unhashed name — which
+# revalidates on the render path and publishes in the wrong wave — pass.
+grep -qE 'app_bundle/app_main-[A-Z0-9]+\.js' "$HTML" \
+  || { echo "FAIL: missing content-addressed bundle script tag"; exit 1; }
+grep -qE '/assets/app_styles\.[0-9a-f]+\.css' "$HTML" \
+  || { echo "FAIL: missing content-addressed stylesheet link"; exit 1; }
 # runtime_config: /env.js must precede the bundle so window.__ENV__ is set before module eval.
-grep -qE '<script src="/env\.js"></script><script type="module" src="/app_bundle/app_main\.js">' "$HTML" \
+grep -qE '<script src="/env\.js"></script><script type="module" src="/app_bundle/app_main-[A-Z0-9]+\.js">' "$HTML" \
   || { echo "FAIL: /env.js script tag missing or not ordered before app_main module"; exit 1; }
 echo "PASS: html"
 

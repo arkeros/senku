@@ -2,7 +2,6 @@
 
 load("@aspect_rules_esbuild//esbuild:defs.bzl", "esbuild")
 load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
-load("@bazel_lib//lib:expand_template.bzl", "expand_template")
 load("//devtools/build/js:devserver.bzl", "devserver")
 load(":asset_pipeline.bzl", "asset_pipeline")
 load(":i18n_artifacts.bzl", "i18n_artifacts")
@@ -11,6 +10,8 @@ load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
 load(":route_tree.bzl", "walk_route_tree")
 load(":runtime_config.bzl", "runtime_config_artifacts", "validate_runtime_config")
+load(":_hash_assets.bzl", "hash_assets")
+load(":bundle_outputs.bzl", "bundle_dir", "bundle_metafile")
 load(":stylex_css.bzl", "stylex_css")
 
 def route(path, component = None, children = None, error_component = None):
@@ -253,34 +254,101 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         components = all_route_components,
     )
 
+    # Both stylesheets are render-blocking `<link>`s, so a stable name costs
+    # a revalidation before first paint on every visit. Content-addressing
+    # them buys the `immutable` policy — and lands them under `assets/`,
+    # which is what earns it: cache.bzl marks that prefix immutable, so the
+    # hash and the header cannot disagree. The devserver keeps reading the
+    # unhashed pair below; nothing it serves is published.
+    css_hashed_target = name + "_css_hashed"
+    hash_assets(
+        name = css_hashed_target,
+        srcs = [":" + name + "_styles", ":" + normalize_css_target],
+    )
+
+    # The tree alone. `hash_assets` returns the manifest in the same
+    # DefaultInfo, and everything in the servable filegroup below is
+    # published — same hazard as the esbuild metafile, but this rule offers
+    # an output group, so selecting the servable half needs no new rule.
+    native.filegroup(
+        name = name + "_css_dir",
+        srcs = [":" + css_hashed_target],
+        output_group = "assets",
+        **kwargs
+    )
+
+    # The manifest half, for the HTML generator. Never served.
+    css_manifest_target = name + "_css_manifest"
+    native.filegroup(
+        name = css_manifest_target,
+        srcs = [":" + css_hashed_target],
+        output_group = "asset_manifest",
+        **kwargs
+    )
+
     # HTML template
     tpl_name = html_template or Label("//devtools/build/react_component:index.html.tpl")
 
+    # The metafile half of the bundle, so the generator can read the entry's
+    # content-addressed name. Kept separate from what gets served — see
+    # bundle_outputs.bzl.
+    bundle_metafile(
+        name = name + "_bundle_meta",
+        bundle = ":" + name + "_bundle",
+        **kwargs
+    )
+
+    # index.html is the last object on the render path with a fixed name, and
+    # every name it points at is now a content hash — so none of them can be
+    # substituted at analysis time the way this template once was. The
+    # generator resolves them from esbuild's metafile and the stylesheet
+    # manifest at action time.
+    #
+    # `type="module"` is required because the esbuild output uses ESM with
+    # code-splitting (`splitting = True`): the entry statically imports the
+    # shared vendor chunk and dynamically imports each lazy route chunk.
+    # Classic `<script>` can't resolve those.
+    html_args = [
+        "--template",
+        "$(location {})".format(tpl_name),
+        "--out",
+        "$(location {}_index.html)".format(name),
+        "--metafile",
+        "$(location :{}_bundle_meta)".format(name),
+        "--css-manifest",
+        "$(location :{})".format(css_manifest_target),
+        # esbuild identifies outputs by their source entry point, and every
+        # `lazy()` route is one too — the source path is what picks ours out.
+        "--entry",
+        "{}/{}_main.js".format(native.package_name(), name),
+        # The TreeArtifact directory esbuild produces. react_static_layer
+        # ships its contents at /var/www/html/{name}_bundle/ for the image
+        # and at the same path in the bucket.
+        "--bundle-dir",
+        name + "_bundle",
+        # Normalize ships before StyleX so source order keeps app styles
+        # winning on equal specificity. This order is the cascade.
+        "--css",
+        name + "_normalize.css",
+        "--css",
+        name + "_styles.css",
+    ]
+
     # When runtime_config is set, the `/env.js` bootstrap must load before the
     # main bundle so `window.__ENV__` is set before any module script runs.
-    env_script_tag = '<script src="/env.js"></script>' if runtime_config != None else ""
-    expand_template(
+    if runtime_config != None:
+        html_args.append("--env-script")
+
+    js_run_binary(
         name = name + "_html",
-        out = name + "_index.html",
-        substitutions = {
-            # Normalize ships before StyleX so source order keeps app styles
-            # winning on equal specificity. Served from /{name}_normalize.css
-            # via the filegroup below (mirrors {name}_styles.css).
-            "{{HEAD}}": (
-                '<link rel="stylesheet" href="/{}_normalize.css" />'.format(name) +
-                '<link rel="stylesheet" href="/{}_styles.css" />'.format(name)
-            ),
-            # `type="module"` is required because the esbuild output uses ESM
-            # with code-splitting (`splitting = True`): the entry `{name}_main.js`
-            # statically imports the shared vendor chunk and dynamically imports
-            # each lazy route chunk. Classic `<script>` can't resolve those.
-            #
-            # The `/{name}_bundle/` prefix corresponds to the TreeArtifact
-            # directory esbuild produces; react_static_layer ships its
-            # contents as a nested path at /var/www/html/{name}_bundle/.
-            "{{SCRIPTS}}": '{}<script type="module" src="/{}_bundle/{}_main.js"></script>'.format(env_script_tag, name, name),
-        },
-        template = tpl_name,
+        srcs = [
+            tpl_name,
+            ":" + name + "_bundle_meta",
+            ":" + css_manifest_target,
+        ],
+        outs = [name + "_index.html"],
+        args = html_args,
+        tool = Label("//devtools/build/react_component:html_codegen_bin"),
         **kwargs
     )
 
@@ -316,6 +384,14 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         target = "es2020",
         splitting = True,
         output_dir = True,
+        # The entry's name carries a content hash (see the esbuild config), so
+        # nothing can know it at analysis time. The metafile is how the HTML
+        # generator learns it. It is declared as a *sibling* of the output
+        # directory rather than inside it, which is what lets the servable
+        # filegroup below leave it out by construction — it must never reach
+        # the bucket, since it holds the whole module graph and every input
+        # path. See docs/adr/0010-content-addressed-webroot.md.
+        metafile = True,
         # Ship production-mode JS. `define` rewrites the classic
         # `process.env.NODE_ENV` guards (react-dom, scheduler, etc. still
         # use them) so minify can dead-code the dev-only branches. The
@@ -356,13 +432,21 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     # so `bazel build :{name}` produces everything a static host would serve,
     # and downstream macros (e.g. react_static_layer) can consume the app
     # as a single Bazel label instead of a string prefix.
+    # The bundle enters as `:{name}_bundle_dir`, not `:{name}_bundle`. The
+    # esbuild target also carries the metafile, and everything named here is
+    # served from a public bucket — see bundle_dir.bzl.
+    bundle_dir(
+        name = name + "_bundle_dir",
+        bundle = ":" + name + "_bundle",
+        **kwargs
+    )
+
     native.filegroup(
         name = name,
         srcs = [
             ":" + name + "_html",
-            ":" + name + "_bundle",
-            ":" + name + "_styles",
-            ":" + normalize_css_target,
+            ":" + name + "_bundle_dir",
+            ":" + name + "_css_dir",
             ":" + name + "_assets",
         ],
         **kwargs

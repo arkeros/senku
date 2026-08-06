@@ -45,25 +45,21 @@ def webroot_cache_rules(app_name):
     return struct(
         default = REVALIDATE,
         rules = [
-            # esbuild's entry point is the one file under the bundle
-            # directory whose name carries no content hash, so its bytes
-            # change under a stable URL on every deploy. It must be tested
-            # before the prefix rule that would otherwise freeze it for a
-            # year.
-            struct(
-                match = "exact",
-                path = "{}{}_main.js".format(bundle_dir, app_name),
-                cache_control = REVALIDATE,
-            ),
-            # Everything else esbuild emits here is content-addressed:
-            # chunk-<hash>.js and <Route>-<hash>.js.
+            # Everything esbuild emits here is content-addressed: the entry
+            # `{app}_main-<hash>.js`, chunk-<hash>.js and <Route>-<hash>.js.
+            # The entry once needed an exact rule ahead of this one — it was
+            # the single unhashed file under the prefix, and freezing it for
+            # a year would have made a deploy invisible to every browser that
+            # had already loaded the app. It carries a hash now, so the
+            # prefix is simply right about it.
             struct(match = "prefix", path = bundle_dir, cache_control = IMMUTABLE),
-            # asset_pipeline's output. Hashes are in the filenames, and the
-            # URLs are baked into the JS that references them.
+            # asset_pipeline's output, plus the hashed stylesheets. Hashes
+            # are in the filenames, and the URLs are baked into the JS and
+            # the HTML that reference them.
             struct(match = "prefix", path = "assets/", cache_control = IMMUTABLE),
-            # The unhashed remainder: index.html, the StyleX sheet,
-            # normalize.css. Small, and they are how a client discovers
-            # every hashed URL above — so they revalidate.
+            # The unhashed remainder: index.html, and the icons and manifest
+            # that no rule below matches. index.html is how a client
+            # discovers every hashed URL above — so it revalidates.
             struct(match = "suffix", path = ".html", cache_control = REVALIDATE),
             struct(match = "suffix", path = ".css", cache_control = REVALIDATE),
             struct(match = "suffix", path = ".js", cache_control = REVALIDATE),

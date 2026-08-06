@@ -8,11 +8,14 @@ def _rule_order_impl(ctx):
 
     got = [(r.match, r.path, r.cache_control) for r in webroot_cache_rules("dino").rules]
 
-    # Order is the policy. The unhashed entry has to be tested before the
-    # bundle prefix that contains it, or the entry never revalidates and a
-    # deploy is invisible to every browser that already loaded the app.
+    # Order is the policy: the prefixes have to be tested before the
+    # extension suffixes, or every hashed chunk lands on no-cache.
+    #
+    # There is no longer an exact rule ahead of them. The entry bundle used
+    # to need one — it was the single unhashed file under the bundle prefix,
+    # and freezing it for a year would have made a deploy invisible — but it
+    # is content-addressed now, so the prefix rule is simply right about it.
     asserts.equals(env, [
-        ("exact", "dino_bundle/dino_main.js", REVALIDATE),
         ("prefix", "dino_bundle/", IMMUTABLE),
         ("prefix", "assets/", IMMUTABLE),
         ("suffix", ".html", REVALIDATE),
@@ -31,9 +34,9 @@ def _json_shape_impl(ctx):
 
     asserts.equals(env, REVALIDATE, got["default_cache_control"])
     asserts.equals(env, {
-        "match": "exact",
-        "path": "dino_bundle/dino_main.js",
-        "cache_control": REVALIDATE,
+        "match": "prefix",
+        "path": "dino_bundle/",
+        "cache_control": IMMUTABLE,
     }, got["rules"][0])
 
     # `ParseRules` decodes with DisallowUnknownFields, so an extra key here
@@ -49,15 +52,10 @@ def _nginx_rendering_impl(ctx):
 
     got = cache_rules_nginx(webroot_cache_rules("dino"))
 
-    # `=` for exact and `^~` for prefix are what give nginx the same
-    # first-match-wins order the rule list states. Without `^~`, the `.js`
-    # regex below wins over the bundle prefix — regex beats an unmodified
-    # prefix — and every chunk request lands on no-cache.
-    asserts.true(
-        env,
-        "location = /dino_bundle/dino_main.js {" in got,
-        "exact rule should render as an `=` location, got:\n" + got,
-    )
+    # `^~` for prefix is what gives nginx the same first-match-wins order the
+    # rule list states. Without it, the `.js` regex below wins over the
+    # bundle prefix — regex beats an unmodified prefix — and every chunk
+    # request lands on no-cache.
     asserts.true(
         env,
         "location ^~ /dino_bundle/ {" in got,
@@ -83,17 +81,17 @@ def _nginx_order_matches_rules_impl(ctx):
 
     got = cache_rules_nginx(webroot_cache_rules("dino"))
 
-    exact = got.find("location = /dino_bundle/dino_main.js")
     prefix = got.find("location ^~ /dino_bundle/")
-    asserts.true(env, exact != -1 and prefix != -1, "both locations should render")
+    suffix = got.find("location ~ \\.js$")
+    asserts.true(env, prefix != -1 and suffix != -1, "both locations should render")
 
-    # nginx resolves `=` before any prefix regardless of declaration order,
+    # nginx resolves `^~` before any regex regardless of declaration order,
     # so this ordering is not what makes the config correct — it is what
     # makes the config *readable as* the rule list it came from. A reader
     # comparing the two should not have to reorder one in their head.
     asserts.true(
         env,
-        exact < prefix,
+        prefix < suffix,
         "rendered locations should follow rule order, got:\n" + got,
     )
 
