@@ -74,6 +74,22 @@ js_test(
     entry_point = "asset_codegen_test.mjs",
 )
 
+# HTML codegen: renders index.html from the template, resolving the entry
+# bundle's hashed name out of esbuild's metafile and the stylesheets' out of
+# the hash_assets manifest. Both names are content hashes, so neither exists
+# until the bytes do — which is why this runs at action time rather than
+# being an `expand_template`.
+js_binary(
+    name = "html_codegen_bin",
+    entry_point = "html_codegen.mjs",
+)
+
+js_test(
+    name = "html_codegen_test",
+    data = ["html_codegen.mjs"],
+    entry_point = "html_codegen_test.mjs",
+)
+
 # App-level asset aggregator: merges per-leaf hash_assets manifests into
 # a single devserver manifest and copies every hashed file into one flat
 # directory siblings to the manifest.
@@ -165,6 +181,8 @@ bzl_library(
     name = "react_app",
     srcs = ["react_app.bzl"],
     deps = [
+        ":_hash_assets",
+        ":bundle_outputs",
         ":i18n_artifacts",
         ":labels",
         ":react_app_manifest",
@@ -175,7 +193,6 @@ bzl_library(
         "//devtools/build/js:devserver",
         "@aspect_rules_esbuild//esbuild:defs",
         "@aspect_rules_js//js:defs",
-        "@bazel_lib//lib:expand_template",
     ],
 )
 
@@ -302,6 +319,11 @@ bzl_library(
 bzl_library(
     name = "asset_codegen",
     srcs = ["asset_codegen.bzl"],
+)
+
+bzl_library(
+    name = "bundle_outputs",
+    srcs = ["bundle_outputs.bzl"],
 )
 
 bzl_library(

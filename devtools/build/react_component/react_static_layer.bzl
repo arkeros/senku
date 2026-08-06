@@ -152,6 +152,12 @@ def react_static_layer(
         replace_prefixes = {
             app_name + "_index.html": "index.html",
             app_name + "_assets_flat": "assets",
+            # The hashed stylesheets join asset_pipeline's output under one
+            # `assets/` prefix. Two producers, one directory, because what
+            # the prefix means is "content-addressed" and not "emitted by
+            # the asset pipeline" — cache.bzl marks it immutable on that
+            # basis alone.
+            app_name + "_css_hashed_dir": "assets",
         },
     )
 
@@ -202,6 +208,12 @@ def react_static_layer(
         replace_prefixes = {
             app_name + "_index.html": "index.html",
             app_name + "_assets_flat": "assets",
+            # The hashed stylesheets join asset_pipeline's output under one
+            # `assets/` prefix. Two producers, one directory, because what
+            # the prefix means is "content-addressed" and not "emitted by
+            # the asset pipeline" — cache.bzl marks it immutable on that
+            # basis alone.
+            app_name + "_css_hashed_dir": "assets",
         },
         **kwargs
     )
