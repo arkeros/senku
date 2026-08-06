@@ -61,8 +61,12 @@ One barrier-separated stage of a **Publish** — every object in a wave is writt
 _Avoid_: batch, phase, pass, stage
 
 **SPA fallback**:
-Serving `/index.html` with a 200 for a path the **Origin** has no object for, so a client-routed application can resolve the route itself.
-_Avoid_: 404 rewrite, catch-all
+Serving `/index.html` as the body of a 404 for a path the **Origin** has no object for, so a client-routed application renders its own not-found page under an honest status.
+_Avoid_: 404 rewrite, catch-all, soft 404 (that is the thing this stopped being)
+
+**Route object**:
+A copy of the **Entry document** materialised at a declared route's path, so the **Origin** answers that route with a 200 the ordinary way — by holding an object there.
+_Avoid_: prerender (nothing is rendered), stub, alias
 
 ### Deploying
 
@@ -90,6 +94,7 @@ _Avoid_: using "service" for any deployable
 - A **Publish** applies its **Wave**s in order — **Content-addressed** objects, then the **Entry document** and the other stable-named files. It deletes nothing; what the build stopped producing is **Retired**
 - A **Wave** boundary protects a client reading the *new* **Entry document**: the names it hands out are all in place before it hands them out. It does nothing for a client reading the old one, which is what **Retention** is for
 - The load balancer routes a host to one **Origin**, and adds the **SPA fallback** only when that origin's **Driver** is `gcs-cdn`
+- A declared route is a **Route object** in the **Webroot**; the **SPA fallback** answers everything else, so a 200 means the site really serves that path
 - Every **Root**, image push and **Publish** is a **Deploy node**; their edges are the `ref()`s between them
 
 ## Example dialogue

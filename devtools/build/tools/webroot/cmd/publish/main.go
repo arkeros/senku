@@ -90,7 +90,7 @@ func run(ctx context.Context, bucket, webrootDir, rulesPath string, dryRun bool)
 	}
 
 	changes := webroot.Plan(local, remote)
-	retire := webroot.Retire(orphans(changes.Orphaned, dated))
+	date, remove := webroot.Retire(orphans(changes.Orphaned, dated), rules)
 
 	first, last := changes.UploadOrder(rules)
 
@@ -101,30 +101,37 @@ func run(ctx context.Context, bucket, webrootDir, rulesPath string, dryRun bool)
 		// names, which a sorted list of every object hides.
 		printUploads(bucket, "content-addressed, written first", first, rules)
 		printUploads(bucket, "mutable, written once the first wave has landed", last, rules)
-		fmt.Println("# orphaned, dated now and deleted by the bucket's lifecycle rule")
-		for _, name := range retire {
+		fmt.Println("# content-addressed orphans, dated now and collected by the bucket's lifecycle rule")
+		for _, name := range date {
 			fmt.Printf("retire gs://%s/%s\n", bucket, name)
+		}
+		fmt.Println("# stable-named orphans, deleted now — nothing holds a URL their removal did not mean to break")
+		for _, name := range remove {
+			fmt.Printf("delete gs://%s/%s\n", bucket, name)
 		}
 		return nil
 	}
 
 	// Uploads go in two waves, the second beginning only once the first has
 	// landed, so that a client reading a new index.html never holds a URL
-	// for an object that is not there yet. Nothing is deleted: a client
-	// reading the *old* index.html holds URLs the new build does not
-	// produce, and ordering cannot help it — see webroot.Retire.
+	// for an object that is not there yet. Orphans are handled last, and
+	// how depends on the name — see webroot.Retire.
 	if err := uploadAll(ctx, bkt, webrootDir, first, rules); err != nil {
 		return err
 	}
 	if err := uploadAll(ctx, bkt, webrootDir, last, rules); err != nil {
 		return err
 	}
-	if err := retireAll(ctx, bkt, retire, time.Now()); err != nil {
+	if err := retireAll(ctx, bkt, date, time.Now()); err != nil {
+		return err
+	}
+	if err := deleteAll(ctx, bkt, remove); err != nil {
 		return err
 	}
 
-	log.Printf("published %d objects to gs://%s (%d newly orphaned, %d awaiting collection)",
-		len(changes.Upload), bucket, len(retire), len(changes.Orphaned)-len(retire))
+	log.Printf("published %d objects to gs://%s (%d retired, %d deleted, %d awaiting collection)",
+		len(changes.Upload), bucket, len(date), len(remove),
+		len(changes.Orphaned)-len(date)-len(remove))
 	return nil
 }
 
@@ -234,10 +241,10 @@ func upload(ctx context.Context, bkt *storage.BucketHandle, dir, name string, ru
 	return w.Close()
 }
 
-// retireAll stamps each newly-orphaned object with the time it went stale.
-// Deleting it here is what breaks a client still on the previous version of
-// the site, so the bucket's lifecycle rule does the deleting, a retention
-// window later — see `staticsite` and webroot.Retire.
+// retireAll stamps each newly-orphaned content-addressed object with the
+// time it went stale. Deleting one here is what breaks a client still on the
+// previous version of the site, so the bucket's lifecycle rule does the
+// deleting, a retention window later — see `staticsite` and webroot.Retire.
 func retireAll(ctx context.Context, bkt *storage.BucketHandle, names []string, now time.Time) error {
 	return eachConcurrently(names, func(name string) error {
 		_, err := bkt.Object(name).Update(ctx, storage.ObjectAttrsToUpdate{CustomTime: now})
@@ -245,6 +252,17 @@ func retireAll(ctx context.Context, bkt *storage.BucketHandle, names []string, n
 		// running at once, should converge rather than fail.
 		if err != nil && !errors.Is(err, storage.ErrObjectNotExist) {
 			return fmt.Errorf("retiring %s: %w", name, err)
+		}
+		return nil
+	})
+}
+
+// deleteAll removes stable-named orphans. Retention would keep answering at
+// a URL somebody deliberately took down, so these go now.
+func deleteAll(ctx context.Context, bkt *storage.BucketHandle, names []string) error {
+	return eachConcurrently(names, func(name string) error {
+		if err := bkt.Object(name).Delete(ctx); err != nil && !errors.Is(err, storage.ErrObjectNotExist) {
+			return fmt.Errorf("deleting %s: %w", name, err)
 		}
 		return nil
 	})
