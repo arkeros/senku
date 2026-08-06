@@ -28,7 +28,9 @@ Order is part of the policy, not an artifact of expressing it. nginx resolves ov
 
 **Content-Type is a closed table, not `mime.TypeByExtension`.** That function reads `/etc/mime.types` where one exists, so the same build would stamp different types depending on which machine ran the upload. Unknown extensions get `application/octet-stream` rather than a guess: a browser downloads an octet-stream it cannot render, but refuses a module script it believes is the wrong type.
 
-**The SPA fallback gained a property it did not have.** `override_response_code = 200` is what makes the URL map's 404 rewrite a fallback rather than a prettier error page — without it the app renders under a 404, which crawlers and uptime checks read as broken. The bucket's own `not_found_page` would have served the same bytes and kept the 404, so it is not used. The cost is the one `try_files` already had: a genuinely missing asset comes back as HTML with a 200, and the app's router is what tells an unknown route from a broken one.
+**The SPA fallback gained a property it did not have.** `override_response_code = 200` made the URL map's 404 rewrite a fallback rather than a prettier error page, so that an app rendering a client-side route did not do so under a 404. The bucket's own `not_found_page` would have served the same bytes and kept the 404, so it is not used. The cost was the one `try_files` already had: a genuinely missing asset came back as HTML with a 200, and the app's router was what told an unknown route from a broken one.
+
+  **Superseded by [ADR 0011](./0011-honest-status-codes.md).** The override was too broad: it forced a 200 on *every* path the bucket had no object for, including paths the site does not serve at all. Declared routes are now materialised as objects and answer 200 on their own, so the fallback no longer has to lie on their behalf.
 
 ## Consequences
 
