@@ -32,7 +32,7 @@ const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
  * tells them apart. Sourcemaps repeat their target's `entryPoint`, so they
  * are excluded rather than tie-broken.
  */
-export function resolveEntry(metafile, entry) {
+function entryOutput(metafile, entry) {
   const matches = Object.keys(metafile.outputs ?? {}).filter(
     (out) => metafile.outputs[out].entryPoint === entry && !out.endsWith(".map"),
   );
@@ -42,7 +42,41 @@ export function resolveEntry(metafile, entry) {
         `'${entry}', found ${matches.length}${matches.length ? `: ${matches.join(", ")}` : ""}`,
     );
   }
-  return matches[0].split("/").pop();
+  return matches[0];
+}
+
+export function resolveEntry(metafile, entry) {
+  return entryOutput(metafile, entry).split("/").pop();
+}
+
+/**
+ * The chunks a browser needs before the entry can finish executing.
+ *
+ * Only `import-statement` edges are followed. The other kind, `dynamic-import`,
+ * is a `lazy()` route — preloading those would fetch every route on every
+ * page and undo the code splitting that produced them. The metafile lists
+ * both in one array and only `kind` separates them.
+ *
+ * The walk is transitive because a chunk the entry imports may import further
+ * chunks, and the browser cannot discover those until it has parsed the one
+ * above. Preloading only the entry's direct imports would move the waterfall
+ * down a level rather than removing it.
+ */
+export function resolvePreloads(metafile, entry) {
+  const seen = new Set();
+  const out = [];
+  const queue = [entryOutput(metafile, entry)];
+
+  while (queue.length) {
+    const current = queue.shift();
+    for (const imported of metafile.outputs[current]?.imports ?? []) {
+      if (imported.kind !== "import-statement" || seen.has(imported.path)) continue;
+      seen.add(imported.path);
+      out.push(imported.path.split("/").pop());
+      queue.push(imported.path);
+    }
+  }
+  return out;
 }
 
 /** The hashed basenames for `names`, in the order asked for. */
@@ -68,9 +102,16 @@ export function generate({
   css,
   envScript,
 }) {
-  const head = resolveCss(cssManifest, css)
-    .map((name) => `<link rel="stylesheet" href="/assets/${name}" />`)
-    .join("");
+  // Stylesheets first: they block first paint, where a preload only races
+  // the entry's own discovery of the same chunk. Both sit in the initial
+  // head, so the browser's preload scanner starts every fetch in one pass.
+  const head =
+    resolveCss(cssManifest, css)
+      .map((name) => `<link rel="stylesheet" href="/assets/${name}" />`)
+      .join("") +
+    resolvePreloads(metafile, entry)
+      .map((name) => `<link rel="modulepreload" href="/${bundleDir}/${name}" />`)
+      .join("");
 
   // The env bootstrap sets `window.__ENV__` and must run before any module
   // script does, so it is emitted ahead of the entry rather than beside it.

@@ -1,7 +1,29 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { generate, resolveCss, resolveEntry } from "./html_codegen.mjs";
+import { generate, resolveCss, resolveEntry, resolvePreloads } from "./html_codegen.mjs";
+
+// The entry's static imports are the modules that must load before anything
+// runs; its dynamic imports are the lazy routes, which must not be preloaded
+// or code splitting buys nothing. The metafile lists both side by side and
+// only `kind` tells them apart.
+const metafileWithImports = {
+  outputs: {
+    "apps/t/app_bundle/app_main-4WSWQT5M.js": {
+      entryPoint: "apps/t/app_main.js",
+      imports: [
+        { path: "apps/t/app_bundle/chunk-VENDOR1.js", kind: "import-statement" },
+        { path: "apps/t/app_bundle/Play-3YV3A6SW.js", kind: "dynamic-import" },
+        { path: "apps/t/app_bundle/NotFound-AXA4SC4Y.js", kind: "dynamic-import" },
+      ],
+    },
+    "apps/t/app_bundle/chunk-VENDOR1.js": {
+      imports: [{ path: "apps/t/app_bundle/chunk-VENDOR2.js", kind: "import-statement" }],
+    },
+    "apps/t/app_bundle/chunk-VENDOR2.js": { imports: [] },
+    "apps/t/app_bundle/Play-3YV3A6SW.js": { entryPoint: "apps/t/pages/Play/Play.js" },
+  },
+};
 
 // esbuild marks every code-split entry point, not just the one we asked
 // for: each `lazy()` route shows up with its own `entryPoint`. Matching on
@@ -50,6 +72,46 @@ test("resolveCss preserves the order it is asked for", () => {
 
 test("resolveCss throws on a name the manifest does not carry", () => {
   assert.throws(() => resolveCss(cssManifest, ["missing.css"]), /missing\.css/);
+});
+
+test("resolvePreloads takes static imports and refuses dynamic ones", () => {
+  const got = resolvePreloads(metafileWithImports, "apps/t/app_main.js");
+  assert.ok(!got.includes("Play-3YV3A6SW.js"), "a lazy route must not be preloaded");
+  assert.ok(!got.includes("NotFound-AXA4SC4Y.js"), "a lazy route must not be preloaded");
+});
+
+// A chunk the entry imports may import further chunks of its own, and every
+// one of them has to arrive before the app runs. Preloading only the entry's
+// direct imports would leave the next level to be discovered after parsing.
+test("resolvePreloads follows the static graph transitively", () => {
+  assert.deepEqual(resolvePreloads(metafileWithImports, "apps/t/app_main.js"), [
+    "chunk-VENDOR1.js",
+    "chunk-VENDOR2.js",
+  ]);
+});
+
+test("resolvePreloads is empty when the entry imports nothing", () => {
+  assert.deepEqual(resolvePreloads(metafile, "apps/t/app_main.js"), []);
+});
+
+test("generate emits a modulepreload per static import", () => {
+  const html = generate({
+    template: "<head>{{HEAD}}</head>",
+    metafile: metafileWithImports,
+    cssManifest,
+    entry: "apps/t/app_main.js",
+    bundleDir: "app_bundle",
+    css: [],
+    envScript: false,
+  });
+
+  assert.equal(
+    html,
+    "<head>" +
+      '<link rel="modulepreload" href="/app_bundle/chunk-VENDOR1.js" />' +
+      '<link rel="modulepreload" href="/app_bundle/chunk-VENDOR2.js" />' +
+      "</head>",
+  );
 });
 
 test("generate substitutes hashed URLs into the template", () => {
