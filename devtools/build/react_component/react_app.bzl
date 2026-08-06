@@ -452,7 +452,11 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     # is the first impression.
     route_documents = []
     for entry in route_objects(routes):
-        route_target = "{}_route_{}".format(name, entry.path.replace("/", "_").replace("-", "_"))
+        # The path goes into the target name unaltered. Bazel target names
+        # admit both `-` and `/`, and folding either into `_` would make the
+        # mapping lossy — `a-b`, `a_b` and `a/b` would all become one name
+        # and collide as duplicate targets.
+        route_target = "{}_route_{}".format(name, entry.path)
         route_args = ["--out", "$(location {}/index.html)".format(entry.path)] + html_args
 
         # A route that only groups children has no component of its own, so
