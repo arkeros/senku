@@ -94,6 +94,42 @@ test("resolvePreloads is empty when the entry imports nothing", () => {
   assert.deepEqual(resolvePreloads(metafile, "apps/t/app_main.js"), []);
 });
 
+// The document materialised at a route's own path knows which route it
+// serves, so it can start that chunk downloading immediately instead of
+// waiting for the router to ask. The chunk is reachable from the entry only
+// by a dynamic import, so it is never in the base set.
+test("resolvePreloads adds the route's own chunk when given one", () => {
+  const got = resolvePreloads(
+    metafileWithImports,
+    "apps/t/app_main.js",
+    "apps/t/pages/Play/Play.js",
+  );
+  assert.deepEqual(got, ["chunk-VENDOR1.js", "chunk-VENDOR2.js", "Play-3YV3A6SW.js"]);
+});
+
+// A route chunk has static imports of its own. Those are usually shared with
+// the entry, and preloading a chunk twice would emit a duplicate link.
+test("resolvePreloads does not repeat a chunk the entry already pulled in", () => {
+  const shared = {
+    outputs: {
+      "apps/t/app_bundle/app_main-X.js": {
+        entryPoint: "apps/t/app_main.js",
+        imports: [{ path: "apps/t/app_bundle/chunk-SHARED.js", kind: "import-statement" }],
+      },
+      "apps/t/app_bundle/chunk-SHARED.js": { imports: [] },
+      "apps/t/app_bundle/Play-Y.js": {
+        entryPoint: "apps/t/pages/Play/Play.js",
+        imports: [{ path: "apps/t/app_bundle/chunk-SHARED.js", kind: "import-statement" }],
+      },
+    },
+  };
+
+  assert.deepEqual(
+    resolvePreloads(shared, "apps/t/app_main.js", "apps/t/pages/Play/Play.js"),
+    ["chunk-SHARED.js", "Play-Y.js"],
+  );
+});
+
 test("generate emits a modulepreload per static import", () => {
   const html = generate({
     template: "<head>{{HEAD}}</head>",

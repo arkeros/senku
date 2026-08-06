@@ -65,7 +65,7 @@ Serving `/index.html` as the body of a 404 for a path the **Origin** has no obje
 _Avoid_: 404 rewrite, catch-all, soft 404 (that is the thing this stopped being)
 
 **Route object**:
-A copy of the **Entry document** materialised at a declared route's path, so the **Origin** answers that route with a 200 the ordinary way — by holding an object there.
+An **Entry document** rendered for a declared route and materialised at that route's path, so the **Origin** answers it with a 200 the ordinary way — by holding an object there — and so it can name the chunk that route needs.
 _Avoid_: prerender (nothing is rendered), stub, alias
 
 ### Deploying

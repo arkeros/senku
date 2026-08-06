@@ -62,11 +62,8 @@ export function resolveEntry(metafile, entry) {
  * above. Preloading only the entry's direct imports would move the waterfall
  * down a level rather than removing it.
  */
-export function resolvePreloads(metafile, entry) {
-  const seen = new Set();
-  const out = [];
-  const queue = [entryOutput(metafile, entry)];
-
+function staticClosure(metafile, root, seen, out) {
+  const queue = [root];
   while (queue.length) {
     const current = queue.shift();
     for (const imported of metafile.outputs[current]?.imports ?? []) {
@@ -75,6 +72,26 @@ export function resolvePreloads(metafile, entry) {
       out.push(imported.path.split("/").pop());
       queue.push(imported.path);
     }
+  }
+}
+
+export function resolvePreloads(metafile, entry, routeEntry = null) {
+  const seen = new Set();
+  const out = [];
+  staticClosure(metafile, entryOutput(metafile, entry), seen, out);
+
+  // The entry itself is not preloaded — it is the `<script src>`. A route
+  // chunk is the opposite: nothing on the page names it, because the entry
+  // reaches it by dynamic import, so it has to be listed to be fetched
+  // early. Its own static imports usually overlap the entry's, and `seen`
+  // is shared so the overlap is not emitted twice.
+  if (routeEntry) {
+    const output = entryOutput(metafile, routeEntry);
+    if (!seen.has(output)) {
+      seen.add(output);
+      out.push(output.split("/").pop());
+    }
+    staticClosure(metafile, output, seen, out);
   }
   return out;
 }
@@ -101,6 +118,7 @@ export function generate({
   bundleDir,
   css,
   envScript,
+  routeEntry = null,
 }) {
   // Stylesheets first: they block first paint, where a preload only races
   // the entry's own discovery of the same chunk. Both sit in the initial
@@ -109,7 +127,7 @@ export function generate({
     resolveCss(cssManifest, css)
       .map((name) => `<link rel="stylesheet" href="/assets/${name}" />`)
       .join("") +
-    resolvePreloads(metafile, entry)
+    resolvePreloads(metafile, entry, routeEntry)
       .map((name) => `<link rel="modulepreload" href="/${bundleDir}/${name}" />`)
       .join("");
 
@@ -144,6 +162,7 @@ function parseArgs(argv) {
     bundleDir: null,
     css: [],
     envScript: false,
+    routeEntry: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -154,6 +173,7 @@ function parseArgs(argv) {
     else if (a === "--entry") args.entry = argv[++i];
     else if (a === "--bundle-dir") args.bundleDir = argv[++i];
     else if (a === "--css") args.css.push(argv[++i]);
+    else if (a === "--route-entry") args.routeEntry = argv[++i];
     else if (a === "--env-script") args.envScript = true;
     else throw new Error(`html_codegen: unknown arg: ${a}`);
   }
@@ -177,6 +197,7 @@ function main(argv) {
     bundleDir: args.bundleDir,
     css: args.css,
     envScript: args.envScript,
+    routeEntry: args.routeEntry,
   });
 
   writeFileSync(resolve(execroot, args.out), html);

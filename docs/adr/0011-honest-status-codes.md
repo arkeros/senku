@@ -12,7 +12,9 @@ The fix is not to stop serving the shell. The shell is what lets the app render 
 
 ## How a real route still returns 200
 
-A bucket routes by object existence — `/` works because `index.html` is there, not because a rule says so. So a declared route becomes an object: `react_app` copies the entry document to `{route}/index.html` for every path in its route tree. The bucket then answers `/how-to-play/` the ordinary way, and the fallback never runs for it.
+A bucket routes by object existence — `/` works because `index.html` is there, not because a rule says so. So a declared route becomes an object: `react_app` renders the entry document to `{route}/index.html` for every path in its route tree. The bucket then answers `/how-to-play/` the ordinary way, and the fallback never runs for it.
+
+Rendered rather than copied, because a route's document knows which route it serves. It preloads that route's chunk — which the entry reaches only by dynamic import, so no client can discover it until the router asks — alongside the entry's static graph, which every document preloads. That only helps a direct hit, since navigating there in-app never fetches the document, but a direct hit is the first impression and this whole stack exists because of one.
 
 This keeps the route table in the build, where routes are already declared, rather than in the URL map. That matters because `//infra/cloud/gcp/lb` is a single root serving six hosts plus the registry: enumerating routes there would make adding a page to one game a Terraform apply on shared routing, with a blast radius across every site. As objects, adding a page stays a `bucket_push`.
 

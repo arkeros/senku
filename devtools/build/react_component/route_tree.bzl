@@ -2,7 +2,7 @@
 
 _MAX_DEPTH = 1000
 
-def route_url_paths(routes):
+def route_objects(routes):
     """The URL paths a client can request that the app answers itself.
 
     A bucket routes by object existence, so a client-side route only returns
@@ -31,13 +31,15 @@ def route_url_paths(routes):
         routes: list of route dicts (each must have "path")
 
     Returns:
-        Sorted list of webroot-relative paths, no leading slash.
+        List of `struct(path, component)`, sorted by path. `path` is
+        webroot-relative with no leading slash; `component` is the route's
+        component label, or None for a route that only groups children.
     """
     out = []
     stack = [(routes, "")]
     for _ in range(_MAX_DEPTH):
         if not stack:
-            return sorted(out)
+            return sorted(out, key = lambda e: e.path)
         routes_in, prefix = stack.pop()
         for r in routes_in:
             path = r["path"]
@@ -58,7 +60,7 @@ def route_url_paths(routes):
             joined = prefix
             if segment:
                 joined = prefix + "/" + segment if prefix else segment
-                out.append(joined)
+                out.append(struct(path = joined, component = r.get("component")))
 
             if "children" in r:
                 stack.append((r["children"], joined))
