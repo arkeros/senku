@@ -60,6 +60,15 @@ gcloud storage objects describe gs://senku-prod-dino-meteor/index.html \
   --format='value(contentType,cacheControl)'
 curl -sI https://dino.arquero.dev/manifest.webmanifest | grep -i content-type
 #   want: application/manifest+json
+
+# Compression happens at the edge, not in the bucket — so it is only ever
+# visible here, and asking without Accept-Encoding is how you tell the edge
+# is choosing rather than the origin serving one fixed form.
+curl -sI -H 'Accept-Encoding: br, gzip' https://dino.arquero.dev/ \
+  | grep -i 'content-encoding\|vary'
+#   want: content-encoding: br (or gzip)  +  vary: Accept-Encoding
+curl -sI https://dino.arquero.dev/ | grep -i content-encoding
+#   want: nothing — an unencoded client still gets the raw object
 ```
 
 `negative_caching` is on for both drivers, and its interaction with the
@@ -69,6 +78,33 @@ the shell to. The client now receives the 404 as well as the body, so a
 cached negative response is a cached *page*, not just a status. If it
 misbehaves, drop `negative_caching` from `_CDN_POLICY` for the `gcs-cdn`
 backends.
+
+## Compression
+
+`compression_mode = "AUTOMATIC"` on the `gcs-cdn` backend buckets: the edge
+compresses text responses with Brotli or gzip according to the request's
+`Accept-Encoding`. It has to happen here because a bucket cannot negotiate —
+it serves the bytes it stores, so a pre-compressed object would carry a
+`Content-Encoding` for every client whether or not it asked.
+
+Two consequences worth knowing before reading a confusing response header.
+Cloud CDN adds `Vary: Accept-Encoding` to anything it *might* compress, so
+the cache keys on that header and a `Vary` you did not write is not a bug.
+And a compressed hit comes back with `Accept-Ranges: none` — `Range` is
+ignored, because nothing can say whether the client wants a range of the
+compressed or the uncompressed form. Nothing these apps serve uses ranges.
+
+Only responses between 1 KiB and 10 MiB with a compressible `Content-Type`
+are touched, and anything that already has a `Content-Encoding` is left
+alone. The size floor is why the inlined stylesheets matter twice over: it
+put every app's `index.html` well clear of 1 KiB, where `cluedo-bayes` used
+to sit at 1.2 KiB and compress or not depending on the build.
+
+The registry backend service is deliberately left at the default
+(`DISABLED`). It serves OCI blobs — already-compressed layers under
+`application/octet-stream`, which the edge would skip anyway — so the
+setting would buy nothing, and `Accept-Ranges: none` is a real hazard for
+registry clients that resume pulls with `Range`.
 
 ## 404 default
 
