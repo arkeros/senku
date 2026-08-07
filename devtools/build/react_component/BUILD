@@ -21,6 +21,14 @@ copy_to_bin(
     srcs = ["esbuild_prerender.config.mjs"],
 )
 
+# The document budget runs as a test in each app's own package, and rules_js
+# requires a js_test's entry point to live in the package declaring it —
+# unless it is already in the output tree, which this makes it.
+copy_to_bin(
+    name = "document_budget",
+    srcs = ["document_budget.mjs"],
+)
+
 # Transpile script: runs @babel/core to produce .js + .js.map + .stylex.json
 js_binary(
     name = "stylex_transpile_bin",
@@ -95,6 +103,12 @@ js_test(
     name = "html_codegen_test",
     data = ["html_codegen.mjs"],
     entry_point = "html_codegen_test.mjs",
+)
+
+js_test(
+    name = "document_budget_test",
+    data = ["document_budget.mjs"],
+    entry_point = "document_budget_test.mjs",
 )
 
 # App-level asset aggregator: merges per-leaf hash_assets manifests into
