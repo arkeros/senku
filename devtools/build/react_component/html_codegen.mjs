@@ -78,18 +78,26 @@ function staticClosure(metafile, root, seen, out) {
   }
 }
 
-export function resolvePreloads(metafile, entry, routeEntry = null) {
+export function resolvePreloads(metafile, entry, extraEntries = []) {
   const seen = new Set();
   const out = [];
   staticClosure(metafile, entryOutput(metafile, entry), seen, out);
 
-  // The entry itself is not preloaded — it is the `<script src>`. A route
-  // chunk is the opposite: nothing on the page names it, because the entry
-  // reaches it by dynamic import, so it has to be listed to be fetched
-  // early. Its own static imports usually overlap the entry's, and `seen`
-  // is shared so the overlap is not emitted twice.
-  if (routeEntry) {
-    const output = entryOutput(metafile, routeEntry);
+  // The entry itself is not preloaded — it is the `<script src>`. The extra
+  // entries are the opposite: nothing on the page names them, because the
+  // entry reaches them by dynamic import, so each has to be listed to be
+  // fetched early.
+  //
+  // This is not a retreat from "never preload a lazy route". An entry is
+  // named here only when this document will certainly render it — the
+  // layout, which is on every path, and the one route this document is
+  // served at. Every other route stays unnamed and unfetched, which is the
+  // whole of what the code splitting bought.
+  //
+  // Their static imports usually overlap the entry's and each other's, and
+  // `seen` is shared across the whole walk so no chunk is emitted twice.
+  for (const extra of extraEntries) {
+    const output = entryOutput(metafile, extra);
     if (!seen.has(output)) {
       seen.add(output);
       out.push(output.split("/").pop());
@@ -129,7 +137,7 @@ export function generate({
   css,
   envScript,
   appHtml = "",
-  routeEntry = null,
+  extraEntries = [],
 }) {
   // Stylesheets first, and inline: a `<link>` here would be a second round
   // trip that first paint waits on, discovered only once this document has
@@ -142,7 +150,7 @@ export function generate({
   // anything until the CSS above has been parsed anyway.
   const head =
     css.map(styleBlock).join("") +
-    resolvePreloads(metafile, entry, routeEntry)
+    resolvePreloads(metafile, entry, extraEntries)
       .map((name) => `<link rel="modulepreload" href="/${bundleDir}/${name}" />`)
       .join("");
 
@@ -182,6 +190,7 @@ function parseArgs(argv) {
     css: [],
     envScript: false,
     appHtml: null,
+    layoutEntry: null,
     routeEntry: null,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -193,6 +202,7 @@ function parseArgs(argv) {
     else if (a === "--bundle-dir") args.bundleDir = argv[++i];
     else if (a === "--css") args.css.push(argv[++i]);
     else if (a === "--app-html") args.appHtml = argv[++i];
+    else if (a === "--layout-entry") args.layoutEntry = argv[++i];
     else if (a === "--route-entry") args.routeEntry = argv[++i];
     else if (a === "--env-script") args.envScript = true;
     else throw new Error(`html_codegen: unknown arg: ${a}`);
@@ -220,7 +230,9 @@ function main(argv) {
     css: args.css.map(read),
     envScript: args.envScript,
     appHtml: args.appHtml ? read(args.appHtml) : "",
-    routeEntry: args.routeEntry,
+    // Layout before route: it is the outer component, so it is the one the
+    // renderer needs first if the two land out of order.
+    extraEntries: [args.layoutEntry, args.routeEntry].filter(Boolean),
   });
 
   writeFileSync(resolve(execroot, args.out), html);

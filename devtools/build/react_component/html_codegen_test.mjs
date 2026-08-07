@@ -13,6 +13,10 @@ const metafileWithImports = {
       entryPoint: "apps/t/app_main.js",
       imports: [
         { path: "apps/t/app_bundle/chunk-VENDOR1.js", kind: "import-statement" },
+        // The layout is a dynamic import like the routes are — the router
+        // lazy-loads it too — which is why the "no dynamic imports" rule
+        // dropped it despite it rendering on every path.
+        { path: "apps/t/app_bundle/Layout-SOM3RGL5.js", kind: "dynamic-import" },
         { path: "apps/t/app_bundle/Play-3YV3A6SW.js", kind: "dynamic-import" },
         { path: "apps/t/app_bundle/NotFound-AXA4SC4Y.js", kind: "dynamic-import" },
       ],
@@ -21,6 +25,10 @@ const metafileWithImports = {
       imports: [{ path: "apps/t/app_bundle/chunk-VENDOR2.js", kind: "import-statement" }],
     },
     "apps/t/app_bundle/chunk-VENDOR2.js": { imports: [] },
+    "apps/t/app_bundle/Layout-SOM3RGL5.js": {
+      entryPoint: "apps/t/components/Layout/Layout.js",
+      imports: [{ path: "apps/t/app_bundle/chunk-VENDOR1.js", kind: "import-statement" }],
+    },
     "apps/t/app_bundle/Play-3YV3A6SW.js": { entryPoint: "apps/t/pages/Play/Play.js" },
   },
 };
@@ -83,12 +91,38 @@ test("resolvePreloads is empty when the entry imports nothing", () => {
 // waiting for the router to ask. The chunk is reachable from the entry only
 // by a dynamic import, so it is never in the base set.
 test("resolvePreloads adds the route's own chunk when given one", () => {
-  const got = resolvePreloads(
-    metafileWithImports,
-    "apps/t/app_main.js",
+  const got = resolvePreloads(metafileWithImports, "apps/t/app_main.js", [
     "apps/t/pages/Play/Play.js",
-  );
+  ]);
   assert.deepEqual(got, ["chunk-VENDOR1.js", "chunk-VENDOR2.js", "Play-3YV3A6SW.js"]);
+});
+
+// The layout renders on every path, so it is wanted on every document —
+// but it reaches the entry by dynamic import like a route does, which is
+// why the blanket "no dynamic imports" rule used to drop it. Left out, it
+// is discovered only once the entry has run, and the route beneath it only
+// once *it* has: a four-deep chain where two levels are avoidable.
+test("resolvePreloads takes several extra entries, in the order given", () => {
+  const got = resolvePreloads(metafileWithImports, "apps/t/app_main.js", [
+    "apps/t/components/Layout/Layout.js",
+    "apps/t/pages/Play/Play.js",
+  ]);
+
+  assert.deepEqual(got, [
+    "chunk-VENDOR1.js",
+    "chunk-VENDOR2.js",
+    "Layout-SOM3RGL5.js",
+    "Play-3YV3A6SW.js",
+  ]);
+});
+
+// Still no blanket preloading of lazy routes: an extra entry is named
+// because this document will certainly render it, not because it exists.
+test("resolvePreloads leaves the routes it was not given alone", () => {
+  const got = resolvePreloads(metafileWithImports, "apps/t/app_main.js", [
+    "apps/t/pages/Play/Play.js",
+  ]);
+  assert.ok(!got.includes("NotFound-AXA4SC4Y.js"), "an unrelated route must not be preloaded");
 });
 
 // A route chunk has static imports of its own. Those are usually shared with
@@ -109,7 +143,7 @@ test("resolvePreloads does not repeat a chunk the entry already pulled in", () =
   };
 
   assert.deepEqual(
-    resolvePreloads(shared, "apps/t/app_main.js", "apps/t/pages/Play/Play.js"),
+    resolvePreloads(shared, "apps/t/app_main.js", ["apps/t/pages/Play/Play.js"]),
     ["chunk-SHARED.js", "Play-Y.js"],
   );
 });
