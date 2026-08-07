@@ -75,6 +75,19 @@ NORMALIZE_AT=$(grep -bo -- '--csstools-color-scheme--light' "$HTML" | head -1 | 
 STYLEX_AT=$(grep -bo 'min-height:100vh' "$HTML" | head -1 | cut -d: -f1)
 [ "$NORMALIZE_AT" -lt "$STYLEX_AT" ] \
   || { echo "FAIL: normalize CSS must be inlined before StyleX CSS"; exit 1; }
+# This app sets `runtime_config`, which is the one case that cannot be
+# prerendered: `window.__ENV__` is injected per deployment, so it does not
+# exist while the build runs and the first `getEnv` in a component would
+# throw. The document still has to build, with `#root` empty — see
+# docs/adr/0013-build-time-prerender.md.
+grep -q '<div id="root"></div>' "$HTML" \
+  || { echo "FAIL: runtime_config app should ship an empty #root, not prerendered markup"; exit 1; }
+# Empty is not the same as unsubstituted. A leftover placeholder would ship
+# the literal text "{{APP}}" into the page.
+if grep -q '{{APP}}' "$HTML"; then
+  echo "FAIL: {{APP}} placeholder left unsubstituted"; exit 1
+fi
+
 # runtime_config: /env.js must precede the bundle so window.__ENV__ is set before module eval.
 grep -qE '<script src="/env\.js"></script><script type="module" src="/app_bundle/app_main-[A-Z0-9]+\.js">' "$HTML" \
   || { echo "FAIL: /env.js script tag missing or not ordered before app_main module"; exit 1; }

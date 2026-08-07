@@ -158,6 +158,40 @@ test("generate inlines the stylesheets into the document", () => {
   );
 });
 
+// The prerendered markup is what makes first paint independent of the
+// bundle: without it the document's only body content is an empty #root,
+// and nothing contentful can paint until React has mounted. See
+// docs/adr/0013-build-time-prerender.md.
+test("generate substitutes the prerendered markup into the document", () => {
+  const html = generate({
+    template: '<body><div id="root">{{APP}}</div>{{SCRIPTS}}</body>',
+    metafile,
+    entry: "apps/t/app_main.js",
+    bundleDir: "app_bundle",
+    css: [],
+    appHtml: "<h1>Batalla</h1>",
+    envScript: false,
+  });
+
+  assert.ok(html.includes('<div id="root"><h1>Batalla</h1></div>'));
+});
+
+// An app that cannot prerender still has to build. The placeholder
+// resolves to nothing rather than being left for the leftover check to
+// reject, which would make prerendering mandatory by accident.
+test("generate empties the placeholder when there is no prerendered markup", () => {
+  const html = generate({
+    template: '<body><div id="root">{{APP}}</div>{{SCRIPTS}}</body>',
+    metafile,
+    entry: "apps/t/app_main.js",
+    bundleDir: "app_bundle",
+    css: [],
+    envScript: false,
+  });
+
+  assert.ok(html.includes('<div id="root"></div>'));
+});
+
 // Source order is the cascade — normalize has to stay ahead of the app's
 // own styles or it wins every tie it should lose.
 test("generate keeps the stylesheets in the order it is given", () => {

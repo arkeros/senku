@@ -1,7 +1,7 @@
 "React application macro with Starlark-defined routes and lazy loading"
 
 load("@aspect_rules_esbuild//esbuild:defs.bzl", "esbuild")
-load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary")
 load("//devtools/build/js:devserver.bzl", "devserver")
 load(":asset_pipeline.bzl", "asset_pipeline")
 load(":i18n_artifacts.bzl", "i18n_artifacts")
@@ -51,7 +51,11 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
       - :{name}_styles — collected StyleX CSS (transitive via
         stylex_metadata_aspect). Inlined into the documents below rather
         than served: it is a build input, not part of the webroot.
-      - :{name}_html — production index.html
+      - :{name}_html — production index.html, carrying the markup for `/`
+        rendered at build time (see docs/adr/0013-build-time-prerender.md).
+        Not rendered when `runtime_config` is set — those values do not
+        exist until a deployment starts.
+      - :{name}_prerender_bin — the renderer, run once per document
       - :{name}_env_tpl / :{name}_env_dev / :{name}_env_component — when
         `runtime_config` is set (see arg docs)
 
@@ -83,6 +87,15 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
             Other locales must satisfy this one's key contract exactly.
         **kwargs: passed through to downstream targets (e.g. visibility, tags)
     """
+
+    # An app whose values arrive at runtime cannot be rendered at build time.
+    # `runtime_config` exists precisely so a deployment can differ without a
+    # rebuild, so `window.__ENV__` does not exist while the build runs and
+    # the first `getEnv` during a prerender throws. Skipping is the honest
+    # answer: the alternative is baking one deployment's values into markup
+    # shipped to every deployment. Documents still build — `{{APP}}` just
+    # resolves to nothing. See docs/adr/0013-build-time-prerender.md.
+    prerender_enabled = runtime_config == None
 
     if runtime_config != None:
         validate_runtime_config(runtime_config)
@@ -165,6 +178,10 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         "--out-main",
         "$(location {}_main.tsx)".format(name),
     ]
+    codegen_outs = [name + "_router.tsx", name + "_main.tsx"]
+    if prerender_enabled:
+        codegen_args += ["--out-prerender", "$(location {}_prerender.tsx)".format(name)]
+        codegen_outs += [name + "_prerender.tsx", name + "_prerender_main.mjs"]
     if i18n_enabled:
         codegen_args.extend([
             "--i18n-manifest-import",
@@ -181,7 +198,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     js_run_binary(
         name = codegen_name,
         srcs = [manifest_name + ".json"],
-        outs = [name + "_router.tsx", name + "_main.tsx"],
+        outs = codegen_outs,
         args = codegen_args,
         tool = Label("//devtools/build/react_component:react_app_codegen_bin"),
     )
@@ -218,6 +235,28 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         _export_test = False,
         deps = _main_deps,
     )
+
+    # Compile the generated prerender entry. Unlike `_main` it depends on the
+    # route components directly rather than through the router: it imports
+    # them statically, because a build-time render has no reason to defer a
+    # module it is about to need.
+    if prerender_enabled:
+        _prerender_deps = all_route_components + [
+            "//:node_modules/react-dom",
+            "//:node_modules/@types/react-dom",
+            "//:node_modules/react-router",
+        ]
+        if i18n_enabled:
+            _prerender_deps.extend([
+                ":" + name + "_i18n_manifest",
+                "//:node_modules/@panellet/i18n-runtime",
+            ])
+        react_component(
+            name = name + "_prerender",
+            srcs = [name + "_prerender.tsx"],
+            _export_test = False,
+            deps = _prerender_deps,
+        )
 
     # Collect StyleX CSS from all route components (transitive via stylex_metadata_aspect)
     stylex_css(
@@ -319,17 +358,97 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         ":" + name + "_bundle_meta",
     ] + css_files
 
+    # Each document carries the markup for the path it is served at, so the
+    # arguments and inputs are per-document rather than shared. `_prerender`
+    # targets are declared further down — Bazel resolves labels after the
+    # package loads, so naming them here is not an ordering problem.
+    def _document_args(out, app_html_target):
+        args = ["--out", "$(location {})".format(out)] + html_args
+        if prerender_enabled:
+            args += ["--app-html", "$(location :{})".format(app_html_target)]
+        return args
+
+    def _document_srcs(app_html_target):
+        return html_srcs + ([":" + app_html_target] if prerender_enabled else [])
+
+    root_markup = name + "_prerender_root"
+
     js_run_binary(
         name = name + "_html",
-        srcs = html_srcs,
+        srcs = _document_srcs(root_markup),
         outs = [name + "_index.html"],
-        args = ["--out", "$(location {}_index.html)".format(name)] + html_args,
+        args = _document_args(name + "_index.html", root_markup),
         tool = Label("//devtools/build/react_component:html_codegen_bin"),
         **kwargs
     )
 
     # esbuild and devserver need _ts targets (which carry JsInfo)
     all_ts_targets = [ts_dep(c) for c in all_route_components]
+
+    # --- Build-time prerender ------------------------------------------------
+    # The route tree rendered to markup once, in Node, so a document arrives
+    # with something contentful in it. Without this the body is an empty
+    # `#root` and first paint cannot happen until the bundle has been
+    # fetched, parsed and executed — on a throttled phone that is the whole
+    # of FCP. See docs/adr/0013-build-time-prerender.md.
+    #
+    # Bundled rather than run from the compiled tree because this executes
+    # in Node against first-party ESM plus npm packages, and one esbuild
+    # pass settles every resolution at build time instead of at run time.
+    # Renders `path` into `out`. A no-op when the app opts out above, so the
+    # route loop below does not have to know which mode it is in.
+    def _prerender(target, out, path):
+        if not prerender_enabled:
+            return
+        js_run_binary(
+            name = target,
+            outs = [out],
+            args = ["--path", path, "--out", "$(location {})".format(out)],
+            tool = ":" + name + "_prerender_bin",
+            **kwargs
+        )
+
+    if prerender_enabled:
+        esbuild(
+            name = name + "_prerender_bundle",
+            # The .mjs wrapper, not the .tsx's output: the render module is
+            # kept free of Node APIs so it type-checks under the same tsconfig
+            # as every other component, and the file I/O lives beside it in
+            # plain JS that tsc never reads.
+            entry_point = name + "_prerender_main.mjs",
+            srcs = [name + "_prerender_main.mjs"],
+            # Node, not the browser: `react-dom/server` and `node:fs` both
+            # resolve differently, and nothing here is ever shipped.
+            platform = "node",
+            target = "node20",
+            # No minify. Nothing downloads this, so the only thing shrinking
+            # it would cost is a readable stack trace when a component throws
+            # mid-render — which is the one output this bundle has to be good
+            # at producing.
+            config = Label("//devtools/build/react_component:esbuild_prerender.config"),
+            deps = [
+                ":" + name + "_prerender_ts",
+            ] + all_ts_targets + [
+                "//:node_modules/react",
+                "//:node_modules/react-dom",
+                "//:node_modules/react-router",
+                "//:node_modules/@stylexjs/stylex",
+            ],
+            **kwargs
+        )
+
+        # The bundle target carries its sourcemap too, so the binary names
+        # the one file rather than the target.
+        js_binary(
+            name = name + "_prerender_bin",
+            entry_point = ":" + name + "_prerender_bundle.js",
+            **kwargs
+        )
+
+    # The root document answers `/` through the bucket's `main_page_suffix`,
+    # and is also the shell the URL map serves under a 404 — so it is
+    # rendered at `/`, the one path it is certain to be showing.
+    _prerender(root_markup, name + "_app.html", "/")
 
     # Production bundle. Asset files ride as data so they end up in the
     # bundle's runfiles; URLs are baked into JS by asset_codegen, so
@@ -433,7 +552,13 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         # mapping lossy — `a-b`, `a_b` and `a/b` would all become one name
         # and collide as duplicate targets.
         route_target = "{}_route_{}".format(name, entry.path)
-        route_args = ["--out", "$(location {}/index.html)".format(entry.path)] + html_args
+
+        # Rendered at its own path, so a direct hit on a route gets that
+        # route's markup rather than the index's.
+        route_markup = "{}_prerender_{}".format(name, entry.path)
+        _prerender(route_markup, entry.path + "/app.html", "/" + entry.path)
+
+        route_args = _document_args(entry.path + "/index.html", route_markup)
 
         # A route that only groups children has no component of its own, so
         # there is no chunk to name and it renders exactly like the entry
@@ -445,7 +570,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
 
         js_run_binary(
             name = route_target,
-            srcs = html_srcs,
+            srcs = _document_srcs(route_markup),
             outs = [entry.path + "/index.html"],
             args = route_args,
             tool = Label("//devtools/build/react_component:html_codegen_bin"),
