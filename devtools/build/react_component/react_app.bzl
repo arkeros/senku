@@ -10,7 +10,6 @@ load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
 load(":route_tree.bzl", "route_objects", "walk_route_tree")
 load(":runtime_config.bzl", "runtime_config_artifacts", "validate_runtime_config")
-load(":_hash_assets.bzl", "hash_assets")
 load(":bundle_outputs.bzl", "bundle_dir", "bundle_metafile")
 load(":stylex_css.bzl", "stylex_css")
 
@@ -49,7 +48,9 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     Produces:
       - :{name}_devserver — dev server with unbundled ESM
       - :{name}_bundle — production esbuild bundle
-      - :{name}_styles — collected StyleX CSS (transitive via stylex_metadata_aspect)
+      - :{name}_styles — collected StyleX CSS (transitive via
+        stylex_metadata_aspect). Inlined into the documents below rather
+        than served: it is a build input, not part of the webroot.
       - :{name}_html — production index.html
       - :{name}_env_tpl / :{name}_env_dev / :{name}_env_component — when
         `runtime_config` is set (see arg docs)
@@ -225,12 +226,9 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         jit_open_props = jit_open_props,
     )
 
-    # Copy open-props/normalize.min.css into a Bazel output so it lands in
-    # the app filegroup (and therefore the prod tar layer). Shipped as a
-    # sibling stylesheet loaded before StyleX CSS: source order gives it
-    # lower precedence than app styles, and keeping it a separate file
-    # lets the browser cache the normalize bytes across deploys — they
-    # only change on open-props version bumps, not on component edits.
+    # Copy open-props/normalize.min.css into a Bazel output so the HTML
+    # generator can read it. Inlined ahead of the StyleX CSS: source order
+    # gives it lower precedence than app styles.
     #
     # //:node_modules/open-props has two execpath entries (virtual store +
     # symlink); either contains the file, so we pick the first that does.
@@ -254,37 +252,19 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         components = all_route_components,
     )
 
-    # Both stylesheets are render-blocking `<link>`s, so a stable name costs
-    # a revalidation before first paint on every visit. Content-addressing
-    # them buys the `immutable` policy — and lands them under `assets/`,
-    # which is what earns it: cache.bzl marks that prefix immutable, so the
-    # hash and the header cannot disagree. The devserver keeps reading the
-    # unhashed pair below; nothing it serves is published.
-    css_hashed_target = name + "_css_hashed"
-    hash_assets(
-        name = css_hashed_target,
-        srcs = [":" + name + "_styles", ":" + normalize_css_target],
-    )
-
-    # The tree alone. `hash_assets` returns the manifest in the same
-    # DefaultInfo, and everything in the servable filegroup below is
-    # published — same hazard as the esbuild metafile, but this rule offers
-    # an output group, so selecting the servable half needs no new rule.
-    native.filegroup(
-        name = name + "_css_dir",
-        srcs = [":" + css_hashed_target],
-        output_group = "assets",
-        **kwargs
-    )
-
-    # The manifest half, for the HTML generator. Never served.
-    css_manifest_target = name + "_css_manifest"
-    native.filegroup(
-        name = css_manifest_target,
-        srcs = [":" + css_hashed_target],
-        output_group = "asset_manifest",
-        **kwargs
-    )
+    # Neither stylesheet is served as a file: both are inlined into every
+    # document by the generator below. They were content-addressed under
+    # `assets/` while they were render-blocking `<link>`s — the hash bought
+    # the `immutable` header, which paid for the revalidation the link cost
+    # before first paint. Inlining removes the request the whole arrangement
+    # was built around: the bytes now arrive with the document that needs
+    # them, one round trip instead of two, and there is no URL left to name
+    # or to cache. See docs/adr/0012-inline-critical-css.md.
+    #
+    # The devserver reads these same two files and keeps linking them, so a
+    # CSS edit there still reloads without rebuilding the document. Nothing
+    # it serves is published.
+    css_files = [":" + normalize_css_target, ":" + name + "_styles"]
 
     # HTML template
     tpl_name = html_template or Label("//devtools/build/react_component:index.html.tpl")
@@ -313,8 +293,6 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         "$(location {})".format(tpl_name),
         "--metafile",
         "$(location :{}_bundle_meta)".format(name),
-        "--css-manifest",
-        "$(location :{})".format(css_manifest_target),
         # esbuild identifies outputs by their source entry point, and every
         # `lazy()` route is one too — the source path is what picks ours out.
         "--entry",
@@ -324,13 +302,12 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         # and at the same path in the bucket.
         "--bundle-dir",
         name + "_bundle",
-        # Normalize ships before StyleX so source order keeps app styles
-        # winning on equal specificity. This order is the cascade.
-        "--css",
-        name + "_normalize.css",
-        "--css",
-        name + "_styles.css",
     ]
+
+    # Normalize is inlined before StyleX so source order keeps app styles
+    # winning on equal specificity. This order is the cascade.
+    for css_file in css_files:
+        html_args += ["--css", "$(location {})".format(css_file)]
 
     # When runtime_config is set, the `/env.js` bootstrap must load before the
     # main bundle so `window.__ENV__` is set before any module script runs.
@@ -340,8 +317,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     html_srcs = [
         tpl_name,
         ":" + name + "_bundle_meta",
-        ":" + css_manifest_target,
-    ]
+    ] + css_files
 
     js_run_binary(
         name = name + "_html",
@@ -421,7 +397,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         components = [":" + name + "_main_ts", ":" + name + "_router_ts"] + all_ts_targets,
         browser_deps = browser_deps,
         html_template = tpl_name,
-        css = [":" + normalize_css_target, ":" + name + "_styles"],
+        css = css_files,
         assets_manifest = ":" + name + "_assets.json",
         assets_dir = ":" + name + "_assets",
         runtime_config_dev = (":" + name + "_env_dev") if runtime_config != None else None,
@@ -491,7 +467,6 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         srcs = [
             ":" + name + "_html",
             ":" + name + "_bundle_dir",
-            ":" + name + "_css_dir",
             ":" + name + "_assets",
         ] + route_documents,
         **kwargs

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { generate, resolveCss, resolveEntry, resolvePreloads } from "./html_codegen.mjs";
+import { generate, resolveEntry, resolvePreloads } from "./html_codegen.mjs";
 
 // The entry's static imports are the modules that must load before anything
 // runs; its dynamic imports are the lazy routes, which must not be preloaded
@@ -39,11 +39,6 @@ const metafile = {
   },
 };
 
-const cssManifest = {
-  "app_normalize.css": "app_normalize.4de6907a35c5.css",
-  "app_styles.css": "app_styles.11cc90d013b2.css",
-};
-
 test("resolveEntry finds the hashed name for the source entry", () => {
   assert.equal(resolveEntry(metafile, "apps/t/app_main.js"), "app_main-4WSWQT5M.js");
 });
@@ -61,17 +56,6 @@ test("resolveEntry throws when the entry is absent", () => {
     () => resolveEntry(metafile, "apps/t/does_not_exist.js"),
     /does_not_exist\.js/,
   );
-});
-
-test("resolveCss preserves the order it is asked for", () => {
-  assert.deepEqual(resolveCss(cssManifest, ["app_normalize.css", "app_styles.css"]), [
-    "app_normalize.4de6907a35c5.css",
-    "app_styles.11cc90d013b2.css",
-  ]);
-});
-
-test("resolveCss throws on a name the manifest does not carry", () => {
-  assert.throws(() => resolveCss(cssManifest, ["missing.css"]), /missing\.css/);
 });
 
 test("resolvePreloads takes static imports and refuses dynamic ones", () => {
@@ -134,7 +118,6 @@ test("generate emits a modulepreload per static import", () => {
   const html = generate({
     template: "<head>{{HEAD}}</head>",
     metafile: metafileWithImports,
-    cssManifest,
     entry: "apps/t/app_main.js",
     bundleDir: "app_bundle",
     css: [],
@@ -150,26 +133,82 @@ test("generate emits a modulepreload per static import", () => {
   );
 });
 
-test("generate substitutes hashed URLs into the template", () => {
+// The stylesheets are inlined, not linked: a `<link>` in the head is a
+// second round trip that first paint waits on, and these two are small
+// enough that their bytes cost less than the trip to fetch them. See
+// docs/adr/0012-inline-critical-css.md.
+test("generate inlines the stylesheets into the document", () => {
   const html = generate({
     template: "<head>{{HEAD}}</head><body>{{SCRIPTS}}</body>",
     metafile,
-    cssManifest,
     entry: "apps/t/app_main.js",
     bundleDir: "app_bundle",
-    css: ["app_normalize.css", "app_styles.css"],
+    css: ["body{margin:0}", ".x{color:red}"],
     envScript: false,
   });
 
   assert.equal(
     html,
     "<head>" +
-      '<link rel="stylesheet" href="/assets/app_normalize.4de6907a35c5.css" />' +
-      '<link rel="stylesheet" href="/assets/app_styles.11cc90d013b2.css" />' +
+      "<style>body{margin:0}</style>" +
+      "<style>.x{color:red}</style>" +
       "</head><body>" +
       '<script type="module" src="/app_bundle/app_main-4WSWQT5M.js"></script>' +
       "</body>",
   );
+});
+
+// Source order is the cascade — normalize has to stay ahead of the app's
+// own styles or it wins every tie it should lose.
+test("generate keeps the stylesheets in the order it is given", () => {
+  const html = generate({
+    template: "{{HEAD}}{{SCRIPTS}}",
+    metafile,
+    entry: "apps/t/app_main.js",
+    bundleDir: "app_bundle",
+    css: ["/*first*/", "/*second*/"],
+    envScript: false,
+  });
+
+  assert.ok(html.indexOf("/*first*/") < html.indexOf("/*second*/"));
+});
+
+// Inlining puts CSS bytes into HTML parsing context, where `</style>`
+// closes the block early and the remaining rules render as body text. A
+// stylesheet can legitimately contain the sequence inside a string, so
+// this is a real input, not a hypothetical one — and silently mangling
+// the page is the one outcome worse than failing the build.
+test("generate rejects a stylesheet that would close its own style tag", () => {
+  assert.throws(
+    () =>
+      generate({
+        template: "{{HEAD}}{{SCRIPTS}}",
+        metafile,
+        entry: "apps/t/app_main.js",
+        bundleDir: "app_bundle",
+        css: ['a::after{content:"</style>"}'],
+        envScript: false,
+      }),
+    /<\/style/,
+  );
+});
+
+test("generate rejects the closing sequence whatever its case or spacing", () => {
+  for (const hostile of ["</STYLE>", "</StYlE >", "</style\t>"]) {
+    assert.throws(
+      () =>
+        generate({
+          template: "{{HEAD}}{{SCRIPTS}}",
+          metafile,
+          entry: "apps/t/app_main.js",
+          bundleDir: "app_bundle",
+          css: [`a::after{content:"${hostile}"}`],
+          envScript: false,
+        }),
+      /<\/style/,
+      `'${hostile}' must be rejected`,
+    );
+  }
 });
 
 // `window.__ENV__` has to exist before any module script runs, so the
@@ -178,7 +217,6 @@ test("generate puts the env bootstrap before the module entry", () => {
   const html = generate({
     template: "{{SCRIPTS}}",
     metafile,
-    cssManifest,
     entry: "apps/t/app_main.js",
     bundleDir: "app_bundle",
     css: [],
@@ -200,7 +238,6 @@ test("generate rejects a template with an unsubstituted placeholder", () => {
       generate({
         template: "{{HEAD}}{{SCRIPTS}}{{TITLE}}",
         metafile,
-        cssManifest,
         entry: "apps/t/app_main.js",
         bundleDir: "app_bundle",
         css: [],

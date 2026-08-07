@@ -4,16 +4,19 @@
  *
  * Every file index.html points at carries a hash of its own bytes, so none
  * of those names exists until the bytes do and none can be substituted at
- * analysis time. The entry bundle's name comes from esbuild's metafile, the
- * stylesheets' from the hash_assets manifest, and this is the only place the
- * two are joined — index.html is the one object left whose name is fixed,
- * which is what makes it the document the whole site is reachable through.
+ * analysis time. The entry bundle's name comes from esbuild's metafile, and
+ * this is where it is resolved — index.html is the one object left whose
+ * name is fixed, which is what makes it the document the whole site is
+ * reachable through.
  *
- * See docs/adr/0010-content-addressed-webroot.md.
+ * The stylesheets are the exception, and they are not named at all: their
+ * bytes are inlined into the document. See
+ * docs/adr/0010-content-addressed-webroot.md and
+ * docs/adr/0012-inline-critical-css.md.
  *
  * Usage: html_codegen.mjs --template <p> --out <p> --metafile <p>
- *          --css-manifest <p> --entry <source path> --bundle-dir <name>
- *          [--css <basename>]... [--env-script]
+ *          --entry <source path> --bundle-dir <name>
+ *          [--css <path>]... [--env-script]
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -96,37 +99,48 @@ export function resolvePreloads(metafile, entry, routeEntry = null) {
   return out;
 }
 
-/** The hashed basenames for `names`, in the order asked for. */
-export function resolveCss(manifest, names) {
-  return names.map((name) => {
-    const hashed = manifest[name];
-    if (!hashed) {
-      throw new Error(
-        `html_codegen: stylesheet '${name}' is not in the manifest ` +
-          `(has: ${Object.keys(manifest).join(", ") || "nothing"})`,
-      );
-    }
-    return hashed;
-  });
+/**
+ * The one sequence that cannot survive being inlined.
+ *
+ * Inside `<style>`, the HTML tokenizer looks for nothing but the end tag, so
+ * a stylesheet is otherwise passed through untouched — no entity escaping,
+ * no quoting. But it does end the block at `</style`, and the spec's match
+ * is case-insensitive and admits whitespace before the `>`. A rule like
+ * `content: "</style>"` is legal CSS, so this is reachable input.
+ */
+const STYLE_CLOSE = /<\/style/i;
+
+/** `text` wrapped in a `<style>` block, or a thrown error if it cannot be. */
+function styleBlock(text) {
+  if (STYLE_CLOSE.test(text)) {
+    throw new Error(
+      "html_codegen: stylesheet contains '</style', which would close the " +
+        "inline block early and render the rest of the sheet as page text",
+    );
+  }
+  return `<style>${text}</style>`;
 }
 
 export function generate({
   template,
   metafile,
-  cssManifest,
   entry,
   bundleDir,
   css,
   envScript,
   routeEntry = null,
 }) {
-  // Stylesheets first: they block first paint, where a preload only races
-  // the entry's own discovery of the same chunk. Both sit in the initial
-  // head, so the browser's preload scanner starts every fetch in one pass.
+  // Stylesheets first, and inline: a `<link>` here would be a second round
+  // trip that first paint waits on, discovered only once this document has
+  // arrived. Inlining makes the CSS arrive *with* the document, which is
+  // the whole of the win — these sheets are a few KB, less than the trip
+  // costs. `css` is in cascade order and stays that way.
+  //
+  // The modulepreloads follow rather than lead: they are already fetched by
+  // the preload scanner in the same pass, and the JS they name cannot paint
+  // anything until the CSS above has been parsed anyway.
   const head =
-    resolveCss(cssManifest, css)
-      .map((name) => `<link rel="stylesheet" href="/assets/${name}" />`)
-      .join("") +
+    css.map(styleBlock).join("") +
     resolvePreloads(metafile, entry, routeEntry)
       .map((name) => `<link rel="modulepreload" href="/${bundleDir}/${name}" />`)
       .join("");
@@ -157,7 +171,6 @@ function parseArgs(argv) {
     template: null,
     out: null,
     metafile: null,
-    cssManifest: null,
     entry: null,
     bundleDir: null,
     css: [],
@@ -169,7 +182,6 @@ function parseArgs(argv) {
     if (a === "--template") args.template = argv[++i];
     else if (a === "--out") args.out = argv[++i];
     else if (a === "--metafile") args.metafile = argv[++i];
-    else if (a === "--css-manifest") args.cssManifest = argv[++i];
     else if (a === "--entry") args.entry = argv[++i];
     else if (a === "--bundle-dir") args.bundleDir = argv[++i];
     else if (a === "--css") args.css.push(argv[++i]);
@@ -177,7 +189,7 @@ function parseArgs(argv) {
     else if (a === "--env-script") args.envScript = true;
     else throw new Error(`html_codegen: unknown arg: ${a}`);
   }
-  for (const required of ["template", "out", "metafile", "cssManifest", "entry", "bundleDir"]) {
+  for (const required of ["template", "out", "metafile", "entry", "bundleDir"]) {
     if (!args[required]) {
       throw new Error(`html_codegen: --${required.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())} is required`);
     }
@@ -192,10 +204,12 @@ function main(argv) {
   const html = generate({
     template: read(args.template),
     metafile: JSON.parse(read(args.metafile)),
-    cssManifest: JSON.parse(read(args.cssManifest)),
     entry: args.entry,
     bundleDir: args.bundleDir,
-    css: args.css,
+    // `--css` now names a file to inline rather than a basename to link,
+    // so the contents are read here and `generate` stays a pure function
+    // of them.
+    css: args.css.map(read),
     envScript: args.envScript,
     routeEntry: args.routeEntry,
   });

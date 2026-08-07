@@ -181,7 +181,6 @@ bzl_library(
     name = "react_app",
     srcs = ["react_app.bzl"],
     deps = [
-        ":_hash_assets",
         ":bundle_outputs",
         ":i18n_artifacts",
         ":labels",

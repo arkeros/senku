@@ -50,14 +50,31 @@ echo "PASS: css"
 HTML="examples/stylex/app_index.html"
 echo "=== HTML tests ==="
 
-# Both names carry a content hash, so the assertions match their shape rather
-# than a literal: pinning the hash would fail on every source edit, and
+# The bundle name carries a content hash, so the assertion matches its shape
+# rather than a literal: pinning the hash would fail on every source edit, and
 # dropping the hash from the pattern would let an unhashed name — which
 # revalidates on the render path and publishes in the wrong wave — pass.
 grep -qE 'app_bundle/app_main-[A-Z0-9]+\.js' "$HTML" \
   || { echo "FAIL: missing content-addressed bundle script tag"; exit 1; }
-grep -qE '/assets/app_styles\.[0-9a-f]+\.css' "$HTML" \
-  || { echo "FAIL: missing content-addressed stylesheet link"; exit 1; }
+
+# Both stylesheets are inlined, not linked — see
+# docs/adr/0012-inline-critical-css.md. Asserted on a rule from each sheet
+# rather than on the presence of a <style> tag, because a template may carry
+# a hand-written one of its own and would satisfy that on its own.
+grep -q 'min-height:100vh' "$HTML" || { echo "FAIL: StyleX CSS not inlined into the document"; exit 1; }
+grep -q -- '--csstools-color-scheme--light' "$HTML" \
+  || { echo "FAIL: normalize CSS not inlined into the document"; exit 1; }
+# A link left behind is the round trip the inlining exists to remove.
+if grep -q 'rel="stylesheet"' "$HTML"; then
+  echo "FAIL: document still links a stylesheet"; exit 1
+fi
+# Normalize must be inlined before StyleX — source order is the cascade, and
+# which file goes first is decided in react_app.bzl, so only an end-to-end
+# assertion covers it.
+NORMALIZE_AT=$(grep -bo -- '--csstools-color-scheme--light' "$HTML" | head -1 | cut -d: -f1)
+STYLEX_AT=$(grep -bo 'min-height:100vh' "$HTML" | head -1 | cut -d: -f1)
+[ "$NORMALIZE_AT" -lt "$STYLEX_AT" ] \
+  || { echo "FAIL: normalize CSS must be inlined before StyleX CSS"; exit 1; }
 # runtime_config: /env.js must precede the bundle so window.__ENV__ is set before module eval.
 grep -qE '<script src="/env\.js"></script><script type="module" src="/app_bundle/app_main-[A-Z0-9]+\.js">' "$HTML" \
   || { echo "FAIL: /env.js script tag missing or not ordered before app_main module"; exit 1; }
