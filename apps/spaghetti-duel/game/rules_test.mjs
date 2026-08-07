@@ -190,6 +190,17 @@ test("turn: two flicks inside one tick cannot reverse the snake", () => {
   assert.deepEqual(after.queue, ["down"]);
 });
 
+test("turn: a flick is spent leaving the cell the head is gliding into", () => {
+  // Mid-glide the head has already been drawn part of the way out of (5,5)
+  // toward (6,5), and a flick arriving now cannot un-travel that. The move
+  // under way finishes, and the turn is taken on the way out of (6,5).
+  const gliding = snakeOf("bottom", "right", [at(5, 5), at(4, 5), at(3, 5)]);
+  const first = run([turn(gliding, "down")]).snakes[0];
+  assert.deepEqual(first.body[0], at(6, 5), "the move under way still lands");
+  assert.equal(first.dir, "down", "and the flick becomes the next one");
+  assert.deepEqual(run([first]).snakes[0].body[0], at(6, 6));
+});
+
 test("turn: the queue does not grow without bound", () => {
   let s = newSnake(board, "bottom");
   for (const d of ["left", "down", "right", "up", "left"]) s = turn(s, d);
@@ -242,9 +253,9 @@ test("step: running off the plate is fatal", () => {
 });
 
 test("step: biting your own flank is fatal", () => {
-  // Coiled tight enough that turning down puts the head onto its fourth
+  // Coiled tight enough that heading down puts the head onto its fourth
   // segment — a cell well away from the tail, so nothing is vacating it.
-  const coiled = snakeOf("bottom", "left", [
+  const coiled = snakeOf("bottom", "down", [
     at(5, 5),
     at(6, 5),
     at(6, 6),
@@ -252,23 +263,23 @@ test("step: biting your own flank is fatal", () => {
     at(4, 6),
     at(4, 5),
   ]);
-  const out = run([turn(coiled, "down")]);
+  const out = run([coiled]);
   assert.deepEqual(out.died, ["bottom"]);
 });
 
 test("step: the cell a tail is vacating is safe to enter", () => {
   // Head at (5,5) chasing its own tail at (5,6). By the time the head lands
   // there the tail has already moved on, so this is a legal loop, not a bite.
-  const loop = snakeOf("bottom", "left", [at(5, 5), at(6, 5), at(6, 6), at(5, 6)]);
-  const out = run([turn(loop, "down")]);
+  const loop = snakeOf("bottom", "down", [at(5, 5), at(6, 5), at(6, 6), at(5, 6)]);
+  const out = run([loop]);
   assert.deepEqual(out.died, []);
   assert.deepEqual(out.snakes[0].body[0], at(5, 6));
 });
 
 test("step: a snake that eats keeps its tail, so the same loop bites", () => {
-  const loop = snakeOf("bottom", "left", [at(5, 5), at(6, 5), at(6, 6), at(5, 6)]);
-  // A meatball on the neck cell it is about to grow into.
-  const out = run([turn(loop, "down")], { food: [at(5, 6)] });
+  const loop = snakeOf("bottom", "down", [at(5, 5), at(6, 5), at(6, 6), at(5, 6)]);
+  // A meatball on the tail cell it is about to grow into.
+  const out = run([loop], { food: [at(5, 6)] });
   assert.deepEqual(out.died, ["bottom"]);
 });
 

@@ -145,8 +145,13 @@ export const inBounds = (board: Board, cell: Cell) =>
 
 export interface Snake {
   readonly seat: Seat;
-  /** Head first. */
+  /** Head first; `body[0]` is the cell the head last reached. */
   readonly body: readonly Cell[];
+  /**
+   * The move under way — out of `body[0]` and into the cell the head is
+   * gliding toward. The renderer eases the head along it, so by the time a
+   * player can react to it, it is already spoken for.
+   */
   readonly dir: Dir;
   /** Turns flicked in but not yet taken; one is spent per move. */
   readonly queue: readonly Dir[];
@@ -245,6 +250,12 @@ export interface StepResult {
 /**
  * Move every strand one cell.
  *
+ * A move lands where `dir` already pointed, and only *then* is a queued turn
+ * taken up as the next heading. Spending the turn on this move instead would
+ * steer out of the cell behind the head: the renderer has spent the whole
+ * interval easing the head toward the cell in front, so a flick answered
+ * there drags it back through a corner it visibly never turned.
+ *
  * Both strands move before anything is judged — a duel where one player's
  * move resolved first would hand them the cell in every tie. Growth is
  * decided in the same pass, because a strand that eats keeps its tail this
@@ -258,8 +269,7 @@ export function step({ board, snakes, food, random }: StepInput): StepResult {
 
   const moved = snakes.map((snake) => {
     if (!snake.alive) return snake;
-    const dir = snake.queue.length > 0 ? snake.queue[0] : snake.dir;
-    const head = advance(snake.body[0], dir);
+    const head = advance(snake.body[0], snake.dir);
     const eating = left.some((f) => sameCell(f, head));
     if (eating) {
       ate.push(snake.seat);
@@ -267,7 +277,7 @@ export function step({ board, snakes, food, random }: StepInput): StepResult {
     }
     return {
       ...snake,
-      dir,
+      dir: snake.queue.length > 0 ? snake.queue[0] : snake.dir,
       queue: snake.queue.slice(1),
       body: eating ? [head, ...snake.body] : [head, ...snake.body.slice(0, -1)],
     };

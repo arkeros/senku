@@ -24,13 +24,20 @@ The split matters because a game loop is otherwise untestable: the interesting
 half — does it grow, does it crash, who took the round — is pure functions,
 while the part that genuinely needs a browser stays thin.
 
-### Five things that look like mistakes and aren't
+### Six things that look like mistakes and aren't
 
 **Turns are queued, not applied.** Two flicks between one move and the next
 would otherwise fold the head straight back into the neck — up, then left,
 then down, all resolved on a single move, and the snake kills itself on a
 gesture the player will swear was legal. `turn` judges each flick against the
 last one queued and `step` spends one per move.
+
+**A queued turn lands one cell further on than you might expect.** `step`
+completes the move `dir` already pointed at and only then takes the flick up
+as the next heading, so a turn flicked mid-glide is taken leaving the cell
+ahead rather than the cell behind. That is the move the renderer has spent
+the whole interval easing the head into: answering the flick from `body[0]`
+instead would drag the head back through a corner it visibly never turned.
 
 **The far player's flicks are *not* inverted.** They read the same glass from
 the opposite end of the table, which looks like a case for rotating their
