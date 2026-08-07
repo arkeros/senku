@@ -88,6 +88,22 @@ if grep -q '{{APP}}' "$HTML"; then
   echo "FAIL: {{APP}} placeholder left unsubstituted"; exit 1
 fi
 
+# Preloads. The layout and this document's own route are reached from the
+# entry by dynamic import, so nothing in the document names them and they
+# are discovered only after the entry has run — a chain the browser walks
+# one level at a time. Both are certain to render here, so both are named.
+grep -qE 'modulepreload" href="/app_bundle/Layout-[A-Z0-9]+\.js"' "$HTML" \
+  || { echo "FAIL: layout chunk not preloaded"; exit 1; }
+grep -qE 'modulepreload" href="/app_bundle/Home-[A-Z0-9]+\.js"' "$HTML" \
+  || { echo "FAIL: index document does not preload the route it renders"; exit 1; }
+
+# The other half of the rule, and the one that makes it a rule rather than
+# "preload everything": a route this document will not render stays
+# unnamed, or code splitting has bought nothing.
+if grep -q 'modulepreload" href="/app_bundle/About-' "$HTML"; then
+  echo "FAIL: an unrelated lazy route was preloaded"; exit 1
+fi
+
 # runtime_config: /env.js must precede the bundle so window.__ENV__ is set before module eval.
 grep -qE '<script src="/env\.js"></script><script type="module" src="/app_bundle/app_main-[A-Z0-9]+\.js">' "$HTML" \
   || { echo "FAIL: /env.js script tag missing or not ordered before app_main module"; exit 1; }

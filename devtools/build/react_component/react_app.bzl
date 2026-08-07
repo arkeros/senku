@@ -348,6 +348,14 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     for css_file in css_files:
         html_args += ["--css", "$(location {})".format(css_file)]
 
+    # The layout renders on every path, so every document wants it early.
+    # The router reaches it by dynamic import exactly as it reaches a route,
+    # which is why the preload walk skipped it — and skipping it puts it on
+    # the critical path, discovered only once the entry has run and itself
+    # delaying the route beneath it.
+    _layout = native.package_relative_label(layout)
+    html_args += ["--layout-entry", "{}/{}.js".format(_layout.package, _layout.name)]
+
     # When runtime_config is set, the `/env.js` bootstrap must load before the
     # main bundle so `window.__ENV__` is set before any module script runs.
     if runtime_config != None:
@@ -373,11 +381,23 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
 
     root_markup = name + "_prerender_root"
 
+    # The index document is the `/` document — the bucket serves it there
+    # through `main_page_suffix`, and it is the path most visitors arrive on.
+    # `route_objects` leaves `/` out because no *separate* object is needed
+    # for it, which is true of the file and false of the preload: this
+    # document knows which route it will render just as surely as a route
+    # document does, and until now was the only one that did not say so.
+    root_route_args = []
+    for r in routes:
+        if r["path"] == "/" and r.get("component"):
+            _c = native.package_relative_label(r["component"])
+            root_route_args = ["--route-entry", "{}/{}.js".format(_c.package, _c.name)]
+
     js_run_binary(
         name = name + "_html",
         srcs = _document_srcs(root_markup),
         outs = [name + "_index.html"],
-        args = _document_args(name + "_index.html", root_markup),
+        args = _document_args(name + "_index.html", root_markup) + root_route_args,
         tool = Label("//devtools/build/react_component:html_codegen_bin"),
         **kwargs
     )
