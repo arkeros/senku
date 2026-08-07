@@ -128,6 +128,7 @@ export function generate({
   bundleDir,
   css,
   envScript,
+  appHtml = "",
   routeEntry = null,
 }) {
   // Stylesheets first, and inline: a `<link>` here would be a second round
@@ -151,8 +152,13 @@ export function generate({
     (envScript ? '<script src="/env.js"></script>' : "") +
     `<script type="module" src="/${bundleDir}/${resolveEntry(metafile, entry)}"></script>`;
 
+  // The route's markup, rendered at build time, so the document paints
+  // something contentful before the bundle has run. Empty when the app does
+  // not prerender — the placeholder still resolves, or the leftover check
+  // below would turn "did not prerender" into "did not build".
   const html = template
     .replaceAll("{{HEAD}}", head)
+    .replaceAll("{{APP}}", appHtml)
     .replaceAll("{{SCRIPTS}}", scripts);
 
   // A leftover placeholder means a tag silently did not ship — a page with
@@ -175,6 +181,7 @@ function parseArgs(argv) {
     bundleDir: null,
     css: [],
     envScript: false,
+    appHtml: null,
     routeEntry: null,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -185,6 +192,7 @@ function parseArgs(argv) {
     else if (a === "--entry") args.entry = argv[++i];
     else if (a === "--bundle-dir") args.bundleDir = argv[++i];
     else if (a === "--css") args.css.push(argv[++i]);
+    else if (a === "--app-html") args.appHtml = argv[++i];
     else if (a === "--route-entry") args.routeEntry = argv[++i];
     else if (a === "--env-script") args.envScript = true;
     else throw new Error(`html_codegen: unknown arg: ${a}`);
@@ -211,6 +219,7 @@ function main(argv) {
     // of them.
     css: args.css.map(read),
     envScript: args.envScript,
+    appHtml: args.appHtml ? read(args.appHtml) : "",
     routeEntry: args.routeEntry,
   });
 

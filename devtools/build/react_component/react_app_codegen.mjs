@@ -20,13 +20,14 @@ import { dirname, resolve } from "node:path";
 import * as R from "ramda";
 
 const args = process.argv.slice(2);
-let manifestFile, outRouter, outMain;
+let manifestFile, outRouter, outMain, outPrerender;
 let i18nManifestImport, i18nRuntimeImport, i18nSourceLocale;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--manifest") manifestFile = args[++i];
   else if (args[i] === "--out-router") outRouter = args[++i];
   else if (args[i] === "--out-main") outMain = args[++i];
+  else if (args[i] === "--out-prerender") outPrerender = args[++i];
   else if (args[i] === "--i18n-manifest-import") i18nManifestImport = args[++i];
   else if (args[i] === "--i18n-runtime-import") i18nRuntimeImport = args[++i];
   else if (args[i] === "--i18n-source-locale") i18nSourceLocale = args[++i];
@@ -189,9 +190,152 @@ import { router } from "${routerModuleName}";
 createRoot(document.getElementById("root")!).render(<RouterProvider router={router} />);
 `;
 
-for (const f of [outRouter, outMain]) {
+// prerender.tsx — the same route tree rendered to a string at build time.
+//
+// Three deliberate differences from router.tsx, each of which exists
+// because this render happens once, in Node, with no client attached:
+//
+//   - Components are imported statically. `lazy()` is how the browser
+//     avoids fetching a route it may never visit; here every route is
+//     wanted immediately and there is no second request to save.
+//   - Local names are positional (`Route0`), not the exported identifier.
+//     Two packages may export the same name, and the client router only
+//     avoids that collision because it never names them at all.
+//   - No `errorElement`. A component that throws here should fail the
+//     build loudly, not quietly ship a document whose entire body is an
+//     error page rendered as if it were the app.
+const prerenderLocals = [];
+const prerenderImports = [];
+
+function localFor(node) {
+  const local = `Route${prerenderLocals.length}`;
+  prerenderLocals.push(local);
+  prerenderImports.push(`import { ${node.name} as ${local} } from "${node.import}";`);
+  return local;
+}
+
+function prerenderRoute(route, indent) {
+  const pad = " ".repeat(indent);
+  const props = [route.path === "/" ? "index: true" : `path: ${JSON.stringify(route.path)}`];
+
+  if (route.import) props.push(`Component: ${localFor(route)}`);
+
+  if (route.children && route.children.length > 0) {
+    const kids = route.children.map((c) => prerenderRoute(c, indent + 2));
+    return [`${pad}{ ${props.join(", ")}, children: [`, kids.join(",\n"), `${pad}] }`].join("\n");
+  }
+  return `${pad}{ ${props.join(", ")} }`;
+}
+
+// The layout's local has to be allocated before its children so the import
+// order matches the tree, and `prerenderRoute` appends as it walks.
+const prerenderLayoutLocal = localFor(layout);
+const prerenderChildren = manifest.routes.map((r) => prerenderRoute(r, 6)).join(",\n");
+
+const prerenderTree = `const routes = [
+  {
+    path: "/",
+    Component: ${prerenderLayoutLocal},
+    children: [
+${prerenderChildren},
+    ],
+  },
+];`;
+
+const prerenderApp = i18nEnabled
+  ? `    <I18nProvider locale={LOCALE} catalog={I18N_CATALOGS[LOCALE]}>
+      <StaticRouterProvider router={router} context={context} hydrate={false} />
+    </I18nProvider>`
+  : `    <StaticRouterProvider router={router} context={context} hydrate={false} />`;
+
+// The source locale, not a negotiated one: one document is served to every
+// visitor, so there is no request whose `Accept-Language` could pick. The
+// client re-renders in its own locale — see the ADR on why this markup is
+// never hydrated.
+const prerenderI18nImports = i18nEnabled
+  ? `import { I18N_CATALOGS, type Locale } from "${i18nManifestImport}";
+import { I18nProvider } from "${i18nRuntimeImport}";
+
+const LOCALE = "${i18nSourceLocale}" as Locale;
+`
+  : "";
+
+const prerenderCode = `import { renderToStaticMarkup } from "react-dom/server";
+import { createStaticHandler, createStaticRouter, StaticRouterProvider } from "react-router";
+
+${prerenderImports.join("\n")}
+${prerenderI18nImports}
+${prerenderTree}
+
+export async function render(pathname: string): Promise<string> {
+  const handler = createStaticHandler(routes);
+  // The origin is arbitrary and never leaves this process — \`query\` needs a
+  // whole URL, and only the path is matched against the route tree.
+  const context = await handler.query(new Request("http://prerender" + pathname));
+
+  // A Response here means a route redirected or threw rather than matching,
+  // which would otherwise be written out as an empty body and shipped as a
+  // document that renders nothing.
+  if (context instanceof Response) {
+    throw new Error(
+      \`prerender: \${pathname} produced a \${context.status} response instead of markup\`,
+    );
+  }
+
+  const router = createStaticRouter(routes, context);
+  return renderToStaticMarkup(
+${prerenderApp},
+  );
+}
+`;
+
+// The Node half, kept out of the .tsx above so that file stays a pure
+// render module: no `node:fs`, no `process`, and therefore no need for
+// `@types/node` in the tsconfig every react_component shares. Plain .mjs,
+// so tsc never type-checks it and esbuild is the only thing that reads it.
+const prerenderMainCode = `import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { render } from "./${outPrerender ? outPrerender.split("/").pop().replace(/\.tsx$/, "") : ""}.js";
+
+const argv = process.argv.slice(2);
+let path = "/";
+let out = "";
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i] === "--path") path = argv[++i];
+  else if (argv[i] === "--out") out = argv[++i];
+  else throw new Error("prerender: unknown arg: " + argv[i]);
+}
+if (!out) throw new Error("prerender: --out is required");
+
+// Same execroot dance as the other codegen tools: js_binary cds into
+// bazel-bin, and the path Bazel passes is relative to the execroot.
+const execroot = process.env.JS_BINARY__EXECROOT || process.cwd();
+
+// \`.then\` rather than top-level await: this is bundled for Node, where
+// esbuild emits CJS, and CJS has no top-level await. The \`catch\` is what
+// turns a component that throws mid-render into a failed build instead of
+// an unhandled rejection and a document with an empty body.
+render(path)
+  .then((markup) => writeFileSync(resolve(execroot, out), markup))
+  .catch((err) => {
+    console.error(\`prerender: rendering \${path} failed\`);
+    console.error(err);
+    process.exit(1);
+  });
+`;
+
+const outPrerenderMain = outPrerender
+  ? outPrerender.replace(/\.tsx$/, "_main.mjs")
+  : null;
+
+for (const f of [outRouter, outMain, outPrerender, outPrerenderMain].filter(Boolean)) {
   mkdirSync(dirname(resolve(execroot, f)), { recursive: true });
 }
 
 writeFileSync(resolve(execroot, outRouter), routerCode);
 writeFileSync(resolve(execroot, outMain), mainCode);
+if (outPrerender) {
+  writeFileSync(resolve(execroot, outPrerender), prerenderCode);
+  writeFileSync(resolve(execroot, outPrerenderMain), prerenderMainCode);
+}

@@ -14,6 +14,13 @@ copy_to_bin(
     srcs = ["esbuild_react_dedup.config.mjs"],
 )
 
+# Same wrapper, for the build-time prerender bundle. See the config's own
+# comment for why it is a separate file rather than a shared one.
+copy_to_bin(
+    name = "esbuild_prerender.config",
+    srcs = ["esbuild_prerender.config.mjs"],
+)
+
 # Transpile script: runs @babel/core to produce .js + .js.map + .stylex.json
 js_binary(
     name = "stylex_transpile_bin",

@@ -145,8 +145,13 @@ const envTag = envJs ? '<script src="/env.js"></script>\n    ' : "";
 const cssLinks = cssFiles
   .map((f) => `<link rel="stylesheet" href="/${f.split("/").pop()}" />`)
   .join("");
+// `{{APP}}` empties out here. The prod documents carry markup rendered at
+// build time, but dev has no build step to render it in — and an empty
+// #root is what the client renders into anyway, so dev matches what the
+// browser does a moment later rather than what the file starts as.
 const indexHtml = originalHtml
   .replace("{{HEAD}}", cssLinks)
+  .replace("{{APP}}", "")
   .replace("{{SCRIPTS}}", `${envTag}${mapTag}\n    <script type="module" src="/${entryFile}"></script>`);
 
 // Reads are intentionally synchronous for simplicity — this is a dev server,

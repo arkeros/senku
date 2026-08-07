@@ -1,5 +1,6 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("@terraform.bzl//:gcp.bzl", "google_provider")
 load("@terraform.bzl", "output", "tf_root")
 load("//devtools/bifrost/modules:staticsite.bzl", "site_gcs")
@@ -57,6 +58,15 @@ react_app(
     ],
     source_locale = "es",
     visibility = ["//visibility:private"],
+)
+
+sh_test(
+    name = "prerender_test",
+    srcs = ["prerender_test.sh"],
+    data = [
+        ":app_html",
+        ":app_route_how-to-play",
+    ],
 )
 
 build_test(
