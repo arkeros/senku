@@ -217,7 +217,7 @@ export function Plate({ labels }: PlateProps) {
     const drag = (id: number | string, x: number, y: number) => {
       const track = tracks.get(id);
       if (!track) return;
-      const dir = swipeDir(x - track.x, y - track.y, track.seat);
+      const dir = swipeDir(x - track.x, y - track.y);
       if (!dir) return;
       steer(track.seat, dir);
       track.x = x;

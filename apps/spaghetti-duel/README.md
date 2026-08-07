@@ -32,10 +32,13 @@ then down, all resolved on a single move, and the snake kills itself on a
 gesture the player will swear was legal. `turn` judges each flick against the
 last one queued and `step` spends one per move.
 
-**The far player's flicks are inverted.** They are reading the same glass from
-the opposite end of the table, so their hand pushing away from their body
-travels *down* the screen. `swipeDir` rotates their gesture half a turn, and
-both players get a plain "flick the way you want to go".
+**The far player's flicks are *not* inverted.** They read the same glass from
+the opposite end of the table, which looks like a case for rotating their
+gesture half a turn — it isn't. Their finger and their strand are on the same
+pane, and `advance` spends a `Dir` in screen space for either seat, so a
+rotation would send the strand away from the finger dragging it. `swipeDir`
+is deliberately blind to the seat; `seatAt` decides only *whose* strand a
+touch steers.
 
 **A resize rescales the grid instead of recutting it.** A phone shifts under a
 running game more often than it looks — the URL bar collapses on first touch.

@@ -17,9 +17,9 @@ export type KeyAction =
 
 /**
  * Two hands on one keyboard: the near player takes the arrows or wasd, the
- * far one ijkl. Headings are given from each player's own side of the table,
- * exactly as `swipeDir` reads their flicks, so `i` sends the far strand the
- * way its owner is facing rather than up the screen.
+ * far one ijkl. Headings are given as the screen is drawn, exactly as
+ * `swipeDir` reads a flick, so `i` sends the far strand up the screen no
+ * matter which end of the table its owner is sitting at.
  */
 const STEER: Readonly<Record<string, { readonly seat: Seat; readonly dir: Dir }>> = {
   ArrowUp: { seat: "bottom", dir: "up" },

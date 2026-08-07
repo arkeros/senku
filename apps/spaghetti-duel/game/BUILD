@@ -21,7 +21,7 @@ js_test(
 # Gesture arithmetic, kept out of `rules` because it is about fingers on
 # glass rather than about the plate. Pure enough to test without a DOM: the
 # component turns TouchEvents into two numbers and asks this which way that
-# was, from the asking player's side of the table.
+# was, and which half of the glass the hand landed on.
 react_component(
     name = "swipe",
     srcs = ["swipe.ts"],
