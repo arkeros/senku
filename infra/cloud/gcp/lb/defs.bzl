@@ -285,6 +285,18 @@ _BACKEND_BUCKETS = {
             "bucket_name": backend["bucket_name"],
             "enable_cdn": True,
             "cdn_policy": _CDN_POLICY,
+            # Brotli or gzip at the edge, chosen from the request's
+            # `Accept-Encoding`. A bucket cannot do this: it serves the bytes
+            # it stores, and `bucket_push` stores them uncompressed. Storing
+            # them compressed instead would mean a `Content-Encoding` stamped
+            # on the object and served to every client whether or not it
+            # asked — GCS does no negotiation — so the choice is edge
+            # compression or none.
+            #
+            # This field is a sibling of `cdn_policy`, not part of it, which
+            # is why it does not live in `_CDN_POLICY` alongside the
+            # cache-mode settings the two origin kinds share.
+            "compression_mode": "AUTOMATIC",
         },
         attrs = ["id", "name", "self_link"],
     )
