@@ -14,10 +14,11 @@ def react_static_layer(
         **kwargs):
     """Build the tar layers for shipping a react_app under nginx.
 
-    react_app's HTML references `/{app}_bundle/{app}_main.js`,
-    `/{app}_styles.css`, and hashed assets under `/assets/`. Nginx serves
-    `/var/www/html` with `try_files $uri $uri/ /index.html`, so the
-    webroot tar's entries sit at those exact absolute paths.
+    react_app's HTML references `/{app}_bundle/{app}_main.js` and hashed
+    assets under `/assets/`. Nginx serves `/var/www/html` with
+    `try_files $uri $uri/ /index.html`, so the webroot tar's entries sit at
+    those exact absolute paths. The stylesheets are not among them — they
+    are inlined into the documents, so there is no CSS URL to serve.
 
     Also produces a per-app `default.conf` that replaces the base nginx
     image's generic one — it knows which URL prefixes this app
@@ -152,12 +153,6 @@ def react_static_layer(
         replace_prefixes = {
             app_name + "_index.html": "index.html",
             app_name + "_assets_flat": "assets",
-            # The hashed stylesheets join asset_pipeline's output under one
-            # `assets/` prefix. Two producers, one directory, because what
-            # the prefix means is "content-addressed" and not "emitted by
-            # the asset pipeline" — cache.bzl marks it immutable on that
-            # basis alone.
-            app_name + "_css_hashed_dir": "assets",
         },
     )
 
@@ -208,12 +203,6 @@ def react_static_layer(
         replace_prefixes = {
             app_name + "_index.html": "index.html",
             app_name + "_assets_flat": "assets",
-            # The hashed stylesheets join asset_pipeline's output under one
-            # `assets/` prefix. Two producers, one directory, because what
-            # the prefix means is "content-addressed" and not "emitted by
-            # the asset pipeline" — cache.bzl marks it immutable on that
-            # basis alone.
-            app_name + "_css_hashed_dir": "assets",
         },
         **kwargs
     )
