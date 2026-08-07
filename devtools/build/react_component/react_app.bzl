@@ -1,7 +1,7 @@
 "React application macro with Starlark-defined routes and lazy loading"
 
 load("@aspect_rules_esbuild//esbuild:defs.bzl", "esbuild")
-load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary", "js_test")
 load("//devtools/build/js:devserver.bzl", "devserver")
 load(":asset_pipeline.bzl", "asset_pipeline")
 load(":i18n_artifacts.bzl", "i18n_artifacts")
@@ -12,6 +12,16 @@ load(":route_tree.bzl", "route_objects", "walk_route_tree")
 load(":runtime_config.bzl", "runtime_config_artifacts", "validate_runtime_config")
 load(":bundle_outputs.bzl", "bundle_dir", "bundle_metafile")
 load(":stylex_css.bzl", "stylex_css")
+
+# One initial congestion window: 10 segments of 1460 bytes. A document that
+# fits arrives in a single round trip, so everything it names — the entry
+# script at the very end of the body included — is discovered at once. A
+# document that does not fit has a tail that lands a round trip later, and
+# every URL in that tail with it.
+#
+# This is a property of TCP, not a policy knob. Raising it does not buy
+# headroom, it just stops measuring the thing.
+_DOCUMENT_BUDGET_BYTES = 14600
 
 def route(path, component = None, children = None, error_component = None):
     """Define a route mapping a URL path to a react_component target.
@@ -597,6 +607,21 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
             **kwargs
         )
         route_documents.append(":" + route_target)
+
+    # Every document, not just the index: a route document carries its own
+    # prerendered markup, so it grows independently and can cross the line on
+    # its own.
+    _documents = [":" + name + "_html"] + route_documents
+    js_test(
+        name = name + "_document_budget_test",
+        entry_point = Label("//devtools/build/react_component:document_budget"),
+        args = [str(_DOCUMENT_BUDGET_BYTES)] + [
+            "$(rootpath {})".format(d)
+            for d in _documents
+        ],
+        data = _documents,
+        **{k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")}
+    )
 
     # The bundle enters as `:{name}_bundle_dir`, not `:{name}_bundle`. The
     # esbuild target also carries the metafile, and everything named here is
