@@ -6,39 +6,30 @@ import { MIN_SWIPE, seatAt, swipeDir } from "./swipe.js";
 const far = MIN_SWIPE * 2;
 
 test("swipeDir: a flick shorter than MIN_SWIPE is a tap, not a turn", () => {
-  assert.equal(swipeDir(0, -(MIN_SWIPE - 1), "bottom"), null);
-  assert.equal(swipeDir(0, 0, "bottom"), null);
+  assert.equal(swipeDir(0, -(MIN_SWIPE - 1)), null);
+  assert.equal(swipeDir(0, 0), null);
 });
 
 test("swipeDir: the longer axis decides the heading", () => {
-  assert.equal(swipeDir(far, -4, "bottom"), "right");
-  assert.equal(swipeDir(4, -far, "bottom"), "up");
+  assert.equal(swipeDir(far, -4), "right");
+  assert.equal(swipeDir(4, -far), "up");
 });
 
-test("swipeDir: the near player reads the screen the usual way round", () => {
-  assert.equal(swipeDir(0, -far, "bottom"), "up");
-  assert.equal(swipeDir(0, far, "bottom"), "down");
-  assert.equal(swipeDir(-far, 0, "bottom"), "left");
-  assert.equal(swipeDir(far, 0, "bottom"), "right");
-});
-
-test("swipeDir: the far player's flicks are read from their side of the table", () => {
-  // They sit at the top edge, so a flick away from their body travels down
-  // the glass — and their snake, drawn heading down the screen, goes forward.
-  assert.equal(swipeDir(0, far, "top"), "up");
-  assert.equal(swipeDir(0, -far, "top"), "down");
-  assert.equal(swipeDir(far, 0, "top"), "left");
-  assert.equal(swipeDir(-far, 0, "top"), "right");
+test("swipeDir: the strand goes the way the finger went across the glass", () => {
+  assert.equal(swipeDir(0, -far), "up");
+  assert.equal(swipeDir(0, far), "down");
+  assert.equal(swipeDir(-far, 0), "left");
+  assert.equal(swipeDir(far, 0), "right");
 });
 
 test("swipeDir: a perfect diagonal resolves the same way every time", () => {
-  assert.equal(swipeDir(far, far, "bottom"), swipeDir(far, far, "bottom"));
-  assert.ok(swipeDir(far, far, "bottom") !== null);
+  assert.equal(swipeDir(far, far), swipeDir(far, far));
+  assert.ok(swipeDir(far, far) !== null);
 });
 
 test("swipeDir: the threshold can be raised for a bigger screen", () => {
-  assert.equal(swipeDir(0, -far, "bottom", far * 2), null);
-  assert.equal(swipeDir(0, -far, "bottom", far), "up");
+  assert.equal(swipeDir(0, -far, far * 2), null);
+  assert.equal(swipeDir(0, -far, far), "up");
 });
 
 test("seatAt: solo hands every touch to the only player", () => {
