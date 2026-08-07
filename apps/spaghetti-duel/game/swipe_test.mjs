@@ -22,9 +22,11 @@ test("swipeDir: the strand goes the way the finger went across the glass", () =>
   assert.equal(swipeDir(far, 0), "right");
 });
 
-test("swipeDir: a perfect diagonal resolves the same way every time", () => {
-  assert.equal(swipeDir(far, far), swipeDir(far, far));
-  assert.ok(swipeDir(far, far) !== null);
+test("swipeDir: a perfect diagonal goes to the vertical", () => {
+  // Arbitrary, but it has to be decided somewhere: a diagonal flick must
+  // always mean the same thing, and never nothing.
+  assert.equal(swipeDir(far, far), "down");
+  assert.equal(swipeDir(-far, -far), "up");
 });
 
 test("swipeDir: the threshold can be raised for a bigger screen", () => {
