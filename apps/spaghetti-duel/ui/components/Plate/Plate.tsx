@@ -19,14 +19,17 @@ import {
   type Mode,
   type Seat,
 } from "../../../game/rules";
+import { PERSONAS, botDir, type PersonaId } from "../../../game/bot";
 import { keyAction } from "../../../game/keys";
 import { seatAt, swipeDir } from "../../../game/swipe";
-import { PALETTE, sauceFor } from "../../../render/palette";
+import { PALETTE, SAUCES, sauceFor } from "../../../render/palette";
 import {
   drawScene,
   hits,
   modeButtons,
+  personaRows,
   type Labels,
+  type Rect,
   type World,
 } from "../../../render/scene";
 
@@ -45,6 +48,15 @@ const styles = stylex.create({
 
 /** Solo high score. Namespaced because the origin serves only this app today. */
 const BEST_KEY = "spaghetti-duel.best";
+
+/**
+ * The persona chosen last. Remembered so a rematch is two taps rather than a
+ * decision — the roster opens with this row already marked.
+ */
+const PERSONA_KEY = "spaghetti-duel.persona";
+
+const isPersona = (id: string | null): id is PersonaId =>
+  id !== null && Object.prototype.hasOwnProperty.call(PERSONAS, id);
 
 const between = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -83,6 +95,15 @@ export function Plate({ labels }: PlateProps) {
       }
     };
 
+    const readPersona = (): PersonaId | null => {
+      try {
+        const stored = window.localStorage.getItem(PERSONA_KEY);
+        return isPersona(stored) ? stored : null;
+      } catch {
+        return null;
+      }
+    };
+
     const world: World = {
       board: layout(w, h),
       match: newMatch("solo"),
@@ -93,7 +114,10 @@ export function Plate({ labels }: PlateProps) {
       slide: 0,
       shake: 0,
       frame: 0,
-      started: false,
+      screen: "title",
+      // Remembered across sessions, and used before a match starts too: the
+      // title card's bot button wears the last sauce played.
+      bot: readPersona(),
       best: readBest(),
     };
 
@@ -135,12 +159,26 @@ export function Plate({ labels }: PlateProps) {
       acc = 0;
     }
 
-    function begin(mode: Mode) {
+    /**
+     * Start a match. `bot` is the controller on `top`, not a third mode — a
+     * bot game is a duel with nobody in the far chair. See ADR 0001.
+     */
+    function begin(mode: Mode, bot: PersonaId | null = null) {
       world.mode = mode;
+      world.bot = bot;
       world.match = newMatch(mode);
-      world.started = true;
+      world.screen = "game";
       world.crumbs = [];
       deal();
+    }
+
+    function rememberPersona(persona: PersonaId) {
+      world.bot = persona;
+      try {
+        window.localStorage.setItem(PERSONA_KEY, persona);
+      } catch {
+        /* the roster still works; it just opens on nothing next time */
+      }
     }
 
     function rememberBest() {
@@ -154,7 +192,31 @@ export function Plate({ labels }: PlateProps) {
     }
 
     // ---- one move --------------------------------------------------------
+    /**
+     * The bot's turn, taken once per move and spent through `turn` exactly as
+     * a flick is. It obeys the reversal rule and the queue cap because the
+     * rulebook enforces them on everybody — `step` cannot tell which of its
+     * two strands has a person behind it. See ADR 0001.
+     */
+    function think() {
+      if (world.bot === null) return;
+      const self = world.snakes.find((s) => s.seat === "top");
+      if (!self || !self.alive) return;
+      const foe = world.snakes.find((s) => s.seat === "bottom") ?? null;
+      steer(
+        "top",
+        botDir({
+          board: world.board,
+          self,
+          foe,
+          food: world.food,
+          traits: PERSONAS[world.bot],
+        }),
+      );
+    }
+
     function move() {
+      think();
       const out = step({
         board: world.board,
         snakes: world.snakes,
@@ -175,7 +237,8 @@ export function Plate({ labels }: PlateProps) {
 
       for (const seat of out.died) {
         const crashed = out.snakes.find((s) => s.seat === seat);
-        if (crashed) burst(crashed.body[0], sauceFor(seat).body, 20);
+        const sauce = seat === "top" && world.bot ? SAUCES[world.bot] : sauceFor(seat);
+        if (crashed) burst(crashed.body[0], sauce.body, 20);
       }
       world.shake = 14;
       buzz([25, 40, 55]);
@@ -189,25 +252,46 @@ export function Plate({ labels }: PlateProps) {
     };
 
     /**
-     * A tap, as opposed to a flick. Only the title card and the game-over
-     * card listen: mid-round a stray tap must not do anything at all.
+     * A tap, as opposed to a flick. Only the title card, the roster and the
+     * game-over card listen: mid-round a stray tap must not do anything.
      */
     function tap(x: number, y: number) {
-      if (!world.started) {
+      if (world.screen === "title") {
         const buttons = modeButtons(w, h);
         if (hits(buttons.solo, x, y)) begin("solo");
+        else if (hits(buttons.bot, x, y)) world.screen = "roster";
         else if (hits(buttons.duel, x, y)) begin("duel");
         return;
       }
+
+      if (world.screen === "roster") {
+        const { rows, back } = personaRows(w, h);
+        // The way out is checked first: it must never be shadowed by a row.
+        if (hits(back, x, y)) {
+          world.screen = "title";
+          return;
+        }
+        for (const [id, rect] of Object.entries(rows) as [PersonaId, Rect][]) {
+          if (!hits(rect, x, y)) continue;
+          rememberPersona(id);
+          begin("duel", id);
+          return;
+        }
+        return;
+      }
+
       // Back to the title rather than straight into another game, so the
       // loser of a duel can switch to solo without reloading.
-      if (world.match.phase === "end") world.started = false;
+      if (world.match.phase === "end") world.screen = "title";
     }
 
     const tracks = new Map<number | string, Track>();
 
     const down = (id: number | string, x: number, y: number) => {
-      tracks.set(id, { seat: seatAt(y, h, world.mode), x, y, turned: false });
+      // A bot in the far seat means one pair of thumbs, so the glass is not
+      // split — every touch steers `bottom`, exactly as in solo.
+      const seat = seatAt(y, h, world.mode, world.bot !== null);
+      tracks.set(id, { seat, x, y, turned: false });
     };
 
     /**
@@ -249,19 +333,38 @@ export function Plate({ labels }: PlateProps) {
     const onMouseMove = (e: MouseEvent) => drag("mouse", e.clientX, e.clientY);
     const onMouseUp = (e: MouseEvent) => up("mouse", e.clientX, e.clientY);
 
+    /**
+     * Every key press is pushed through the drawn control it corresponds to,
+     * rather than calling `begin` or setting `screen` directly. One set of
+     * rules for a thumb and a keyboard is what stops the two drifting — which
+     * is the bug this module was extracted to make visible in the first place.
+     */
+    const press = (rect: Rect) => tap(rect.x + rect.w / 2, rect.y + rect.h / 2);
+
     const onKeyDown = (e: KeyboardEvent) => {
-      const action = keyAction(e.key);
+      const action = keyAction(e.key, world.screen);
       if (!action) return;
       e.preventDefault();
-      if (action.kind === "steer") {
-        steer(action.seat, action.dir);
-        return;
+      switch (action.kind) {
+        case "steer":
+          steer(action.seat, action.dir);
+          return;
+        case "start":
+          press(modeButtons(w, h)[action.mode]);
+          return;
+        case "roster":
+          press(modeButtons(w, h).bot);
+          return;
+        case "pick":
+          press(personaRows(w, h).rows[action.persona]);
+          return;
+        case "back":
+          press(personaRows(w, h).back);
+          return;
+        case "dismiss":
+          if (world.match.phase === "end") world.screen = "title";
+          return;
       }
-      // Press the drawn button rather than call `begin` directly, so a key and
-      // a thumb go through one set of rules: only the title card starts a
-      // game, and the game-over card reads any press as "back to the title".
-      const button = modeButtons(w, h)[action.mode];
-      tap(button.x + button.w / 2, button.y + button.h / 2);
     };
 
     // ---- frame -----------------------------------------------------------
@@ -288,7 +391,7 @@ export function Plate({ labels }: PlateProps) {
       last = now;
       world.frame++;
 
-      if (world.started) {
+      if (world.screen === "game") {
         const before = world.match.phase;
         world.match = tick(world.match, dt);
         if (before === "round" && world.match.phase === "ready") deal();
@@ -321,7 +424,7 @@ export function Plate({ labels }: PlateProps) {
       canvas!.height = Math.round(h * dpr);
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       // Mid-game the grid is only rescaled, never re-cut — see `refit`.
-      world.board = world.started ? refit(world.board, w, h) : layout(w, h);
+      world.board = world.screen === "game" ? refit(world.board, w, h) : layout(w, h);
     }
 
     // ---- screen wake lock ------------------------------------------------

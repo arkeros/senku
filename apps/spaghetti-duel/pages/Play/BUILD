@@ -7,6 +7,7 @@ react_component(
     visibility = ["//apps/spaghetti-duel:__pkg__"],
     deps = [
         "//:node_modules/@panellet/i18n-runtime",
+        "//apps/spaghetti-duel/game:bot",
         "//apps/spaghetti-duel/render:scene",
         "//apps/spaghetti-duel/ui/components/Plate",
     ],
