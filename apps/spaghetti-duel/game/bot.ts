@@ -182,18 +182,67 @@ export function botDir(input: BotInput): Dir {
   // Everything left is survivable, so the traits get to choose among equals —
   // and only among equals. `>` rather than `>=` keeps the earliest, which is
   // straight on.
-  const score = (dir: Dir) => wanting(input, advance(from, dir));
+  const score = (dir: Dir) => wanting(input, advance(from, dir), room.get(dir)!);
   return roomy.reduce((best, dir) => (score(dir) > score(best) ? dir : best), roomy[0]);
 }
 
 const manhattan = (a: Cell, b: Cell) => Math.abs(a.col - b.col) + Math.abs(a.row - b.row);
 
-/** A sign, not a magnitude: what a mutual kill is worth to this bot. */
-const TRADE_SIGN: Readonly<Record<Traits["trade"], number>> = {
+/**
+ * What a mutual kill is worth to this bot.
+ *
+ * Deliberately lopsided: refusing hard costs nothing, since a bot that gives
+ * up a cell to avoid swapping paint just plays somewhere else, while at +1 a
+ * seeker outranks `menace` and chases collisions ahead of everything on the
+ * plate.
+ *
+ * **`refuse` is the only value that makes a playable match, and lowering this
+ * weight does not change that.** Measured against a deliberately unpredictable
+ * opponent, 120 rounds per cell, draw rate:
+ *
+ * | menace | refuse | neutral | seek |
+ * | ---    | ---    | ---     | ---  |
+ * | 0.0    | 13%    | 48%     | 76%  |
+ * | 0.2    |  8%    | 54%     | 73%  |
+ * | 0.7    |  6%    | 87%     | 87%  |
+ *
+ * Two things in that table. `seek` is degenerate at *every* menace, including
+ * none, so the weight below is not what was driving it. And at high menace
+ * `neutral` and `seek` are indistinguishable — being near the other head and
+ * landing where the other head is going are nearly the same geometry, so
+ * `menace` produces the trades whatever this says.
+ *
+ * A draw scores nobody and replays the round, so a bot that will not avoid one
+ * is not a hard opponent, it is a match that does not end. Whether the roster
+ * keeps the two draw-heavy values is a design question, recorded in ADR 0002;
+ * this weight is set where it is because +1 is indefensible either way.
+ */
+const TRADE_WEIGHT: Readonly<Record<Traits["trade"], number>> = {
   refuse: -1,
   neutral: 0,
-  seek: 1,
+  seek: 0.35,
 };
+
+/**
+ * How much a bot likes elbow room, over and above being able to fit.
+ *
+ * The gate has already thrown out everything that does not fit, so this can
+ * only ever pick the safer of two survivable moves — it cannot talk anybody
+ * into a pocket, which is the property ADR 0002 turns on.
+ *
+ * It exists because `appetite` had nothing to trade against. Alone in the sum
+ * it is the only non-zero term, and scaling one term cannot change which move
+ * wins, so KÉTCHUP and MAYONESA played *identical* games — not similar,
+ * identical, in every one of 600 rounds. Appetite is the pull toward a
+ * meatball; this is the pull away from a tight spot; the balance between them
+ * is the difference between diving at everything and biding your time.
+ *
+ * It does what it claims on a board with a tight spot on it — there is a test
+ * for exactly that — and it has *not* yet been shown to separate those two in
+ * a duel, where both candidates usually fill the horizon and the term cancels.
+ * Duels are settled by head-on geometry long before navigation gets a say.
+ */
+const CAUTION = 0.5;
 
 /**
  * Where the other head might be standing when this move lands.
@@ -219,10 +268,12 @@ function foeReach(foe: Snake | null): readonly Cell[] {
  * weight that means one thing in portrait and another in landscape would make
  * the personas untunable.
  *
- * Survival is not in here. It was settled by the gate, and leaving it out is
- * what keeps the traits independent of one another.
+ * Whether the move is *survivable* is not in here — the gate settled that, and
+ * leaving it there is what stops any of these weights arguing with it. `room`
+ * arrives already capped at the horizon, so it is a preference between two
+ * moves that both already fit, never a vote on whether one does.
  */
-function wanting({ board, foe, food, traits }: BotInput, cell: Cell): number {
+function wanting({ board, foe, food, traits }: BotInput, cell: Cell, room: number): number {
   const span = board.cols + board.rows;
 
   const nearestFood = food.reduce((best, f) => Math.min(best, manhattan(cell, f)), Infinity);
@@ -233,7 +284,14 @@ function wanting({ board, foe, food, traits }: BotInput, cell: Cell): number {
 
   const risky = foeReach(foe).some((c) => sameCell(c, cell)) ? 1 : 0;
 
-  return traits.appetite * hunger + traits.menace * pressure + TRADE_SIGN[traits.trade] * risky;
+  const elbowRoom = traits.horizon <= 0 ? 0 : room / traits.horizon;
+
+  return (
+    traits.appetite * hunger +
+    traits.menace * pressure +
+    TRADE_WEIGHT[traits.trade] * risky +
+    CAUTION * elbowRoom
+  );
 }
 
 /** The five sauces, and the only place their numbers are written down. */
@@ -273,8 +331,15 @@ export const PERSONAS: Readonly<Record<PersonaId, Traits>> = {
   ketchup: { horizon: 12, appetite: 1, menace: 0, trade: "refuse" },
   /** Thick, slow, gets everywhere. Won't beat you — will outlast you. */
   mayo: { horizon: 64, appetite: 0.3, menace: 0, trade: "refuse" },
-  /** Doesn't come for you and doesn't get out of the way. Sticks to you. */
-  alioli: { horizon: 32, appetite: 0.6, menace: 0.5, trade: "neutral" },
+  /**
+   * Doesn't come for you and doesn't get out of the way. Sticks to you.
+   *
+   * Low `menace` on purpose. Indifference to a collision is only interesting
+   * if the bot is not also standing in front of your head — crowding *and*
+   * not minding a trade is a trade every time, and at 0.5 this drew over half
+   * its rounds against an opponent that was actively dodging.
+   */
+  alioli: { horizon: 32, appetite: 0.6, menace: 0.2, trade: "neutral" },
   /** Takes the ground in front of you, and never once trades. */
   brava: { horizon: 64, appetite: 0.6, menace: 1, trade: "refuse" },
   /** Brava with alioli in it — brava taken too far. */

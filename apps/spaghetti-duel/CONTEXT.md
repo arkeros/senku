@@ -104,7 +104,9 @@ _Avoid_: aggression (ambiguous with **Trade**), difficulty
 How a bot scores a move that kills both strands — `refuse`, `neutral` or
 `seek`. A stated trait rather than something a hunting bot is allowed to
 discover, because a **Draw** costs the bot nothing and a bot free to trade
-converges on manufacturing them.
+converges on manufacturing them. Measurement bore that out further than
+intended: `refuse` is currently the only value that makes a match that ends,
+and the other two are unresolved — see ADR 0002.
 _Avoid_: kamikaze (that is a persona, not the trait), suicide, sacrifice
 
 ## Relationships
