@@ -45,3 +45,14 @@ test("seatAt: a duel splits the glass down the middle", () => {
   assert.equal(seatAt(401, 800, "duel"), "bottom");
   assert.equal(seatAt(790, 800, "duel"), "bottom");
 });
+
+test("seatAt: a bot in the far seat leaves the whole glass to the one player", () => {
+  // Two strands, one pair of thumbs. Splitting the glass would hand two
+  // thirds of it to something with no hands.
+  assert.equal(seatAt(10, 800, "duel", true), "bottom");
+  assert.equal(seatAt(790, 800, "duel", true), "bottom");
+
+  // ...and with two people it still splits, exactly as before.
+  assert.equal(seatAt(10, 800, "duel", false), "top");
+  assert.equal(seatAt(790, 800, "duel", false), "bottom");
+});

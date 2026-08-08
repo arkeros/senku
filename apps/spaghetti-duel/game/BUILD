@@ -45,11 +45,40 @@ react_component(
     srcs = ["keys.ts"],
     _export_test = False,
     visibility = ["//apps/spaghetti-duel:__subpackages__"],
-    deps = [":rules"],
+    deps = [
+        ":bot",
+        ":rules",
+    ],
 )
 
 js_test(
     name = "keys_test",
-    data = [":keys_ts"],
+    data = [
+        ":bot_ts",
+        ":keys_ts",
+        ":rules_ts",
+    ],
     entry_point = "keys_test.mjs",
+)
+
+# The bot: a third controller beside `swipe` and `keys`, and kept there for the
+# same reason. It hands back a heading and the caller spends it through `turn`,
+# so the rulebook never learns that one of its strands is artificial — see
+# ADR 0001. Unlike its two siblings it depends on `rules` at runtime rather
+# than for types alone, because deciding a move means walking the board.
+react_component(
+    name = "bot",
+    srcs = ["bot.ts"],
+    _export_test = False,
+    visibility = ["//apps/spaghetti-duel:__subpackages__"],
+    deps = [":rules"],
+)
+
+js_test(
+    name = "bot_test",
+    data = [
+        ":bot_ts",
+        ":rules_ts",
+    ],
+    entry_point = "bot_test.mjs",
 )

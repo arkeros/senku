@@ -16,6 +16,7 @@ build and deploy pipeline: hermetic bundle, digest-pinned image, one
 | --- | --- |
 | `game/rules.ts` | The whole rulebook: grid geometry, turning, one simultaneous move for every strand, collisions, meatball spawning, and the match state machine. No canvas, no clock, injected randomness — 50 `node:test` cases. |
 | `game/swipe.ts` | Fingers into headings. Separate from the rules because it is about where a hand is, not about the plate — 8 more cases. |
+| `game/bot.ts` | The five sauces you can play against, and the one scoring function underneath them. A third controller beside `swipe` and `keys`: it hands back a heading and the caller spends it through `turn`, so the rulebook never learns one of its strands is artificial. |
 | `render/` | Every `ctx` call, driven by a `World` snapshot plus a `Labels` bag. Knows nothing about React, i18n or the rules. |
 | `ui/components/Plate/` | The only stateful component. Owns the canvas, the RAF loop and the touches. |
 | `pages/Play/` | Resolves all i18n and hands the strings down. |
@@ -80,7 +81,29 @@ bazel test //apps/spaghetti-duel/...
 
 `?lang=es|en|ca` switches locale; Spanish is the source. At a desk the arrow
 keys or `WASD` drive PESTO and `IJKL` drives CARBONARA, which is enough to
-check a duel without two people — the game itself wants two thumbs.
+check a duel without two people — the game itself wants two thumbs. `1` and
+`2` start solo and a duel, `B` opens the roster, `1`–`5` pick a sauce off it
+and `Escape` backs out. Every card can be left by key alone, which is the
+thing `keys.ts` exists to keep true.
+
+### The bot
+
+Playing a sauce is a **duel** with a bot controlling the far seat — not a
+third mode. `Mode` still counts strands; who steers them is a separate axis,
+which is why nothing in `rules.ts` changed to add any of this. See
+[ADR 0001](./docs/adr/0001-a-bot-is-a-controller-not-a-mode.md).
+
+A bot is four numbers: how far it can see, how hard it chases a meatball, how
+hard it crowds you, and what it thinks of a move that kills you both. Space is
+a **gate** rather than a term in that sum, so no amount of appetite talks one
+into a pocket — which leaves sight as the only reason a bot ever dies, and
+means every death can be explained by pointing at the board.
+[ADR 0002](./docs/adr/0002-the-bot-is-beatable-because-it-cannot-see-far.md)
+has the measurements, including why a bot that sees 96 cells is one you cannot
+beat and one that sees 64 is.
+
+The words all of this is written in — **Controller**, **Reader**, **Persona**,
+**Horizon** — are fixed in [CONTEXT.md](./CONTEXT.md).
 
 ## Deploying
 

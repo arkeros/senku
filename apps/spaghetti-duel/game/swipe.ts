@@ -32,8 +32,16 @@ export function swipeDir(dx: number, dy: number, minDistance: number = MIN_SWIPE
 }
 
 /**
- * Whose hand that is. A duel splits the glass across the middle; solo hands
- * every touch to the only player, so they can flick wherever is comfortable.
+ * Whose hand that is.
+ *
+ * The glass is split across the middle only when there are two people to split
+ * it between. Solo hands every touch to the only player, and so does a duel
+ * against a bot — the far strand has a controller, but it does not have
+ * thumbs, and halving the glass for it would take away two-thirds of the
+ * places the one real player can comfortably flick.
+ *
+ * `botted` rather than a third mode because `Mode` counts strands and this
+ * counts people; see ADR 0001.
  */
-export const seatAt = (y: number, height: number, mode: Mode): Seat =>
-  mode === "solo" ? "bottom" : y < height / 2 ? "top" : "bottom";
+export const seatAt = (y: number, height: number, mode: Mode, botted = false): Seat =>
+  mode === "solo" || botted ? "bottom" : y < height / 2 ? "top" : "bottom";
