@@ -86,6 +86,36 @@ mistakes.
   precisely the never-crashing opponent this ADR exists to forbid — the knee is
   a property of the board, so re-measure if the plate is ever recut.
 
+- **`refuse` is the only trade value that makes a playable match, and this is
+  not yet resolved.** Measured against a deliberately unpredictable opponent,
+  120 rounds per cell, draw rate by `menace` × `trade`:
+
+  | menace | refuse | neutral | seek |
+  | --- | --- | --- | --- |
+  | 0.0 | 13% | 48% | 76% |
+  | 0.2 | 8% | 54% | 73% |
+  | 0.7 | 6% | 87% | 87% |
+
+  A draw scores nobody and replays the round, so a bot that will not avoid one
+  does not make a hard match, it makes one that does not end: over 600
+  bot-versus-bot rounds `KAMIKAZE` won nothing at all, 0 from 240. Lowering the
+  `seek` weight does not fix it — `seek` is degenerate at *every* menace
+  including none, and above 0.7 `neutral` and `seek` are indistinguishable,
+  because being near the other head and landing where it is going are nearly
+  the same geometry. The axis is real and its two non-default values are
+  unplayable as they stand. Either the roster drops them, or a draw has to stop
+  being free — which is a change to `endRound` and would reach human duels too,
+  so it is a decision this ADR records rather than takes.
+
+- **Space is a gate first and a mild preference second.** `CAUTION` gives a
+  bounded bonus for elbow room *among moves that already passed the gate*, so
+  it can only ever pick the safer of two survivable options — it cannot argue a
+  bot into a pocket, which is the property this ADR turns on. It was added
+  because `appetite` had nothing to weigh against: as the only non-zero term
+  its magnitude cancelled, and `KÉTCHUP` and `MAYONESA` played identical games.
+  It demonstrably works on a board with a tight spot; it has not been shown to
+  separate them in a duel, where both candidates usually fill the horizon.
+
 - **The bot is deterministic, and stays that way.** Ties go to continuing
   straight — partly because a random tie-break makes the strand visibly wobble
   between two equally good options, and partly because once perception is the

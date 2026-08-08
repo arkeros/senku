@@ -381,3 +381,36 @@ test("seeing further is what keeps a bot alive", () => {
     `sighted lasted ${far.moves} moves and blind ${near.moves} — the horizon is not doing its job`,
   );
 });
+
+// ---- caution ---------------------------------------------------------------
+
+test("caution: prefers elbow room between two moves that both fit", () => {
+  // The same corner as the gate tests, but with a strand short enough that the
+  // ten-cell pocket is survivable. The gate passes both ways, so this is not
+  // about fitting — it is about which of two survivable moves is the roomier,
+  // and straight on into the pocket is the one it would take without the term.
+  const roomy = {
+    ...cornerTrap(40),
+    self: strand(at(9, 3), "up", 4),
+  };
+  assert.equal(botDir(roomy), "left");
+});
+
+test("caution: appetite now has something to outweigh", () => {
+  // The whole point of the term. Put a meatball in the survivable pocket: a
+  // bot that wants nothing keeps its elbow room, and a bot that wants badly
+  // enough goes in after it. Before this, no pair of appetites could differ —
+  // a lone term's magnitude cannot change which move wins, which is why
+  // KÉTCHUP and MAYONESA played identical games.
+  //
+  // The two appetites are deliberately absurd. Where the crossover actually
+  // falls is a question about the size of `CAUTION`, and this file does not
+  // ask those: nought and fifty bracket it wherever it sits.
+  const bait = {
+    ...cornerTrap(40),
+    self: strand(at(9, 3), "up", 4),
+    food: [at(9, 0)],
+  };
+  assert.equal(botDir({ ...bait, traits: { ...bait.traits, appetite: 50 } }), "up");
+  assert.equal(botDir({ ...bait, traits: { ...bait.traits, appetite: 0 } }), "left");
+});
