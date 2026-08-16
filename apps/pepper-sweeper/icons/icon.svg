@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="Pimientos de Padrón">
+  <title>Pimientos de Padrón</title>
+  <!--
+    Source art for every raster icon in this directory. Opaque and full-bleed:
+    iOS masks the corners itself and turns transparency black.
+
+    Three peppers on the griddle, not a grid of tiles. At 60px a minefield is
+    a grey chequerboard indistinguishable from every other puzzle app, while
+    a plate of padróns says what this one is — and the joke it is named after
+    is that you cannot tell which of the three will sting.
+  -->
+  <defs>
+    <radialGradient id="bar" cx="50%" cy="36%" r="74%">
+      <stop offset="0" stop-color="#1B2126"/>
+      <stop offset="1" stop-color="#0E1113"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="180" height="180" fill="url(#bar)"/>
+
+  <!-- The plancha. -->
+  <circle cx="90" cy="90" r="70" fill="#171B1E"/>
+  <circle cx="90" cy="90" r="70" fill="none" stroke="#E9EEF0" stroke-opacity=".13" stroke-width="2"/>
+
+  <!--
+    One pepper, drawn three times at different angles. The shape is the same
+    curve the canvas renderer strokes, so the icon and the board agree.
+  -->
+  <g stroke-linecap="round">
+    <g transform="translate(58 96) rotate(-22)">
+      <path d="M0 -26C21 -21 17 18 0 34C-17 18 -21 -21 0 -26Z" fill="#5FA83C" stroke="#2C5F1D" stroke-width="4"/>
+      <path d="M0 -24C5 -34 10 -39 14 -42" fill="none" stroke="#8A7A3C" stroke-width="6"/>
+    </g>
+    <g transform="translate(92 84) rotate(6)">
+      <path d="M0 -30C24 -24 20 21 0 39C-20 21 -24 -24 0 -30Z" fill="#5FA83C" stroke="#2C5F1D" stroke-width="4"/>
+      <path d="M0 -28C6 -39 11 -45 16 -48" fill="none" stroke="#8A7A3C" stroke-width="6"/>
+      <path d="M-7 -12C-9 -2 -9 8 -6 16" fill="none" stroke="#A8DE7C" stroke-opacity=".5" stroke-width="4"/>
+    </g>
+    <g transform="translate(124 100) rotate(26)">
+      <path d="M0 -24C19 -19 16 17 0 31C-16 17 -19 -19 0 -24Z" fill="#5FA83C" stroke="#2C5F1D" stroke-width="4"/>
+      <path d="M0 -22C4 -31 9 -36 13 -39" fill="none" stroke="#8A7A3C" stroke-width="6"/>
+    </g>
+  </g>
+</svg>

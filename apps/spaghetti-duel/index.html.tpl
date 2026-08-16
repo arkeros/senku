@@ -48,7 +48,7 @@
     {{HEAD}}
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">{{APP}}</div>
     {{SCRIPTS}}
   </body>
 </html>

@@ -1,6 +1,7 @@
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_test")
 load("@bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load(":cache_test.bzl", "cache_test_suite")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -11,6 +12,21 @@ package(default_visibility = ["//visibility:public"])
 copy_to_bin(
     name = "esbuild_react_dedup.config",
     srcs = ["esbuild_react_dedup.config.mjs"],
+)
+
+# Same wrapper, for the build-time prerender bundle. See the config's own
+# comment for why it is a separate file rather than a shared one.
+copy_to_bin(
+    name = "esbuild_prerender.config",
+    srcs = ["esbuild_prerender.config.mjs"],
+)
+
+# The document budget runs as a test in each app's own package, and rules_js
+# requires a js_test's entry point to live in the package declaring it —
+# unless it is already in the output tree, which this makes it.
+copy_to_bin(
+    name = "document_budget",
+    srcs = ["document_budget.mjs"],
 )
 
 # Transpile script: runs @babel/core to produce .js + .js.map + .stylex.json
@@ -71,6 +87,28 @@ js_test(
         "//:node_modules/ramda",
     ],
     entry_point = "asset_codegen_test.mjs",
+)
+
+# HTML codegen: renders index.html from the template, resolving the entry
+# bundle's hashed name out of esbuild's metafile and the stylesheets' out of
+# the hash_assets manifest. Both names are content hashes, so neither exists
+# until the bytes do — which is why this runs at action time rather than
+# being an `expand_template`.
+js_binary(
+    name = "html_codegen_bin",
+    entry_point = "html_codegen.mjs",
+)
+
+js_test(
+    name = "html_codegen_test",
+    data = ["html_codegen.mjs"],
+    entry_point = "html_codegen_test.mjs",
+)
+
+js_test(
+    name = "document_budget_test",
+    data = ["document_budget.mjs"],
+    entry_point = "document_budget_test.mjs",
 )
 
 # App-level asset aggregator: merges per-leaf hash_assets manifests into
@@ -158,10 +196,13 @@ exports_files(
     visibility = ["//visibility:public"],
 )
 
+cache_test_suite(name = "cache_test")
+
 bzl_library(
     name = "react_app",
     srcs = ["react_app.bzl"],
     deps = [
+        ":bundle_outputs",
         ":i18n_artifacts",
         ":labels",
         ":react_app_manifest",
@@ -172,7 +213,6 @@ bzl_library(
         "//devtools/build/js:devserver",
         "@aspect_rules_esbuild//esbuild:defs",
         "@aspect_rules_js//js:defs",
-        "@bazel_lib//lib:expand_template",
     ],
 )
 
@@ -180,9 +220,11 @@ bzl_library(
     name = "react_static_layer",
     srcs = ["react_static_layer.bzl"],
     deps = [
+        ":cache",
         "//oci:frontend_image",
         "@bazel_lib//lib:copy_to_directory",
         "@bazel_lib//lib:expand_template",
+        "@bazel_skylib//rules:write_file",
     ],
 )
 
@@ -297,6 +339,16 @@ bzl_library(
 bzl_library(
     name = "asset_codegen",
     srcs = ["asset_codegen.bzl"],
+)
+
+bzl_library(
+    name = "bundle_outputs",
+    srcs = ["bundle_outputs.bzl"],
+)
+
+bzl_library(
+    name = "cache",
+    srcs = ["cache.bzl"],
 )
 
 bzl_library(

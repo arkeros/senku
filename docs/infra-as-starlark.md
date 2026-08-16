@@ -182,17 +182,19 @@ Aspect Build's [outside-of-Bazel pattern](https://blog.aspect.build/outside-of-b
 named exactly the smell: *multi-process orchestration belongs in the task
 layer, not the build core*. We agreed and dropped it.
 
-Sequencing now lives in `.aspect/{plan,apply}.axl`. `stdlib.axl` defines
-`TF_ROOTS` (the ordered list). The tasks are thin Starlark wrappers around
-`bazel run <root>.{plan,apply}`:
+Sequencing now lives in `.aspect/{plan,apply}.axl`. `stdlib.axl` discovers the
+roots by querying the build graph — a deployable `tf_root` *is* a node rule,
+and its edges are an ordinary label attribute, so there is no list to keep in
+sync and no edge Bazel hasn't already checked (this was an ordered `TF_ROOTS`
+list until it drifted; see
+[ADR 0008](adr/0008-derived-terraform-deploy-set.md)). The tasks are thin
+Starlark wrappers around `bazel run <root>.{plan,apply}`:
 
 ```python
-# .aspect/stdlib.axl
-TF_ROOTS = [
-    "//infra/cloud/gcp/gar:terraform",
-    "//oci/cmd/registry:terraform",
-    "//infra/cloud/gcp/lb:terraform",
-]
+# .aspect/stdlib.axl — roughly
+graph = query('kind("tf_root_node|tf_deploy_task", //...)')  # class + attrs
+predecessors = {n: graph[n].deploy_after for n in graph}     # edges on the dependent
+ordered = topo_sort(graph, predecessors)                     # `aspect dag` prints this
 ```
 
 ```bash
@@ -202,18 +204,19 @@ aspect plan                                   # all roots
 aspect plan //infra/cloud/gcp/lb:terraform    # one root
 ```
 
-CI's `needs:` graph mirrors `TF_ROOTS` for per-step UI (per-root PR plan
-comments, per-root retries). Same source of truth, two surfaces.
+CI does not re-encode the order: the apply job is a single `aspect apply`,
+and the sequencing comes from the same query a local run makes. Per-root PR
+plan comments are posted by `plan.axl` itself rather than by a `needs:` graph.
 
 ## Worked example: registry
 
 `oci/cmd/registry/BUILD` after migration:
 
 ```python
-load("@terraform.bzl", "var")
 load("@terraform.bzl//:gcp.bzl", "service_account")
 load("//devtools/bifrost/modules:cloudrun.bzl", "service_cloudrun")
-load("//devtools/build/tools/tf:render.bzl", "IMAGE_URI", "tf_root_with_image")
+load("@terraform.bzl", "tf_root", "var")
+load("//devtools/build/tools/tf:render.bzl", "image_uri")
 
 REGIONS = ["us-central1", "europe-west3", "asia-northeast1"]
 
@@ -229,10 +232,11 @@ services = [
         name = "registry_%s" % r.replace("-", "_"),
         project = var("project_id"),
         region = r,
-        # Sentinel substituted with `<registry>/<repo>@sha256:<digest>` at
-        # Bazel build time — see `tf_root_with_image.image_push` below. No
-        # `var.image` round-trip via `*.auto.tfvars.json`.
-        image = IMAGE_URI,
+        # A `ref` to the push node's digest export, resolved to
+        # `<registry>/<repo>@sha256:<digest>` at Bazel build time, and
+        # carrying this root's deploy edge on the push. No `var.image`
+        # round-trip via `*.auto.tfvars.json`.
+        image = image_uri(":image_push_gar"),
         service_account_email = sa.email,         # <-- the cross-resource ref
         args = [
             "--upstream=ghcr.io",
@@ -244,10 +248,10 @@ services = [
     for r in REGIONS
 ]
 
-tf_root_with_image(
+tf_root(
     name = "terraform",
-    backend_bucket = "senku-prod-terraform-state",
-    image_push = ":image_push_gar",   # auto-prepended to pre_apply
+    backend_prefix = "oci/cmd/registry",
+    pre_apply = [":image_push_gar"],   # push before terraform reads the digest
     docs = [sa] + services + [
         # outputs consumed by //infra/cloud/gcp/lb
         {"output": {"lb_backends": {"value": {
@@ -262,8 +266,8 @@ tf_root_with_image(
 ```
 
 `bazel run //oci/cmd/registry:terraform.apply` replaces `deploy.sh`. The image
-push + apply chain is encoded by `tf_root_with_image` (it auto-prepends
-`image_push` to `pre_apply`); no separate shell script, no tfvars round-trip.
+push + apply chain is the root's `pre_apply`; no separate shell script, no
+tfvars round-trip.
 
 ## Migration plan
 
@@ -312,18 +316,20 @@ runtime indirection, fail-fast at Bazel build time.
 
 ### Step 5 — Adopt Aspect CLI for orchestration + wire CI
 
-Add `.aspect/{stdlib,plan,apply}.axl`:
+Add `.aspect/{stdlib,plan,apply,dag}.axl`:
 
-- `stdlib.axl` exports `TF_ROOTS` (ordered list) and a small `bazel_run`
-  helper that auto-sets `TF_AUTO_APPROVE` when `$CI` is set.
-- `plan.axl` defines `aspect plan [<target>]` — runs all roots or one.
-- `apply.axl` defines `aspect apply [<target>]` — runs all in order, with
-  `--stamp` (registry's image tags need it).
+- `stdlib.axl` derives the deploy set from one `bazel query` over the node
+  rule classes, topo-sorts it on the `deploy_after` edges, and exposes a
+  `build_and_run` helper that auto-sets `TF_AUTO_APPROVE` when `$CI` is set.
+- `plan.axl` defines `aspect plan [<target>]` — runs all nodes or one.
+- `apply.axl` defines `aspect apply [<target>]` — runs all in dependency
+  order.
+- `dag.axl` defines `aspect dag` — prints that order without touching
+  Terraform, state, or credentials.
 
-Three new GHA jobs (`gar`, `registry`, `lb`), each invoking
-`bazel run //path:terraform.{plan,apply}` (or `aspect <command>` if
-aspect-cli is set up in CI). Plans run in parallel on PR, applies chain
-via `needs:` on push.
+Two GHA jobs, not one per root: `aspect plan` on PR and `aspect apply` on
+push. Both are a single step, because the order lives in the graph rather
+than in a `needs:` chain — adding a root changes no CI file.
 
 ### Step 6 — Delete the HCL twin of `service_cloudrun` and its example
 
@@ -431,6 +437,12 @@ Result: targets `//infra/cloud/gcp/gar:prod_terraform.{plan,apply}` and
 state under its own backend prefix; same code path otherwise.
 
 ### Aspect CLI
+
+> **Superseded in part by [ADR 0008](adr/0008-derived-terraform-deploy-set.md).**
+> The deploy set is no longer a list, so a per-env sketch would key off a tag
+> (`tf-env=staging`) filtered into the same discovery query rather than a dict
+> keyed by env. The rest of this section — one `tf_root` per env, own backend
+> prefix, `--env` flag — still holds. Kept as written for the shape.
 
 `TF_ROOTS` becomes a dict keyed by env; `aspect apply` / `aspect plan` accept
 an `--env` flag (defaulting to `prod`):
@@ -559,13 +571,13 @@ one language.
 > Historical note: this is the layout as originally proposed. Post-migration,
 > the rules + toolchain + resource constructors live in the standalone
 > `bazel/modules/terraform.bzl/` module; the senku-side `render.bzl`
-> (IMAGE_URI + `tf_root_with_image`) is the only piece still under
-> `devtools/build/tools/tf/`.
+> (`registry_push` + `image_uri`, the rules_img glue) is the only piece still
+> under `devtools/build/tools/tf/`.
 
 ```
 devtools/build/tools/tf/
 ├── defs.bzl              — tf_root, resource, var, remote_state
-├── render.bzl            — IMAGE_URI sentinel + render_main_with_image
+├── render.bzl            — registry_push + image_uri (rules_img glue)
 ├── resources/
 │   └── gcp.bzl           — service_account, project_service, ...
 ├── run.sh                — per-root plan/apply runner

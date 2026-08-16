@@ -1,17 +1,27 @@
 "React application macro with Starlark-defined routes and lazy loading"
 
 load("@aspect_rules_esbuild//esbuild:defs.bzl", "esbuild")
-load("@aspect_rules_js//js:defs.bzl", "js_run_binary")
-load("@bazel_lib//lib:expand_template.bzl", "expand_template")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary", "js_test")
 load("//devtools/build/js:devserver.bzl", "devserver")
 load(":asset_pipeline.bzl", "asset_pipeline")
 load(":i18n_artifacts.bzl", "i18n_artifacts")
 load(":labels.bzl", "ts_dep")
 load(":react_app_manifest.bzl", "react_app_manifest")
 load(":react_component.bzl", "react_component")
-load(":route_tree.bzl", "walk_route_tree")
+load(":route_tree.bzl", "route_objects", "walk_route_tree")
 load(":runtime_config.bzl", "runtime_config_artifacts", "validate_runtime_config")
+load(":bundle_outputs.bzl", "bundle_dir", "bundle_metafile")
 load(":stylex_css.bzl", "stylex_css")
+
+# One initial congestion window: 10 segments of 1460 bytes. A document that
+# fits arrives in a single round trip, so everything it names — the entry
+# script at the very end of the body included — is discovered at once. A
+# document that does not fit has a tail that lands a round trip later, and
+# every URL in that tail with it.
+#
+# This is a property of TCP, not a policy knob. Raising it does not buy
+# headroom, it just stops measuring the thing.
+_DOCUMENT_BUDGET_BYTES = 14600
 
 def route(path, component = None, children = None, error_component = None):
     """Define a route mapping a URL path to a react_component target.
@@ -48,8 +58,14 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     Produces:
       - :{name}_devserver — dev server with unbundled ESM
       - :{name}_bundle — production esbuild bundle
-      - :{name}_styles — collected StyleX CSS (transitive via stylex_metadata_aspect)
-      - :{name}_html — production index.html
+      - :{name}_styles — collected StyleX CSS (transitive via
+        stylex_metadata_aspect). Inlined into the documents below rather
+        than served: it is a build input, not part of the webroot.
+      - :{name}_html — production index.html, carrying the markup for `/`
+        rendered at build time (see docs/adr/0013-build-time-prerender.md).
+        Not rendered when `runtime_config` is set — those values do not
+        exist until a deployment starts.
+      - :{name}_prerender_bin — the renderer, run once per document
       - :{name}_env_tpl / :{name}_env_dev / :{name}_env_component — when
         `runtime_config` is set (see arg docs)
 
@@ -81,6 +97,15 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
             Other locales must satisfy this one's key contract exactly.
         **kwargs: passed through to downstream targets (e.g. visibility, tags)
     """
+
+    # An app whose values arrive at runtime cannot be rendered at build time.
+    # `runtime_config` exists precisely so a deployment can differ without a
+    # rebuild, so `window.__ENV__` does not exist while the build runs and
+    # the first `getEnv` during a prerender throws. Skipping is the honest
+    # answer: the alternative is baking one deployment's values into markup
+    # shipped to every deployment. Documents still build — `{{APP}}` just
+    # resolves to nothing. See docs/adr/0013-build-time-prerender.md.
+    prerender_enabled = runtime_config == None
 
     if runtime_config != None:
         validate_runtime_config(runtime_config)
@@ -163,6 +188,10 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         "--out-main",
         "$(location {}_main.tsx)".format(name),
     ]
+    codegen_outs = [name + "_router.tsx", name + "_main.tsx"]
+    if prerender_enabled:
+        codegen_args += ["--out-prerender", "$(location {}_prerender.tsx)".format(name)]
+        codegen_outs += [name + "_prerender.tsx", name + "_prerender_main.mjs"]
     if i18n_enabled:
         codegen_args.extend([
             "--i18n-manifest-import",
@@ -179,7 +208,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     js_run_binary(
         name = codegen_name,
         srcs = [manifest_name + ".json"],
-        outs = [name + "_router.tsx", name + "_main.tsx"],
+        outs = codegen_outs,
         args = codegen_args,
         tool = Label("//devtools/build/react_component:react_app_codegen_bin"),
     )
@@ -217,6 +246,28 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         deps = _main_deps,
     )
 
+    # Compile the generated prerender entry. Unlike `_main` it depends on the
+    # route components directly rather than through the router: it imports
+    # them statically, because a build-time render has no reason to defer a
+    # module it is about to need.
+    if prerender_enabled:
+        _prerender_deps = all_route_components + [
+            "//:node_modules/react-dom",
+            "//:node_modules/@types/react-dom",
+            "//:node_modules/react-router",
+        ]
+        if i18n_enabled:
+            _prerender_deps.extend([
+                ":" + name + "_i18n_manifest",
+                "//:node_modules/@panellet/i18n-runtime",
+            ])
+        react_component(
+            name = name + "_prerender",
+            srcs = [name + "_prerender.tsx"],
+            _export_test = False,
+            deps = _prerender_deps,
+        )
+
     # Collect StyleX CSS from all route components (transitive via stylex_metadata_aspect)
     stylex_css(
         name = name + "_styles",
@@ -224,12 +275,9 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         jit_open_props = jit_open_props,
     )
 
-    # Copy open-props/normalize.min.css into a Bazel output so it lands in
-    # the app filegroup (and therefore the prod tar layer). Shipped as a
-    # sibling stylesheet loaded before StyleX CSS: source order gives it
-    # lower precedence than app styles, and keeping it a separate file
-    # lets the browser cache the normalize bytes across deploys — they
-    # only change on open-props version bumps, not on component edits.
+    # Copy open-props/normalize.min.css into a Bazel output so the HTML
+    # generator can read it. Inlined ahead of the StyleX CSS: source order
+    # gives it lower precedence than app styles.
     #
     # //:node_modules/open-props has two execpath entries (virtual store +
     # symlink); either contains the file, so we pick the first that does.
@@ -253,39 +301,184 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         components = all_route_components,
     )
 
+    # Neither stylesheet is served as a file: both are inlined into every
+    # document by the generator below. They were content-addressed under
+    # `assets/` while they were render-blocking `<link>`s — the hash bought
+    # the `immutable` header, which paid for the revalidation the link cost
+    # before first paint. Inlining removes the request the whole arrangement
+    # was built around: the bytes now arrive with the document that needs
+    # them, one round trip instead of two, and there is no URL left to name
+    # or to cache. See docs/adr/0012-inline-critical-css.md.
+    #
+    # The devserver reads these same two files and keeps linking them, so a
+    # CSS edit there still reloads without rebuilding the document. Nothing
+    # it serves is published.
+    css_files = [":" + normalize_css_target, ":" + name + "_styles"]
+
     # HTML template
     tpl_name = html_template or Label("//devtools/build/react_component:index.html.tpl")
 
+    # The metafile half of the bundle, so the generator can read the entry's
+    # content-addressed name. Kept separate from what gets served — see
+    # bundle_outputs.bzl.
+    bundle_metafile(
+        name = name + "_bundle_meta",
+        bundle = ":" + name + "_bundle",
+        **kwargs
+    )
+
+    # index.html is the last object on the render path with a fixed name, and
+    # every name it points at is now a content hash — so none of them can be
+    # substituted at analysis time the way this template once was. The
+    # generator resolves them from esbuild's metafile and the stylesheet
+    # manifest at action time.
+    #
+    # `type="module"` is required because the esbuild output uses ESM with
+    # code-splitting (`splitting = True`): the entry statically imports the
+    # shared vendor chunk and dynamically imports each lazy route chunk.
+    # Classic `<script>` can't resolve those.
+    html_args = [
+        "--template",
+        "$(location {})".format(tpl_name),
+        "--metafile",
+        "$(location :{}_bundle_meta)".format(name),
+        # esbuild identifies outputs by their source entry point, and every
+        # `lazy()` route is one too — the source path is what picks ours out.
+        "--entry",
+        "{}/{}_main.js".format(native.package_name(), name),
+        # The TreeArtifact directory esbuild produces. react_static_layer
+        # ships its contents at /var/www/html/{name}_bundle/ for the image
+        # and at the same path in the bucket.
+        "--bundle-dir",
+        name + "_bundle",
+    ]
+
+    # Normalize is inlined before StyleX so source order keeps app styles
+    # winning on equal specificity. This order is the cascade.
+    for css_file in css_files:
+        html_args += ["--css", "$(location {})".format(css_file)]
+
+    # The layout renders on every path, so every document wants it early.
+    # The router reaches it by dynamic import exactly as it reaches a route,
+    # which is why the preload walk skipped it — and skipping it puts it on
+    # the critical path, discovered only once the entry has run and itself
+    # delaying the route beneath it.
+    _layout = native.package_relative_label(layout)
+    html_args += ["--layout-entry", "{}/{}.js".format(_layout.package, _layout.name)]
+
     # When runtime_config is set, the `/env.js` bootstrap must load before the
     # main bundle so `window.__ENV__` is set before any module script runs.
-    env_script_tag = '<script src="/env.js"></script>' if runtime_config != None else ""
-    expand_template(
+    if runtime_config != None:
+        html_args.append("--env-script")
+
+    html_srcs = [
+        tpl_name,
+        ":" + name + "_bundle_meta",
+    ] + css_files
+
+    # Each document carries the markup for the path it is served at, so the
+    # arguments and inputs are per-document rather than shared. `_prerender`
+    # targets are declared further down — Bazel resolves labels after the
+    # package loads, so naming them here is not an ordering problem.
+    def _document_args(out, app_html_target):
+        args = ["--out", "$(location {})".format(out)] + html_args
+        if prerender_enabled:
+            args += ["--app-html", "$(location :{})".format(app_html_target)]
+        return args
+
+    def _document_srcs(app_html_target):
+        return html_srcs + ([":" + app_html_target] if prerender_enabled else [])
+
+    root_markup = name + "_prerender_root"
+
+    # The index document is the `/` document — the bucket serves it there
+    # through `main_page_suffix`, and it is the path most visitors arrive on.
+    # `route_objects` leaves `/` out because no *separate* object is needed
+    # for it, which is true of the file and false of the preload: this
+    # document knows which route it will render just as surely as a route
+    # document does, and until now was the only one that did not say so.
+    root_route_args = []
+    for r in routes:
+        if r["path"] == "/" and r.get("component"):
+            _c = native.package_relative_label(r["component"])
+            root_route_args = ["--route-entry", "{}/{}.js".format(_c.package, _c.name)]
+
+    js_run_binary(
         name = name + "_html",
-        out = name + "_index.html",
-        substitutions = {
-            # Normalize ships before StyleX so source order keeps app styles
-            # winning on equal specificity. Served from /{name}_normalize.css
-            # via the filegroup below (mirrors {name}_styles.css).
-            "{{HEAD}}": (
-                '<link rel="stylesheet" href="/{}_normalize.css" />'.format(name) +
-                '<link rel="stylesheet" href="/{}_styles.css" />'.format(name)
-            ),
-            # `type="module"` is required because the esbuild output uses ESM
-            # with code-splitting (`splitting = True`): the entry `{name}_main.js`
-            # statically imports the shared vendor chunk and dynamically imports
-            # each lazy route chunk. Classic `<script>` can't resolve those.
-            #
-            # The `/{name}_bundle/` prefix corresponds to the TreeArtifact
-            # directory esbuild produces; react_static_layer ships its
-            # contents as a nested path at /var/www/html/{name}_bundle/.
-            "{{SCRIPTS}}": '{}<script type="module" src="/{}_bundle/{}_main.js"></script>'.format(env_script_tag, name, name),
-        },
-        template = tpl_name,
+        srcs = _document_srcs(root_markup),
+        outs = [name + "_index.html"],
+        args = _document_args(name + "_index.html", root_markup) + root_route_args,
+        tool = Label("//devtools/build/react_component:html_codegen_bin"),
         **kwargs
     )
 
     # esbuild and devserver need _ts targets (which carry JsInfo)
     all_ts_targets = [ts_dep(c) for c in all_route_components]
+
+    # --- Build-time prerender ------------------------------------------------
+    # The route tree rendered to markup once, in Node, so a document arrives
+    # with something contentful in it. Without this the body is an empty
+    # `#root` and first paint cannot happen until the bundle has been
+    # fetched, parsed and executed — on a throttled phone that is the whole
+    # of FCP. See docs/adr/0013-build-time-prerender.md.
+    #
+    # Bundled rather than run from the compiled tree because this executes
+    # in Node against first-party ESM plus npm packages, and one esbuild
+    # pass settles every resolution at build time instead of at run time.
+    # Renders `path` into `out`. A no-op when the app opts out above, so the
+    # route loop below does not have to know which mode it is in.
+    def _prerender(target, out, path):
+        if not prerender_enabled:
+            return
+        js_run_binary(
+            name = target,
+            outs = [out],
+            args = ["--path", path, "--out", "$(location {})".format(out)],
+            tool = ":" + name + "_prerender_bin",
+            **kwargs
+        )
+
+    if prerender_enabled:
+        esbuild(
+            name = name + "_prerender_bundle",
+            # The .mjs wrapper, not the .tsx's output: the render module is
+            # kept free of Node APIs so it type-checks under the same tsconfig
+            # as every other component, and the file I/O lives beside it in
+            # plain JS that tsc never reads.
+            entry_point = name + "_prerender_main.mjs",
+            srcs = [name + "_prerender_main.mjs"],
+            # Node, not the browser: `react-dom/server` and `node:fs` both
+            # resolve differently, and nothing here is ever shipped.
+            platform = "node",
+            target = "node20",
+            # No minify. Nothing downloads this, so the only thing shrinking
+            # it would cost is a readable stack trace when a component throws
+            # mid-render — which is the one output this bundle has to be good
+            # at producing.
+            config = Label("//devtools/build/react_component:esbuild_prerender.config"),
+            deps = [
+                ":" + name + "_prerender_ts",
+            ] + all_ts_targets + [
+                "//:node_modules/react",
+                "//:node_modules/react-dom",
+                "//:node_modules/react-router",
+                "//:node_modules/@stylexjs/stylex",
+            ],
+            **kwargs
+        )
+
+        # The bundle target carries its sourcemap too, so the binary names
+        # the one file rather than the target.
+        js_binary(
+            name = name + "_prerender_bin",
+            entry_point = ":" + name + "_prerender_bundle.js",
+            **kwargs
+        )
+
+    # The root document answers `/` through the bucket's `main_page_suffix`,
+    # and is also the shell the URL map serves under a 404 — so it is
+    # rendered at `/`, the one path it is certain to be showing.
+    _prerender(root_markup, name + "_app.html", "/")
 
     # Production bundle. Asset files ride as data so they end up in the
     # bundle's runfiles; URLs are baked into JS by asset_codegen, so
@@ -316,6 +509,14 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         target = "es2020",
         splitting = True,
         output_dir = True,
+        # The entry's name carries a content hash (see the esbuild config), so
+        # nothing can know it at analysis time. The metafile is how the HTML
+        # generator learns it. It is declared as a *sibling* of the output
+        # directory rather than inside it, which is what lets the servable
+        # filegroup below leave it out by construction — it must never reach
+        # the bucket, since it holds the whole module graph and every input
+        # path. See docs/adr/0010-content-addressed-webroot.md.
+        metafile = True,
         # Ship production-mode JS. `define` rewrites the classic
         # `process.env.NODE_ENV` guards (react-dom, scheduler, etc. still
         # use them) so minify can dead-code the dev-only branches. The
@@ -345,7 +546,7 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
         components = [":" + name + "_main_ts", ":" + name + "_router_ts"] + all_ts_targets,
         browser_deps = browser_deps,
         html_template = tpl_name,
-        css = [":" + normalize_css_target, ":" + name + "_styles"],
+        css = css_files,
         assets_manifest = ":" + name + "_assets.json",
         assets_dir = ":" + name + "_assets",
         runtime_config_dev = (":" + name + "_env_dev") if runtime_config != None else None,
@@ -356,14 +557,87 @@ def react_app(name, layout, routes, browser_deps, error_component = None, jit_op
     # so `bazel build :{name}` produces everything a static host would serve,
     # and downstream macros (e.g. react_static_layer) can consume the app
     # as a single Bazel label instead of a string prefix.
+    # A client-side route is only a 200 if the bucket holds an object at that
+    # path — object existence is the whole of a bucket's routing. So each
+    # declared route gets a copy of the entry document, and everything not
+    # declared falls to the URL map's fallback, which serves the shell under
+    # a 404. That keeps the route table in the build, where it is declared,
+    # rather than in a URL map shared by every host.
+    #
+    # `{path}/index.html` rather than a bare `{path}`: the bucket's
+    # `main_page_suffix` resolves the directory form, and an extensionless
+    # object would be stamped `application/octet-stream` by the closed
+    # content-type table — a download prompt instead of a page.
+    #
+    # Each is rendered rather than copied, because a route's document knows
+    # which route it serves and can say so: it preloads that route's chunk,
+    # which the entry reaches only by dynamic import and no client can
+    # discover until the router asks for it. That only helps a direct hit —
+    # navigating there in-app never fetches this document — but a direct hit
+    # is the first impression.
+    route_documents = []
+    for entry in route_objects(routes):
+        # The path goes into the target name unaltered. Bazel target names
+        # admit both `-` and `/`, and folding either into `_` would make the
+        # mapping lossy — `a-b`, `a_b` and `a/b` would all become one name
+        # and collide as duplicate targets.
+        route_target = "{}_route_{}".format(name, entry.path)
+
+        # Rendered at its own path, so a direct hit on a route gets that
+        # route's markup rather than the index's.
+        route_markup = "{}_prerender_{}".format(name, entry.path)
+        _prerender(route_markup, entry.path + "/app.html", "/" + entry.path)
+
+        route_args = _document_args(entry.path + "/index.html", route_markup)
+
+        # A route that only groups children has no component of its own, so
+        # there is no chunk to name and it renders exactly like the entry
+        # document. esbuild identifies the chunk by the component's source
+        # path, which react_component fixes as `{package}/{target}.js`.
+        if entry.component:
+            component = native.package_relative_label(entry.component)
+            route_args += ["--route-entry", "{}/{}.js".format(component.package, component.name)]
+
+        js_run_binary(
+            name = route_target,
+            srcs = _document_srcs(route_markup),
+            outs = [entry.path + "/index.html"],
+            args = route_args,
+            tool = Label("//devtools/build/react_component:html_codegen_bin"),
+            **kwargs
+        )
+        route_documents.append(":" + route_target)
+
+    # Every document, not just the index: a route document carries its own
+    # prerendered markup, so it grows independently and can cross the line on
+    # its own.
+    _documents = [":" + name + "_html"] + route_documents
+    js_test(
+        name = name + "_document_budget_test",
+        entry_point = Label("//devtools/build/react_component:document_budget"),
+        args = [str(_DOCUMENT_BUDGET_BYTES)] + [
+            "$(rootpath {})".format(d)
+            for d in _documents
+        ],
+        data = _documents,
+        **{k: v for k, v in kwargs.items() if k in ("visibility", "tags", "testonly")}
+    )
+
+    # The bundle enters as `:{name}_bundle_dir`, not `:{name}_bundle`. The
+    # esbuild target also carries the metafile, and everything named here is
+    # served from a public bucket — see bundle_dir.bzl.
+    bundle_dir(
+        name = name + "_bundle_dir",
+        bundle = ":" + name + "_bundle",
+        **kwargs
+    )
+
     native.filegroup(
         name = name,
         srcs = [
             ":" + name + "_html",
-            ":" + name + "_bundle",
-            ":" + name + "_styles",
-            ":" + normalize_css_target,
+            ":" + name + "_bundle_dir",
             ":" + name + "_assets",
-        ],
+        ] + route_documents,
         **kwargs
     )

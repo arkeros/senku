@@ -43,24 +43,30 @@ bootstrap, so changing it needs a document load.
 ## Deploying
 
 ```bash
-bazel build //apps/napkin-battle:image      # nginx + the built napkin
 aspect plan  //apps/napkin-battle:terraform
-aspect apply //apps/napkin-battle:terraform # pushes to GAR, then applies
+aspect apply //apps/napkin-battle:terraform   # the bucket
+bazel  run   //apps/napkin-battle:bucket_push # its contents
+aspect apply //infra/cloud/gcp/lb:terraform
 ```
 
-The image is nginx serving `/var/www/html` from two layers (webroot and
-nginx conf, split so a cache-header change doesn't invalidate the bundle).
-`tf_root_with_image` substitutes the pushed digest into `main.tf.json` at
-build time, so the Cloud Run service is always digest-pinned — there is no
-`var.image` round-trip and no floating tag in the deploy path.
+`aspect apply` walks these in order on its own; the split matters only when
+running a step by hand. The bucket has to exist before the push, and the push
+before the LB — routing to an empty bucket is a 404 with nothing to explain
+it (ADR 0009).
+
+`bucket_push` stamps each object's `Cache-Control` and `Content-Type` from
+the policy in `//devtools/build/react_component:cache.bzl`, then deletes
+whatever the build no longer produces. A bucket decides nothing per request,
+so those two headers are the whole of what the origin says.
+
+The image still builds (`bazel build //apps/napkin-battle:image`) and still
+pushes to GAR, but nothing runs it: it is what keeps the deployed bytes
+traceable to a signed, SBOM'd artifact.
 
 ### Reaching it
 
-The service runs with `ingress = INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER`
-because `constraints/run.allowedIngress` on `senku-prod` permits only
-`internal` and `internal-and-cloud-load-balancing`. There is no usable
-`*.run.app` URL — requests to it get a 404 from Google's ingress filter, not
-from nginx — so the shared load balancer is the only way in.
+The shared load balancer is the only way in — the bucket answers nothing but
+a cache miss from it.
 
 It is served at **`napkin.arquero.dev`**, on its own hostname rather than a
 path under `distroless.io`. That is forced, not stylistic: the game is an SPA

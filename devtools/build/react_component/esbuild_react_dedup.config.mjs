@@ -17,6 +17,18 @@
 // that tree, so these path-form values land deterministically on the
 // consumer's copy.
 export default {
+  // Content-address the entry the same way esbuild already content-addresses
+  // the chunks it splits out. Without this the entry keeps a stable name and
+  // is the one file on the render path a browser must revalidate before any
+  // JavaScript runs. `[dir]` is empty for our single root entry point, but
+  // it is esbuild's default prefix and dropping it would flatten output that
+  // is nested for a reason.
+  //
+  // This names *and* places the file in one setting, which is what keeps it
+  // honest: the hash cannot appear without the file staying under
+  // `{app}_bundle/`, where cache.bzl's prefix rule already marks it
+  // immutable. See docs/adr/0010-content-addressed-webroot.md.
+  entryNames: "[dir]/[name]-[hash]",
   alias: {
     react: "./node_modules/react",
     "react-dom": "./node_modules/react-dom",

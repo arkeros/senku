@@ -1,0 +1,18 @@
+{
+  "padron.title": "PEBROTS DE PADRÓ",
+  "padron.tagline": "uns piquen i altres no",
+  "padron.solo": "SOL",
+  "padron.duel": "DUEL",
+  "padron.soloHint": "Neteja tota la planxa",
+  "padron.duelHint": "Cinc coents i guanyes",
+  "padron.holdHint": "Mantén premut per marcar · toca un número per netejar",
+  "padron.remaining": "EN QUEDEN",
+  "padron.time": "TEMPS",
+  "padron.best": "RÈCORD",
+  "padron.swept": "PLANXA NETA",
+  "padron.bitten": "AQUEST PICAVA!",
+  "padron.playAgain": "Toca per tornar al menú",
+  "padron.name.brava": "BRAVA",
+  "padron.name.alioli": "ALIOLI",
+  "padron.win": "GUANYA {$name}!"
+}

@@ -4,17 +4,13 @@ load("@rules_img//img:image.bzl", "image_from_binary")
 load("@rules_img//img:load.bzl", "image_load")
 load("@rules_img//img:push.bzl", "image_push")
 load("@terraform.bzl//:gcp.bzl", "google_provider", "service_account")
-load("@terraform.bzl", "output")
+load("@terraform.bzl", "output", "tf_root")
 load(
     "//devtools/bifrost/modules:cloudrun.bzl",
     "service_cloudrun",
 )
-load("//devtools/build/tools/tf:render.bzl", "IMAGE_URI", "tf_root_with_image")
-load(
-    "//infra/cloud/gcp/gar:defs.bzl",
-    "GAR_REGISTRY",
-    "GAR_REPOSITORY_PREFIX",
-)
+load("//devtools/build/tools/tf:render.bzl", "image_uri", "registry_push")
+load("//infra/cloud/gcp/gar:defs.bzl", "REGISTRY")
 load(
     "//oci:config.bzl",
     "OCI_REGISTRY",
@@ -25,9 +21,10 @@ load("//oci:supply_chain.bzl", "image_supply_chain")
 load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "DEBIAN_WONTFIX_CVES", "DEBUG_MODE")
 load(
     ":defs.bzl",
-    "LB_BACKEND",
+    "LB_BACKEND_TF",
     "PROJECT",
     "REGIONS",
+    "SERVICE_NAME",
 )
 
 package(default_visibility = [
@@ -111,18 +108,20 @@ go_binary(
 # scope per ADR 0006. `aspect apply` re-pushes against the same digest via
 # the registry root's pre_apply hook.
 [
-    image_push(
+    registry_push(
         name = "image" + mode + "_push_gar",
+        # Only the non-debug image is deployed. The debug variant exists for
+        # `gcloud run services proxy` sessions and is pushed by hand, so it is
+        # built here but stays out of the deploy DAG.
+        deploy = not mode,
         image = ":image" + mode,
-        registry = GAR_REGISTRY,
-        repository = GAR_REPOSITORY_PREFIX + "/registry",
-        stamp = "force",
+        registry = REGISTRY,
+        repository = "registry",
         tag_list = [
             "debug" if mode else "latest",
             "{{.STABLE_MONOREPO_IMAGE_TAG_VERSION}}" + mode.replace("_", "-"),
             "{{.STABLE_MONOREPO_SHORT_VERSION}}" + mode.replace("_", "-"),
         ],
-        tags = ["manual"],
     )
     for mode in DEBUG_MODE
 ]
@@ -177,9 +176,10 @@ services = [
             "--repo=" + image
             for image in CATALOG
         ],
-        # Sentinel substituted with the digest URI at Bazel build time
-        # (see `tf_root_with_image.image_push` below). No `var.image` round-trip.
-        image = IMAGE_URI,
+        # A `ref` to the push node's digest export: resolved at build time,
+        # and it brings this root's deploy edge on the push along with it.
+        # No `var.image` round-trip.
+        image = image_uri(":image_push_gar"),
         ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER",
         probes = {
             "startup_path": "/v2/",
@@ -215,9 +215,13 @@ SERVICE_URIS = "${ {" + ", ".join([
     for region in REGIONS
 ]) + "} }"
 
-tf_root_with_image(
+tf_root(
     name = "terraform",
     backend_bucket = "senku-prod-terraform-state",
+    # Published for other roots to `ref`. The LB names this to build its
+    # serverless NEG, and takes its deploy edge from the same reference —
+    # so a backend is always running before anything routes to it.
+    exports = {"service_name": SERVICE_NAME},
     docs = [
         google_provider(project = PROJECT),
         sa,
@@ -225,7 +229,7 @@ tf_root_with_image(
         output(
             "lb_backends",
             description = "LB backends exposed for external (terraform-only) consumers. In-repo callers (//infra/cloud/gcp/lb) load `LB_BACKEND` from `:defs.bzl` directly — same content, no `terraform_remote_state` round-trip.",
-            value = {"registry": LB_BACKEND},
+            value = {"registry": LB_BACKEND_TF},
         ),
         output(
             "service_account_email",
@@ -238,7 +242,10 @@ tf_root_with_image(
             value = SERVICE_URIS,
         ),
     ],
-    image_push = ":image_push_gar",
+    # The digest in `main.tf.json` is baked in at build time; the push is what
+    # makes it real. Keeping it here means a bare `bazel run :terraform.apply`
+    # is correct on its own, not only under `aspect apply`.
+    pre_apply = [":image_push_gar"],
     providers = ["@terraform_providers//:google"],
     visibility = ["//visibility:public"],
 )

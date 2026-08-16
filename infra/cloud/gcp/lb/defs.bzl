@@ -1,16 +1,18 @@
 """Identity, derived strings, and resource declarations for the global LB.
 
-The HTTP(S) load balancer fronts every Cloud Run service that contributes a
-backend (registry today, others later). Each contributing service exposes an
-`LB_BACKEND` constant from its own `defs.bzl`; this root aggregates them.
-That replaces the previous `terraform_remote_state` data sources — same
-content, no runtime indirection.
+The HTTP(S) load balancer fronts every origin that contributes a backend —
+Cloud Run services and GCS buckets alike. Each contributor exposes an
+`LB_BACKEND` constant from its own `defs.bzl` naming the `driver` that
+realises it; this root aggregates them. That replaces the previous
+`terraform_remote_state` data sources — same content, no runtime
+indirection.
 """
 
 load("@terraform.bzl", "output", "resource")
 load("//apps/cluedo-bayes:defs.bzl", _CLUEDO_LB_BACKEND = "LB_BACKEND")
 load("//apps/dino-meteor:defs.bzl", _DINO_LB_BACKEND = "LB_BACKEND")
 load("//apps/napkin-battle:defs.bzl", _NAPKIN_LB_BACKEND = "LB_BACKEND")
+load("//apps/pepper-sweeper:defs.bzl", _PADRON_LB_BACKEND = "LB_BACKEND")
 load("//apps/spaghetti-duel:defs.bzl", _PASTA_LB_BACKEND = "LB_BACKEND")
 load("//apps/table-for-two:defs.bzl", _TABLE_LB_BACKEND = "LB_BACKEND")
 load("//oci/cmd/registry:defs.bzl", _REGISTRY_LB_BACKEND = "LB_BACKEND")
@@ -38,35 +40,83 @@ BUCKET_LOCATION = "EU"
 # Map backend_key → backend descriptor. New services contributing to this LB
 # add an entry here and an `LB_BACKEND` constant in their root.
 
+# The drivers this LB knows how to realise an origin with. `driver`, not
+# `kind`: bifrost's model reserves `kind` for what an app *is* — a
+# `StaticSite` has no server, a `Runtime` does — and `driver` for how that
+# thing is realised. Which one the LB is choosing between is the second
+# question: it does not care whether an app has a server, only which GCP
+# resource fronts it. (`kind` is also already spoken for in this repo, as
+# the document type in //devtools/bifrost/api:types.go.)
+#
+# The five games were `StaticSite`s before this migration and after it; what
+# changed was their driver. Only the registry is a `Runtime`.
+#
+# They stay separate drivers rather than one because they share no
+# mechanism: a Cloud Run service is reached through a serverless NEG wrapped
+# in a backend service, a bucket through a backend bucket, and neither
+# resource accepts the other's configuration. Collapsing them would mean a
+# descriptor whose fields are each meaningful for only half its values.
+DRIVER_CLOUDRUN = "cloudrun"
+DRIVER_GCS_CDN = "gcs-cdn"
+
 def _normalize(backend):
     """Fill in the defaults contributors shouldn't have to think about.
+
+    `driver` defaults to `DRIVER_CLOUDRUN` — it was the only one when the
+    first backends were written, and defaulting keeps their descriptors
+    reading the same as before.
 
     Regions get sorted because `google_compute_backend_service.backend[]`
     is order-significant in Terraform state, so an unsorted regions list at
     the source would silently churn the LB plan whenever a new region is
     appended. Sorting here makes the invariant the LB's responsibility —
     services can declare regions in any order (geographic, deploy-date,
-    etc.) without knowing it matters downstream.
+    etc.) without knowing it matters downstream. `gcs-cdn` has no regions:
+    one backend bucket fronts one bucket, and the CDN is what makes it
+    global.
 
     `host` defaults to `DOMAIN`. Backends can't load it from here (this
     module already loads *them*, so importing back would be a cycle), which
     is why the default lives on this side: a service names a host only when
     it wants one of its own.
     """
-    return dict(
-        backend,
-        host = backend.get("host", DOMAIN),
-        regions = sorted(backend["regions"]),
-    )
+    driver = backend.get("driver", DRIVER_CLOUDRUN)
+    normalized = dict(backend, driver = driver, host = backend.get("host", DOMAIN))
+
+    if driver == DRIVER_CLOUDRUN:
+        normalized["regions"] = sorted(backend["regions"])
+        return normalized
+
+    if driver == DRIVER_GCS_CDN:
+        # Catching this here rather than letting it pass through unused:
+        # a `regions` list on a `gcs-cdn` backend means its author expected
+        # regional fan-out, and silently dropping it would leave them
+        # believing they had it.
+        for unsupported in ("regions", "service_name"):
+            if unsupported in backend:
+                fail("%s backend %r declares %r, which only a %s backend has" %
+                     (DRIVER_GCS_CDN, backend.get("host"), unsupported, DRIVER_CLOUDRUN))
+        return normalized
+
+    fail("backend %r has unknown driver %r; expected one of %r" %
+         (backend.get("host"), driver, [DRIVER_CLOUDRUN, DRIVER_GCS_CDN]))
 
 BACKENDS = {
     "cluedo": _normalize(_CLUEDO_LB_BACKEND),
     "dino": _normalize(_DINO_LB_BACKEND),
     "napkin": _normalize(_NAPKIN_LB_BACKEND),
+    "padron": _normalize(_PADRON_LB_BACKEND),
     "pasta": _normalize(_PASTA_LB_BACKEND),
     "registry": _normalize(_REGISTRY_LB_BACKEND),
     "table": _normalize(_TABLE_LB_BACKEND),
 }
+
+# No deploy-edge list here. Each backend names its origin with a `ref()` in
+# the contributing root's `defs.bzl` — `service_name` for `cloudrun`,
+# `bucket_name` for `gcs-cdn` — so `tf_root` reads the edges out of the NEGs
+# and backend buckets those names end up in. The value routed to and the
+# node waited on are one token; there is no second list that could disagree
+# with the first, and nothing to update when a backend is added.
 
 def _host_slug(host):
     """Hostname → a name fragment valid in GCP resource names."""
@@ -75,6 +125,12 @@ def _host_slug(host):
 def _host_tf_name(host):
     """Hostname → a Terraform resource identifier."""
     return host.replace(".", "_").replace("-", "_")
+
+def _of_driver(driver):
+    return {k: b for k, b in BACKENDS.items() if b["driver"] == driver}
+
+_CLOUDRUN_BACKENDS = _of_driver(DRIVER_CLOUDRUN)
+_GCS_CDN_BACKENDS = _of_driver(DRIVER_GCS_CDN)
 
 def _backends_on(host):
     return {k: b for k, b in BACKENDS.items() if b["host"] == host}
@@ -96,7 +152,7 @@ _NEG_ENTRIES = {
         "region": region,
         "service_name": backend["service_name"],
     }
-    for backend_key, backend in BACKENDS.items()
+    for backend_key, backend in _CLOUDRUN_BACKENDS.items()
     for region in backend["regions"]
 }
 
@@ -172,6 +228,20 @@ _NEGS = {
     for slug, entry in _NEG_ENTRIES.items()
 }
 
+# Cloud CDN respecting upstream `Cache-Control`, shared by both origin
+# kinds. This stack assumes nothing about cacheability per path: a Cloud Run
+# origin emits the headers from its nginx conf, a bucket origin carries them
+# as object metadata, and both are rendered from the same declared policy
+# (`//devtools/build/react_component:cache.bzl`).
+_CDN_POLICY = [{
+    "cache_mode": "USE_ORIGIN_HEADERS",
+    "negative_caching": True,
+    # Provider requires one of cache_key_policy or
+    # signed_url_cache_max_age_sec. We don't issue signed URLs, so 0 is a
+    # no-op; keeps the schema happy.
+    "signed_url_cache_max_age_sec": 0,
+}]
+
 _BACKEND_SERVICES = {
     backend_key: resource(
         rtype = "google_compute_backend_service",
@@ -188,19 +258,8 @@ _BACKEND_SERVICES = {
                 }
                 for r in backend["regions"]
             ],
-            # Cloud CDN respecting upstream `Cache-Control`. The backends
-            # behind us (Cloud Run services) are responsible for emitting
-            # accurate headers — this stack assumes nothing about
-            # cacheability per path.
             "enable_cdn": True,
-            "cdn_policy": [{
-                "cache_mode": "USE_ORIGIN_HEADERS",
-                "negative_caching": True,
-                # Provider requires one of cache_key_policy or
-                # signed_url_cache_max_age_sec. We don't issue signed URLs,
-                # so 0 is a no-op; keeps the schema happy.
-                "signed_url_cache_max_age_sec": 0,
-            }],
+            "cdn_policy": _CDN_POLICY,
             "log_config": [{
                 "enable": True,
                 "sample_rate": 1.0,
@@ -208,8 +267,45 @@ _BACKEND_SERVICES = {
         },
         attrs = ["id", "name", "self_link"],
     )
-    for backend_key, backend in BACKENDS.items()
+    for backend_key, backend in _CLOUDRUN_BACKENDS.items()
 }
+
+# --- Backend buckets ---------------------------------------------------------
+# The static origins. A backend bucket has no NEG, no health check and no
+# region list, because there is nothing running to find, check or place —
+# which is exactly why a site served this way has no cold start.
+
+_BACKEND_BUCKETS = {
+    backend_key: resource(
+        rtype = "google_compute_backend_bucket",
+        name = backend_key,
+        body = {
+            "project": PROJECT,
+            "name": "{}-{}".format(NAME, backend_key),
+            "bucket_name": backend["bucket_name"],
+            "enable_cdn": True,
+            "cdn_policy": _CDN_POLICY,
+            # Brotli or gzip at the edge, chosen from the request's
+            # `Accept-Encoding`. A bucket cannot do this: it serves the bytes
+            # it stores, and `bucket_push` stores them uncompressed. Storing
+            # them compressed instead would mean a `Content-Encoding` stamped
+            # on the object and served to every client whether or not it
+            # asked — GCS does no negotiation — so the choice is edge
+            # compression or none.
+            #
+            # This field is a sibling of `cdn_policy`, not part of it, which
+            # is why it does not live in `_CDN_POLICY` alongside the
+            # cache-mode settings the two origin kinds share.
+            "compression_mode": "AUTOMATIC",
+        },
+        attrs = ["id", "name", "self_link"],
+    )
+    for backend_key, backend in _GCS_CDN_BACKENDS.items()
+}
+
+# Both kinds under one key space, so the URL map can route to a backend
+# without caring which mechanism realises it.
+_ORIGINS = dict(_BACKEND_SERVICES, **_BACKEND_BUCKETS)
 
 # --- URL map (HTTPS) ---------------------------------------------------------
 # One path matcher per host. Within a host, a backend that declares `paths`
@@ -217,6 +313,32 @@ _BACKEND_SERVICES = {
 # `default_service` — which is what an SPA needs, since it serves its own
 # 404 page on any unrecognised path and can't be hung off a path prefix
 # without teaching it a base path.
+
+# Where an SPA's history-API fallback lives now that there is no nginx to
+# hold a `try_files`. A bucket 404s on every path that is not an object it
+# holds, so the URL map answers with the app shell — which is what lets the
+# app's `*` route render its own not-found page.
+#
+# The status stays 404. There is no `override_response_code` here on
+# purpose: a path the bucket has no object for is a path this site does not
+# serve, and saying 200 about it is untrue. A 200 is what makes a soft 404 —
+# caches store the page, crawlers index it, uptime checks call it healthy,
+# and a missing chunk comes back as HTML that a module loader cannot use
+# while every 404 metric reads zero.
+#
+# A *real* client-side route must therefore be a real object, so the bucket
+# answers it without this policy ever running — see `react_static_layer`,
+# which materialises one per declared route. A route whose values cannot be
+# enumerated (a dynamic segment) needs a `path_rule` here instead; none
+# exists yet.
+def _spa_fallback(origin):
+    return [{
+        "error_response_rule": [{
+            "match_response_codes": ["404"],
+            "path": "/index.html",
+        }],
+        "error_service": origin.id,
+    }]
 
 def _path_matcher(name, host):
     on_host = _backends_on(host)
@@ -231,13 +353,21 @@ def _path_matcher(name, host):
         "name": name,
         # No owner → unmatched paths on this host fall to the 404 bucket.
         "default_service": (
-            _BACKEND_SERVICES[owners[0]].id if owners else _DEFAULT_404_BACKEND_BUCKET.id
+            _ORIGINS[owners[0]].id if owners else _DEFAULT_404_BACKEND_BUCKET.id
         ),
     }
+
+    # Only the host's owner gets the fallback, and only if its driver is
+    # `gcs-cdn`. A Cloud Run origin answers its own unknown paths — the app
+    # is running there and knows what it serves — and the 404 bucket's whole
+    # job is to 404.
+    if owners and BACKENDS[owners[0]]["driver"] == DRIVER_GCS_CDN:
+        matcher["default_custom_error_response_policy"] = _spa_fallback(_ORIGINS[owners[0]])
+
     rules = [
         {
             "paths": b["paths"],
-            "service": _BACKEND_SERVICES[k].id,
+            "service": _ORIGINS[k].id,
         }
         for k, b in sorted(on_host.items())
         if b.get("paths")
@@ -453,6 +583,7 @@ LB_DOCS = (
     [_DEFAULT_404_BUCKET, _DEFAULT_404_BUCKET_PUBLIC, _DEFAULT_404_BACKEND_BUCKET] +
     list(_NEGS.values()) +
     list(_BACKEND_SERVICES.values()) +
+    list(_BACKEND_BUCKETS.values()) +
     [_CERTS[host] for host in HOSTS] +
     _CERT_MAP_ENTRIES +
     [

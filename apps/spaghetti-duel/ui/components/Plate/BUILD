@@ -12,6 +12,7 @@ react_component(
     srcs = ["Plate.tsx"],
     visibility = ["//apps/spaghetti-duel:__subpackages__"],
     deps = [
+        "//apps/spaghetti-duel/game:bot",
         "//apps/spaghetti-duel/game:keys",
         "//apps/spaghetti-duel/game:rules",
         "//apps/spaghetti-duel/game:swipe",

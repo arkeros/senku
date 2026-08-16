@@ -50,10 +50,62 @@ echo "PASS: css"
 HTML="examples/stylex/app_index.html"
 echo "=== HTML tests ==="
 
-grep -q 'app_bundle/app_main.js' "$HTML" || { echo "FAIL: missing bundle script tag"; exit 1; }
-grep -q 'app_styles.css' "$HTML" || { echo "FAIL: missing stylesheet link"; exit 1; }
+# The bundle name carries a content hash, so the assertion matches its shape
+# rather than a literal: pinning the hash would fail on every source edit, and
+# dropping the hash from the pattern would let an unhashed name — which
+# revalidates on the render path and publishes in the wrong wave — pass.
+grep -qE 'app_bundle/app_main-[A-Z0-9]+\.js' "$HTML" \
+  || { echo "FAIL: missing content-addressed bundle script tag"; exit 1; }
+
+# Both stylesheets are inlined, not linked — see
+# docs/adr/0012-inline-critical-css.md. Asserted on a rule from each sheet
+# rather than on the presence of a <style> tag, because a template may carry
+# a hand-written one of its own and would satisfy that on its own.
+grep -q 'min-height:100vh' "$HTML" || { echo "FAIL: StyleX CSS not inlined into the document"; exit 1; }
+grep -q -- '--csstools-color-scheme--light' "$HTML" \
+  || { echo "FAIL: normalize CSS not inlined into the document"; exit 1; }
+# A link left behind is the round trip the inlining exists to remove.
+if grep -q 'rel="stylesheet"' "$HTML"; then
+  echo "FAIL: document still links a stylesheet"; exit 1
+fi
+# Normalize must be inlined before StyleX — source order is the cascade, and
+# which file goes first is decided in react_app.bzl, so only an end-to-end
+# assertion covers it.
+NORMALIZE_AT=$(grep -bo -- '--csstools-color-scheme--light' "$HTML" | head -1 | cut -d: -f1)
+STYLEX_AT=$(grep -bo 'min-height:100vh' "$HTML" | head -1 | cut -d: -f1)
+[ "$NORMALIZE_AT" -lt "$STYLEX_AT" ] \
+  || { echo "FAIL: normalize CSS must be inlined before StyleX CSS"; exit 1; }
+# This app sets `runtime_config`, which is the one case that cannot be
+# prerendered: `window.__ENV__` is injected per deployment, so it does not
+# exist while the build runs and the first `getEnv` in a component would
+# throw. The document still has to build, with `#root` empty — see
+# docs/adr/0013-build-time-prerender.md.
+grep -q '<div id="root"></div>' "$HTML" \
+  || { echo "FAIL: runtime_config app should ship an empty #root, not prerendered markup"; exit 1; }
+# Empty is not the same as unsubstituted. A leftover placeholder would ship
+# the literal text "{{APP}}" into the page.
+if grep -q '{{APP}}' "$HTML"; then
+  echo "FAIL: {{APP}} placeholder left unsubstituted"; exit 1
+fi
+
+# Preloads. The layout and this document's own route are reached from the
+# entry by dynamic import, so nothing in the document names them and they
+# are discovered only after the entry has run — a chain the browser walks
+# one level at a time. Both are certain to render here, so both are named.
+grep -qE 'modulepreload" href="/app_bundle/Layout-[A-Z0-9]+\.js"' "$HTML" \
+  || { echo "FAIL: layout chunk not preloaded"; exit 1; }
+grep -qE 'modulepreload" href="/app_bundle/Home-[A-Z0-9]+\.js"' "$HTML" \
+  || { echo "FAIL: index document does not preload the route it renders"; exit 1; }
+
+# The other half of the rule, and the one that makes it a rule rather than
+# "preload everything": a route this document will not render stays
+# unnamed, or code splitting has bought nothing.
+if grep -q 'modulepreload" href="/app_bundle/About-' "$HTML"; then
+  echo "FAIL: an unrelated lazy route was preloaded"; exit 1
+fi
+
 # runtime_config: /env.js must precede the bundle so window.__ENV__ is set before module eval.
-grep -qE '<script src="/env\.js"></script><script type="module" src="/app_bundle/app_main\.js">' "$HTML" \
+grep -qE '<script src="/env\.js"></script><script type="module" src="/app_bundle/app_main-[A-Z0-9]+\.js">' "$HTML" \
   || { echo "FAIL: /env.js script tag missing or not ordered before app_main module"; exit 1; }
 echo "PASS: html"
 

@@ -5,7 +5,7 @@ load("@rules_rpm//rpm:defs.bzl", "rpmdb_merge")
 load("//oci:vex.bzl", "vex_document")
 load("//oci/distroless:matrix.bzl", "distroless_matrix")
 load("//oci/distroless/common:debian_fixed_vex.bzl", "BUSYBOX_FIXED_VEX_STATEMENTS", "GLIBC_FIXED_VEX_STATEMENTS")
-load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV")
+load("//oci/distroless/common:variables.bzl", "BUSYBOX_WONTFIX_CVES", "COMPRESSION", "DEBIAN_WONTFIX_CVES", "DEFAULT_DEBUG_ENV", "DEFAULT_ENV", "OPENSSL_WONTFIX_CVES")
 load(":config.bzl", "CC_ARCHITECTURES", "CC_DISTROS", "cc_layers")
 
 package(default_visibility = ["//visibility:public"])
@@ -40,7 +40,7 @@ vex_document(
 )
 
 _IGNORE_CVES = {
-    "debian": DEBIAN_WONTFIX_CVES,
+    "debian": DEBIAN_WONTFIX_CVES + OPENSSL_WONTFIX_CVES,
     "hummingbird": [],
 }
 
@@ -72,8 +72,10 @@ _VEX = {
 #   libstdc++6   → libstdc++ (+ libgcc; libstdc++.so.6 dynlinks libgcc_s.so.1)
 #   libssl3t64   → openssl-libs (libssl.so.3 + libcrypto.so.3)
 # glibc-2.42-13.hum1 is the version Red Hat's CVE API names as carrying
-# backports for CVE-2026-5435/5450/5928 — the three glibc CVEs Debian sid
-# still has on its wontfix list. This layer is the proof point for ADR 0007.
+# backports for CVE-2026-5435/5450/5928 — the three glibc CVEs that sat on
+# Debian sid's wontfix list (`DEBIAN_WONTFIX_CVES`) while ADR 0007 was
+# argued; the last of them, CVE-2026-5435, left the scan on 2026-08-14.
+# Hummingbird carried the backports first, which is the ADR's proof point.
 [
     flatten(
         name = "cc_amd64_hummingbird_layer",

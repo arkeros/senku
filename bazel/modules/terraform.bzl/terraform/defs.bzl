@@ -11,10 +11,11 @@ Three primitives:
   `backend.tf.json` for one Terraform root, plus `:<name>.{plan,apply,destroy}`
   runnable targets that exec terraform against the generated dir.
 
-Cross-root sequencing (`apply gar, then registry, then lb`) is *not* this
-file's job — that's CI's job graph (or a task runner like `mise`/`just`
-locally). Bazel owns the build/test DAG; deploy ordering belongs to the
-runner that's already orchestrating the rest of the pipeline.
+Cross-root sequencing is *published* here and *walked* elsewhere. A root
+declares what it waits for (or has it derived from the `ref()`s in its
+document, see `refs.bzl`), and an orchestrator — in senku, `.aspect` — reads
+that back and runs things in order. Bazel owns the build/test DAG; nothing in
+this module applies anything.
 
 Terraform's interpolation language stays — `${...}` strings flow through the
 generated JSON unchanged. Starlark only handles things resolvable at
@@ -23,10 +24,12 @@ emitted as strings and resolved by Terraform at plan time.
 """
 
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load(":deploy.bzl", "tf_root_node")
 load(
     ":lockfile.bzl",
     _tf_root_provider_artifacts = "tf_root_provider_artifacts",
 )
+load(":refs.bzl", "check_exports", "collect_refs", "ref_key_label", "tf_resolve_refs")
 load(":rule.bzl", "tf_runner")
 
 # ---------- references ------------------------------------------------------
@@ -143,6 +146,20 @@ def _merge(*docs):
 
 # ---------- tf_root ---------------------------------------------------------
 
+# --- deploy DAG metadata -----------------------------------------------------
+#
+# A deployable root's public target is a `tf_root_node` (see `deploy.bzl`);
+# a non-deployable one is a plain `filegroup`. Membership is therefore the rule
+# class, and the edges are a real `attr.label_list` — an orchestrator gets both
+# out of one loading-phase query, and a wrong edge is a Bazel error rather than
+# something it has to re-validate at deploy time.
+#
+# Nodes are *operations*, not roots. A Terraform root is one kind of node; a
+# plain runnable (senku pushes container images) is another. Modelling the
+# operation is what lets an edge point at the thing that actually has the
+# dependency: an app's image push needs the registry to exist, while the app's
+# Terraform does not.
+
 def tf_root(
         name,
         docs,
@@ -153,8 +170,11 @@ def tf_root(
         tfvars = None,
         modules = None,
         pre_apply = None,
-        main_postprocess = None,
         providers = None,
+        deploy = True,
+        bootstrap = False,
+        deploy_after = None,
+        exports = None,
         visibility = None):
     """Emit `.tf.json` files + plan/apply runnables for one Terraform root.
 
@@ -199,19 +219,40 @@ def tf_root(
             `terraform apply`. Used for image push or other side effects that
             must happen between Bazel build and Terraform apply. NOT run on
             `plan` or `destroy`.
-        main_postprocess: Optional callable `(name, template, out)` that
-            consumes a `main.tf.json.tpl` (the JSON-encoded template) and
-            produces the final `main.tf.json`. When set, `tf_root` writes
-            the template instead of the final and delegates the final-form
-            production to the callback. Used by senku's `render.bzl` to
-            substitute `IMAGE_URI` sentinels with `image_push` digest URIs.
-            Module is otherwise agnostic to the substitution semantics.
+        deploy: Whether this root belongs to the deploy set that
+            `aspect plan` / `aspect apply` walk. Defaults True, so a new
+            root is deployed without anyone remembering to register it —
+            forgetting to *register* is silent, whereas a root that
+            deploys when it shouldn't fails loudly on the next apply.
+            Set False for examples and fixtures: they are still built and
+            analyzed, just never planned or applied.
+        bootstrap: Marks a root that provisions the CI identity itself.
+            `aspect plan` / `aspect apply` skip these under `$CI` — a
+            botched CI-side apply could revoke the SA's own permissions
+            and leave CI unable to recover — but walk them locally.
+        deploy_after: Labels of deploy nodes that must run to completion
+            before this root is applied. A real `attr.label_list`, so a
+            label naming nothing fails at load time and a label naming
+            something that isn't a deploy node fails at analysis.
+            An edge means "the resources that node creates must already
+            exist", which is not the same as what the root `load()`s:
+            importing another root's bucket *name* into a log filter is a
+            build dependency, not a deploy one. Prefer deriving these from
+            data the root already has — a list nobody has to remember to
+            update cannot drift. A `ref()` in `docs` adds its edge here
+            automatically, which is the least driftable form of all.
+        exports: Build-time constants other roots may name with `ref()`,
+            as `{name: literal}`. Not Terraform `output`s: these are
+            resolved by Bazel during analysis and never read from state,
+            so an apply-time value belongs in `output()` + `remote_state()`
+            instead. See `refs.bzl`.
         visibility: Standard.
     """
     tfvars = tfvars or []
     modules = modules or {}
     pre_apply = list(pre_apply or [])
     providers = providers or []
+    check_exports(name, exports or {})
     if providers and required_providers:
         fail("tf_root({}): pass either `providers` (recommended) or `required_providers` (legacy), not both.".format(name))
     if backend_prefix == None:
@@ -243,28 +284,49 @@ def tf_root(
         visibility = ["//visibility:private"],
     )
 
-    if main_postprocess:
-        # Stage the JSON as a template (still contains any sentinels), then
-        # delegate the final-form to the callback. Used for image-digest
-        # substitution by senku's render.bzl; the module itself stays
-        # agnostic to what the postprocessor does.
-        template_target = "_{}_main_template".format(name)
-        write_file(
-            name = template_target,
-            out = "{}/main.tf.json.tpl".format(name),
-            content = [json.encode_indent(main_doc, indent = "  "), ""],
-            visibility = ["//visibility:private"],
+    # Cross-root references, derived from the document rather than declared:
+    # every `ref()` in it names the root that exports the value, so the deploy
+    # edge and the reference are the same token. See `refs.bzl`.
+    ref_keys = collect_refs(main_doc)
+    ref_labels = sorted({ref_key_label(k): None for k in ref_keys})
+
+    # A root referencing itself would be a build cycle, reported by Bazel as a
+    # dependency loop through targets nobody wrote by hand. Catch it here,
+    # where the advice is obvious: the root *is* the source of its exports, so
+    # it should use the constant.
+    own_label = "//{}:{}".format(native.package_name(), name)
+    if own_label in ref_labels:
+        fail(
+            ("tf_root({}): document references its own exports ({}). A root is " +
+             "the source of the values it exports — use the constant directly.").format(
+                name,
+                ", ".join([k for k in ref_keys if ref_key_label(k) == own_label]),
+            ),
         )
-        main_postprocess(
+
+    # `main.tf.json` is whatever the last stage in the chain produces. With
+    # references, the reference resolver is last and the earlier stage writes
+    # an intermediate — deliberately not named `*.tf.json`, so a stray copy in
+    # the working directory could never be read as configuration.
+    final_out = "{}/main.tf.json".format(name)
+    staged_target = "_{}_main_unresolved".format(name) if ref_keys else main_target
+    staged_out = "{}/main.tf.json.unresolved".format(name) if ref_keys else final_out
+
+    write_file(
+        name = staged_target,
+        out = staged_out,
+        content = [json.encode_indent(main_doc, indent = "  "), ""],
+        visibility = ["//visibility:private"],
+    )
+
+    if ref_keys:
+        tf_resolve_refs(
             name = main_target,
-            template = ":" + template_target,
-            out = "{}/main.tf.json".format(name),
-        )
-    else:
-        write_file(
-            name = main_target,
-            out = "{}/main.tf.json".format(name),
-            content = [json.encode_indent(main_doc, indent = "  "), ""],
+            src = ":" + staged_target,
+            refs = ref_labels,
+            ref_labels = ref_labels,
+            ref_keys = ref_keys,
+            out = final_out,
             visibility = ["//visibility:private"],
         )
 
@@ -287,11 +349,38 @@ def tf_root(
         )
         generated.append(":" + artifacts_target)
 
-    native.filegroup(
-        name = name,
-        srcs = generated,
-        visibility = visibility,
-    )
+    # Deployable roots are a `tf_root_node`; everything else is an ordinary
+    # filegroup. Membership in the deploy DAG is the rule class itself, so
+    # there is no flag for an orchestrator to read and no tag to trust — and
+    # an edge to a non-deployable root fails analysis on the missing provider
+    # instead of quietly resolving to nothing.
+    if deploy:
+        # A reference *is* a deploy edge: naming another root's value means
+        # the resource it names has to exist. Declared edges are unioned in
+        # for the dependencies no value passes through.
+        edges = sorted({e: None for e in list(deploy_after or []) + ref_labels})
+        tf_root_node(
+            name = name,
+            srcs = generated,
+            bootstrap = bootstrap,
+            deploy_after = edges,
+            exports = exports or {},
+            visibility = visibility,
+        )
+    else:
+        if bootstrap:
+            fail("tf_root({}): `bootstrap` is meaningless with `deploy = False`.".format(name))
+        if deploy_after:
+            fail("tf_root({}): `deploy_after` is meaningless with `deploy = False`.".format(name))
+        if exports:
+            fail("tf_root({}): `exports` needs `deploy = True` — a root nothing deploys has nothing to publish.".format(name))
+        if ref_keys:
+            fail("tf_root({}): `ref()` needs `deploy = True` — a reference is a deploy edge.".format(name))
+        native.filegroup(
+            name = name,
+            srcs = generated,
+            visibility = visibility,
+        )
 
     # Per-verb runners. The `tf_runner` rule resolves the terraform
     # toolchain at analysis time and bakes the resulting paths into a

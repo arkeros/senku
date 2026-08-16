@@ -14,7 +14,7 @@
  */
 import { build } from "esbuild";
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, relative, sep } from "node:path";
 
 // node_modules lives on the local filesystem with OS-native separators, but
@@ -55,6 +55,22 @@ const require = createRequire(join(cwd, "package.json"));
  * condition in package.json exports, then "module" field, then "type": "module".
  * Falls back to CJS via require.resolve().
  */
+function findPackageJson(rootPkg) {
+  // The straightforward path — but a strict "exports" map that doesn't
+  // list "./package.json" (lru-cache, react-map-gl, ...) makes
+  // require.resolve throw ERR_PACKAGE_PATH_NOT_EXPORTED, so fall back to
+  // probing the resolution paths on disk, where exports don't apply.
+  try {
+    return require.resolve(rootPkg + "/package.json");
+  } catch {
+    for (const base of require.resolve.paths(rootPkg) ?? []) {
+      const candidate = join(base, ...rootPkg.split("/"), "package.json");
+      if (existsSync(candidate)) return candidate;
+    }
+    throw new Error(`cannot locate package.json for ${rootPkg}`);
+  }
+}
+
 function resolvePackage(specifier) {
   const rootPkg = specifier.startsWith("@")
     ? specifier.split("/").slice(0, 2).join("/")
@@ -62,7 +78,7 @@ function resolvePackage(specifier) {
   const subpath = specifier.slice(rootPkg.length + 1); // "" or "client" etc
   const exportKey = subpath ? "./" + subpath : ".";
 
-  const pkgJsonPath = require.resolve(rootPkg + "/package.json");
+  const pkgJsonPath = findPackageJson(rootPkg);
   const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf-8"));
   const pkgDir = dirname(pkgJsonPath);
 
@@ -71,9 +87,13 @@ function resolvePackage(specifier) {
     const entry = pkgJson.exports[exportKey];
     // entry.import can be a string or nested {types, default}
     const importEntry = typeof entry === "string" ? null : entry.import;
-    const importPath = typeof importEntry === "string" ? importEntry
-      : typeof importEntry === "object" && importEntry?.default ? importEntry.default
-      : null;
+    // Conditions nest arbitrarily (tslib: import -> {node, default:
+    // {types, default}}); descend through `default` until a string.
+    let importPath = importEntry;
+    while (importPath && typeof importPath === "object") {
+      importPath = importPath.default;
+    }
+    if (typeof importPath !== "string") importPath = null;
     if (importPath) {
       return { resolved: resolve(pkgDir, importPath), isESM: true };
     }
@@ -93,13 +113,47 @@ function resolvePackage(specifier) {
   return { resolved: require.resolve(specifier), isESM: false };
 }
 
+
+/**
+ * Externals in an ESM bundle: an `import` can simply stay external, but a
+ * `require()` inside bundled CJS would become esbuild's throwing __require
+ * stub ("Dynamic require of \"react\" is not supported"). Rewrite those
+ * require-calls to a CJS shim module whose own import IS left external, so
+ * the external ends up as a real ESM import at the bundle top level.
+ */
+function externalEsmPlugin(externalPkgs) {
+  const filter = new RegExp(
+    "^(" + externalPkgs.map((x) => x.replace(/[|\\{}()[\]^$+*?.\/-]/g, "\\$&")).join("|") + ")$",
+  );
+  return {
+    name: "external-esm",
+    setup(build) {
+      build.onResolve({ filter }, (args) => {
+        if (args.kind === "require-call") {
+          return { path: args.path, namespace: "external-cjs" };
+        }
+        return { path: args.path, external: true };
+      });
+      build.onLoad({ filter: /.*/, namespace: "external-cjs" }, (args) => ({
+        contents:
+          `import * as m from ${JSON.stringify(args.path)};\n` +
+          `module.exports = m;\n`,
+        resolveDir: cwd,
+      }));
+    },
+  };
+}
+
 const { resolved, isESM } = resolvePackage(pkg);
 
 function resolveRelativeImport(fromFile, spec) {
   const base = resolve(dirname(fromFile), spec);
   const candidates = [base, base + ".js", base + ".mjs", join(base, "index.js"), join(base, "index.mjs")];
   for (const c of candidates) {
-    if (existsSync(c)) return c;
+    // `base` may exist as a DIRECTORY (import "./store" resolving to
+    // store/index.js) — returning it would make the walker readFileSync a
+    // directory and die with EISDIR.
+    if (existsSync(c) && statSync(c).isFile()) return c;
   }
   return null;
 }
@@ -171,7 +225,7 @@ if (isESM && !forceBundle) {
     format: "esm",
     outfile: absOutputJs,
     platform: "browser",
-    external: externals,
+    plugins: externals.length ? [externalEsmPlugin(externals)] : [],
     logLevel: "warning",
   });
 
@@ -203,7 +257,7 @@ if (isESM && !forceBundle) {
     format: "esm",
     outfile: absOutputJs,
     platform: "browser",
-    external: externals,
+    plugins: externals.length ? [externalEsmPlugin(externals)] : [],
     logLevel: "warning",
   });
 

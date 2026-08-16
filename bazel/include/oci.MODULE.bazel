@@ -1,7 +1,7 @@
 bazel_dep(name = "rules_img", version = "0.3.19")
 bazel_dep(name = "rules_img_tool", version = "0.3.19")
 bazel_dep(name = "rules_distroless", version = "0.6.2")
-bazel_dep(name = "tar.bzl", version = "0.10.7")
+bazel_dep(name = "tar.bzl", version = "0.10.8")
 bazel_dep(name = "grype.bzl", version = "0.1.0")
 bazel_dep(name = "cosign.bzl", version = "0.0.0")
 bazel_dep(name = "container_structure_test", version = "1.22.1")
@@ -227,27 +227,19 @@ exports_files(["bin/node"])
     )
     for major, full_version, sha_by_arch in [
         (
-            "20",
-            "20.20.2",
-            {
-                "amd64": "df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d",
-                "arm64": "73093db209e4e9e09dd7d15a47aeaab1b74833830df03efa5f942a1122c5fa71",
-            },
-        ),
-        (
             "24",
-            "24.15.0",
+            "24.19.0",
             {
-                "amd64": "472655581fb851559730c48763e0c9d3bc25975c59d518003fc0849d3e4ba0f6",
-                "arm64": "f3d5a797b5d210ce8e2cb265544c8e482eaedcb8aa409a8b46da7e8595d0dda0",
+                "amd64": "14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647",
+                "arm64": "01443c1e1a29e531ccad5a46fefa6df490d2189c49f7955904aecdbb0fe86fdc",
             },
         ),
         (
             "26",
-            "26.1.0",
+            "26.6.0",
             {
-                "amd64": "9fc6f21b6c4a62439727123e510e9c39febb2f563738f4927cd3e0b288c9b3c9",
-                "arm64": "058f00fe6c84f804b4b96aab377f76ed57dd0be5f10af4dcc0fded172746f366",
+                "amd64": "e53a8c8ca2ee7135de38e63859bd4f43002ae2d222f5b3a98ac1945db9f544bb",
+                "arm64": "974e6f0332fb26179b34d49c57f35339e089a89faf8b82a81e44c0e1164b7923",
             },
         ),
     ]
@@ -306,27 +298,27 @@ filegroup(
             "jre",
             {
                 "17": (
-                    "17.0.19",
-                    "10",
+                    "17.0.20",
+                    "8",
                     {
-                        "amd64": "adb5a2364baa51de1ef91bb9911f5a61d24b045fe1d6647cb8050272a3a8ee75",
-                        "arm64": "aae834297a87736869745be7c1fca3207ea9167c5824f41c88b0ebb2e3ccb9b1",
+                        "amd64": "ef491a51a46ef90cc47fbc4abb219fde32483ff91be5ec66ddc896df43524b27",
+                        "arm64": "9d14a95e07c44bc48666625162baf40db9da4dcb192bfc3e43047790693061a2",
                     },
                 ),
                 "21": (
-                    "21.0.11",
-                    "10",
+                    "21.0.12",
+                    "8",
                     {
-                        "amd64": "e5038aae3ca9ff670bc696496b0728dbd23d280026bad30291cb919221ecfdcb",
-                        "arm64": "fa23d9d9945053e67bcc7638410eabf1e17a7672c7c95a24f70cd08b8407d36e",
+                        "amd64": "8a379a67c91a3ae61ffb33d46e0a40c7ba35e70713c4db31cfca30492f792eff",
+                        "arm64": "5f9c96b656827b9d14ebeda7739e25be554fa6d25669b03847c1df6e869c0679",
                     },
                 ),
                 "25": (
-                    "25.0.3",
-                    "9",
+                    "25.0.4",
+                    "7",
                     {
-                        "amd64": "487ad434d8b121ae3902d5ad9cb830cd8e1f75fefad6e2ba80f89d60e3db95d7",
-                        "arm64": "d12d5b19ff7f6c4a99fd4f9eecede2c96e64df7d1f41cc84f2e9c9b38408600b",
+                        "amd64": "aed3915f8facc0c80733ab2448bb0df4b494a36a2c5759e9a6e1eb979720f2b3",
+                        "arm64": "1f2644427000316bc431df3389504551ed7464fe8486bf6b4f1130af9ffc8f55",
                     },
                 ),
             },
@@ -335,27 +327,27 @@ filegroup(
             "jdk",
             {
                 "17": (
-                    "17.0.19",
-                    "10",
+                    "17.0.20",
+                    "8",
                     {
-                        "amd64": "d8afc263758141a66e0e3aafc321e783f7016696f4eaea067d340a269037d331",
-                        "arm64": "83a52172678ec8975164648654869cb2e71d7c748b47aca94b29bbfa10c18e81",
+                        "amd64": "be7668bc030d578b83d6d5ef9221d6d6729bbbca8cf94a7d52e16ac68b5a5a35",
+                        "arm64": "d143936f473a4cb24e3b0e247d6d0775769d55ec9775c339540e753059a8d77a",
                     },
                 ),
                 "21": (
-                    "21.0.11",
-                    "10",
+                    "21.0.12",
+                    "8",
                     {
-                        "amd64": "4b2220e232a97997b436ca6ab15cbf70171ecff52958a46159dfa5a8c44ca4de",
-                        "arm64": "8d498ec88e1c1989fab95c6784240ab92d011e29c54d20a3f9c324b13476f9ad",
+                        "amd64": "e4446ff06a276155697597cc0f1b15da004ff083f4964a35271ecee567177370",
+                        "arm64": "eba38e871b02d407897bfe017ea35352dfc1420ef6d2112425b0c67325ca509d",
                     },
                 ),
                 "25": (
-                    "25.0.3",
-                    "9",
+                    "25.0.4",
+                    "7",
                     {
-                        "amd64": "69264a7a211bf5029830d07bc3370f879769d62ebc5b5488e90c9343a2da0e1f",
-                        "arm64": "3e4287cb98870ba824ed698854bdc27cff984254caf66dd12cc291e7bfdde26b",
+                        "amd64": "e58fcdcd637b25c03ca84cbbcefc70d11efb8f4b4cbd05decc9f661769d77f94",
+                        "arm64": "621f7196f0b682fb557da58bec89bd7dfe5419811fe1c0ba75c9cc8432f084c7",
                     },
                 ),
             },
@@ -368,7 +360,7 @@ filegroup(
 grype_db = use_extension("@grype.bzl//grype:extensions.bzl", "grype_database", dev_dependency = True)
 grype_db.database(
     name = "grype_database",
-    sha256 = "b7e00d48b3c511334b89f25afe49363b01081f8c8812f881ed4b1b6ec557c434",
-    url = "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.9_2026-08-01T00:38:20Z_1785567576.tar.zst",
+    sha256 = "5f8172952b86c8af2726ab5f17c323c16fde7cf99e76b87768f93fba68705a85",
+    url = "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.9_2026-08-15T00:15:26Z_1786774428.tar.zst",
 )
 use_repo(grype_db, "grype_database")
