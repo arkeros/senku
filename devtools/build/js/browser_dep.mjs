@@ -87,9 +87,13 @@ function resolvePackage(specifier) {
     const entry = pkgJson.exports[exportKey];
     // entry.import can be a string or nested {types, default}
     const importEntry = typeof entry === "string" ? null : entry.import;
-    const importPath = typeof importEntry === "string" ? importEntry
-      : typeof importEntry === "object" && importEntry?.default ? importEntry.default
-      : null;
+    // Conditions nest arbitrarily (tslib: import -> {node, default:
+    // {types, default}}); descend through `default` until a string.
+    let importPath = importEntry;
+    while (importPath && typeof importPath === "object") {
+      importPath = importPath.default;
+    }
+    if (typeof importPath !== "string") importPath = null;
     if (importPath) {
       return { resolved: resolve(pkgDir, importPath), isESM: true };
     }
