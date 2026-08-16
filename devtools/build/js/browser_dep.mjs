@@ -14,7 +14,7 @@
  */
 import { build } from "esbuild";
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, relative, sep } from "node:path";
 
 // node_modules lives on the local filesystem with OS-native separators, but
@@ -55,6 +55,22 @@ const require = createRequire(join(cwd, "package.json"));
  * condition in package.json exports, then "module" field, then "type": "module".
  * Falls back to CJS via require.resolve().
  */
+function findPackageJson(rootPkg) {
+  // The straightforward path — but a strict "exports" map that doesn't
+  // list "./package.json" (lru-cache, react-map-gl, ...) makes
+  // require.resolve throw ERR_PACKAGE_PATH_NOT_EXPORTED, so fall back to
+  // probing the resolution paths on disk, where exports don't apply.
+  try {
+    return require.resolve(rootPkg + "/package.json");
+  } catch {
+    for (const base of require.resolve.paths(rootPkg) ?? []) {
+      const candidate = join(base, ...rootPkg.split("/"), "package.json");
+      if (existsSync(candidate)) return candidate;
+    }
+    throw new Error(`cannot locate package.json for ${rootPkg}`);
+  }
+}
+
 function resolvePackage(specifier) {
   const rootPkg = specifier.startsWith("@")
     ? specifier.split("/").slice(0, 2).join("/")
@@ -62,7 +78,7 @@ function resolvePackage(specifier) {
   const subpath = specifier.slice(rootPkg.length + 1); // "" or "client" etc
   const exportKey = subpath ? "./" + subpath : ".";
 
-  const pkgJsonPath = require.resolve(rootPkg + "/package.json");
+  const pkgJsonPath = findPackageJson(rootPkg);
   const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf-8"));
   const pkgDir = dirname(pkgJsonPath);
 
@@ -99,7 +115,10 @@ function resolveRelativeImport(fromFile, spec) {
   const base = resolve(dirname(fromFile), spec);
   const candidates = [base, base + ".js", base + ".mjs", join(base, "index.js"), join(base, "index.mjs")];
   for (const c of candidates) {
-    if (existsSync(c)) return c;
+    // `base` may exist as a DIRECTORY (import "./store" resolving to
+    // store/index.js) — returning it would make the walker readFileSync a
+    // directory and die with EISDIR.
+    if (existsSync(c) && statSync(c).isFile()) return c;
   }
   return null;
 }
