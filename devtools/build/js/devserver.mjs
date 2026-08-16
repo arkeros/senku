@@ -166,13 +166,13 @@ createServer((req, res) => {
   const url = req.url.split("?")[0];
 
   if (url === "/" || url === "/index.html") {
-    res.writeHead(200, { "Content-Type": "text/html" });
+    res.writeHead(200, { "Cache-Control": "no-store", "Content-Type": "text/html" });
     res.end(indexHtml);
     return;
   }
 
   if (envJs && url === "/env.js") {
-    res.writeHead(200, { "Content-Type": mimeFor(".js") });
+    res.writeHead(200, { "Cache-Control": "no-store", "Content-Type": mimeFor(".js") });
     res.end(envJs);
     return;
   }
@@ -180,14 +180,14 @@ createServer((req, res) => {
   // Serve dep files (bundled CJS or raw ESM from node_modules)
   if (servedFiles[url]) {
     const ext = extname(url) || ".js";
-    res.writeHead(200, { "Content-Type": mimeFor(ext) });
+    res.writeHead(200, { "Cache-Control": "no-store", "Content-Type": mimeFor(ext) });
     res.end(readFileSync(servedFiles[url]));
     return;
   }
 
   const cssMatch = cssFiles.find((f) => url === "/" + f.split("/").pop());
   if (cssMatch) {
-    res.writeHead(200, { "Content-Type": "text/css" });
+    res.writeHead(200, { "Cache-Control": "no-store", "Content-Type": "text/css" });
     res.end(readFileSync(cssMatch));
     return;
   }
@@ -229,7 +229,7 @@ createServer((req, res) => {
     // (no trailing /index.js) would readFileSync a directory and crash.
     if (existsSync(jsPath) && statSync(jsPath).isFile()) {
       const ext = extname(jsPath) || ".js";
-      res.writeHead(200, { "Content-Type": mimeFor(ext) });
+      res.writeHead(200, { "Cache-Control": "no-store", "Content-Type": mimeFor(ext) });
       res.end(readFileSync(jsPath));
       return;
     }
@@ -238,7 +238,7 @@ createServer((req, res) => {
   // SPA fallback: serve index.html for navigation requests (no file extension)
   // so client-side routing (react-router) can handle the path
   if (!extname(url)) {
-    res.writeHead(200, { "Content-Type": "text/html" });
+    res.writeHead(200, { "Cache-Control": "no-store", "Content-Type": "text/html" });
     res.end(indexHtml);
     return;
   }
