@@ -117,6 +117,9 @@ def panellet_browser_modules(
         name = name + "/_react",
         packages = [
             "react",
+            # Bare react-dom too: portal users (createPortal) import it
+            # directly, and it must share the group's single React copy.
+            "react-dom",
             "react-dom/client",
             "react/jsx-runtime",
         ],

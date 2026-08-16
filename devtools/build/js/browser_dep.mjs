@@ -82,9 +82,27 @@ function resolvePackage(specifier) {
   const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf-8"));
   const pkgDir = dirname(pkgJsonPath);
 
-  // Check exports field for an "import" condition
-  if (pkgJson.exports?.[exportKey]) {
-    const entry = pkgJson.exports[exportKey];
+  // Check exports field for an "import" condition. Exact key first, then
+  // wildcard patterns ("./*" — zustand, lodash-es style), substituting the
+  // matched star text into the resolved value.
+  let exportEntry = pkgJson.exports?.[exportKey];
+  if (!exportEntry && subpath && pkgJson.exports) {
+    for (const [key, value] of Object.entries(pkgJson.exports)) {
+      if (!key.includes("*")) continue;
+      const [pre, post] = key.split("*");
+      if (
+        exportKey.startsWith(pre) &&
+        exportKey.endsWith(post) &&
+        exportKey.length >= pre.length + post.length
+      ) {
+        const star = exportKey.slice(pre.length, exportKey.length - post.length);
+        exportEntry = JSON.parse(JSON.stringify(value).replaceAll("*", star));
+        break;
+      }
+    }
+  }
+  if (exportEntry) {
+    const entry = exportEntry;
     // entry.import can be a string or nested {types, default}
     const importEntry = typeof entry === "string" ? null : entry.import;
     // Conditions nest arbitrarily (tslib: import -> {node, default:
