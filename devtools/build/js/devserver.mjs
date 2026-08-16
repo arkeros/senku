@@ -152,7 +152,13 @@ const cssLinks = cssFiles
 const indexHtml = originalHtml
   .replace("{{HEAD}}", cssLinks)
   .replace("{{APP}}", "")
-  .replace("{{SCRIPTS}}", `${envTag}${mapTag}\n    <script type="module" src="/${entryFile}"></script>`);
+  .replace(
+    "{{SCRIPTS}}",
+    // Raw (unbundled) ESM deps are served straight from node_modules and
+    // may reference process.env.NODE_ENV (react-redux, redux, ...). The
+    // prod bundle gets a define; the devserver provides a shim.
+    `${envTag}${mapTag}\n    <script>globalThis.process ??= {env: {NODE_ENV: "development"}};</script>\n    <script type="module" src="/${entryFile}"></script>`,
+  );
 
 // Reads are intentionally synchronous for simplicity — this is a dev server,
 // not a production one, so the overhead doesn't matter.
