@@ -113,6 +113,37 @@ function resolvePackage(specifier) {
   return { resolved: require.resolve(specifier), isESM: false };
 }
 
+
+/**
+ * Externals in an ESM bundle: an `import` can simply stay external, but a
+ * `require()` inside bundled CJS would become esbuild's throwing __require
+ * stub ("Dynamic require of \"react\" is not supported"). Rewrite those
+ * require-calls to a CJS shim module whose own import IS left external, so
+ * the external ends up as a real ESM import at the bundle top level.
+ */
+function externalEsmPlugin(externalPkgs) {
+  const filter = new RegExp(
+    "^(" + externalPkgs.map((x) => x.replace(/[|\\{}()[\]^$+*?.\/-]/g, "\\$&")).join("|") + ")$",
+  );
+  return {
+    name: "external-esm",
+    setup(build) {
+      build.onResolve({ filter }, (args) => {
+        if (args.kind === "require-call") {
+          return { path: args.path, namespace: "external-cjs" };
+        }
+        return { path: args.path, external: true };
+      });
+      build.onLoad({ filter: /.*/, namespace: "external-cjs" }, (args) => ({
+        contents:
+          `import * as m from ${JSON.stringify(args.path)};\n` +
+          `module.exports = m;\n`,
+        resolveDir: cwd,
+      }));
+    },
+  };
+}
+
 const { resolved, isESM } = resolvePackage(pkg);
 
 function resolveRelativeImport(fromFile, spec) {
@@ -194,7 +225,7 @@ if (isESM && !forceBundle) {
     format: "esm",
     outfile: absOutputJs,
     platform: "browser",
-    external: externals,
+    plugins: externals.length ? [externalEsmPlugin(externals)] : [],
     logLevel: "warning",
   });
 
@@ -226,7 +257,7 @@ if (isESM && !forceBundle) {
     format: "esm",
     outfile: absOutputJs,
     platform: "browser",
-    external: externals,
+    plugins: externals.length ? [externalEsmPlugin(externals)] : [],
     logLevel: "warning",
   });
 
