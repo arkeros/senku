@@ -2,8 +2,8 @@
   "schema_version": 1,
   "repo": {
     "url": "https://koji-s3-cache.hummingbird-project.io/packages.redhat.com/api/pulp-content/public-hummingbird",
-    "revision": "1787331405",
-    "repomd_sha256": "fca89f0564a16418cf5633dc22adb007bb1deaf79e341db6cac5398d18f7c7a5"
+    "revision": "1787406975",
+    "repomd_sha256": "d92ad89d77330becb7ec7c1325411a0cc54a2c15456c4e3340ee66ca58a6944c"
   },
   "packages": {
     "audit-libs": {
@@ -272,11 +272,11 @@
     },
     "libatomic": {
       "aarch64": {
-        "version": "16.2.1-1.1.hum1",
-        "sha256": "c1f79e96da9c89fa0c4ef922c85f8c3f207a7935201e87c6c3683a1aa854505b",
-        "path": "aarch64/Packages/l/libatomic-16.2.1-1.1.hum1.aarch64.rpm",
-        "size": 62492,
-        "upstream": "gcc-16.2.1-1.1.hum1.src.rpm"
+        "version": "16.2.1-2.hum1",
+        "sha256": "2c02a4c78bd986022072796d8c3615174219177f13f443fa2198038cd2f55485",
+        "path": "aarch64/Packages/l/libatomic-16.2.1-2.hum1.aarch64.rpm",
+        "size": 62934,
+        "upstream": "gcc-16.2.1-2.hum1.src.rpm"
       },
       "x86_64": {
         "version": "16.2.1-1.1.hum1",
@@ -361,11 +361,11 @@
     },
     "libgcc": {
       "aarch64": {
-        "version": "16.2.1-1.1.hum1",
-        "sha256": "195ac6fce6caa1ca10d76cf7f2f890cafd2b08c83ad2dc9fa449a499a969a19a",
-        "path": "aarch64/Packages/l/libgcc-16.2.1-1.1.hum1.aarch64.rpm",
-        "size": 126556,
-        "upstream": "gcc-16.2.1-1.1.hum1.src.rpm"
+        "version": "16.2.1-2.hum1",
+        "sha256": "eb0620e166315b08004262925656ff25546b1c03d9d24b1b8c06a394a1dd1af0",
+        "path": "aarch64/Packages/l/libgcc-16.2.1-2.hum1.aarch64.rpm",
+        "size": 127016,
+        "upstream": "gcc-16.2.1-2.hum1.src.rpm"
       },
       "x86_64": {
         "version": "16.2.1-1.1.hum1",
@@ -409,11 +409,11 @@
     },
     "libstdc++": {
       "aarch64": {
-        "version": "16.2.1-1.1.hum1",
-        "sha256": "e10d66bb1f9ab3c444ca4e690121246305be4f0ff34fa44d4b0e32a88d51e5a8",
-        "path": "aarch64/Packages/l/libstdc++-16.2.1-1.1.hum1.aarch64.rpm",
-        "size": 949787,
-        "upstream": "gcc-16.2.1-1.1.hum1.src.rpm"
+        "version": "16.2.1-2.hum1",
+        "sha256": "b30e8c8ce61f216233802cc0e7360479b4096d403abb2a7acca8368f9ecfb9ff",
+        "path": "aarch64/Packages/l/libstdc++-16.2.1-2.hum1.aarch64.rpm",
+        "size": 950469,
+        "upstream": "gcc-16.2.1-2.hum1.src.rpm"
       },
       "x86_64": {
         "version": "16.2.1-1.1.hum1",
