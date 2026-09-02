@@ -1,0 +1,53 @@
+"""What this repo takes as given from github.com/arkeros/distroless.
+
+The load balancer at //infra/cloud/gcp/lb fronts distroless.io, but the two
+Cloud Run services behind it — `registry` on `/v2/*` and `web` on everything
+else — are deployed from that repo, from Knative manifests and region lists
+that live there. This repo cannot load those files at analysis time (there is
+no module dependency on distroless, deliberately: its package-resolution
+extensions collide with a consumer's), so the LB declares the same facts as
+literals.
+
+These pins are what keep those literals honest. Each file is fetched from a
+fixed commit, verified by digest, and diffed against the LB's declaration by
+//infra/cloud/gcp/lb's tests, so a region added or a service renamed over there
+fails the build here instead of quietly routing a NEG at a service that does
+not exist — the bare-404 failure ADR 0008 is about.
+
+To bump: set COMMIT to the new distroless commit and refresh every sha256:
+
+  for f in oci/cmd/registry/regions.json oci/cmd/registry/service.yaml \
+           web/cmd/server/regions.json web/cmd/server/service.yaml; do
+    curl -fsSL https://raw.githubusercontent.com/arkeros/distroless/$COMMIT/$f | shasum -a 256
+  done
+"""
+
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+_COMMIT = "ba8f510a9d9c558a6e664f9cf61254b724b38edf"
+
+_RAW = "https://raw.githubusercontent.com/arkeros/distroless/" + _COMMIT + "/"
+
+http_file(
+    name = "distroless_registry_regions",
+    sha256 = "fa8a33e6418a0aabbe22618f62f98586e292b87cdcfe8d7fa11f19b12e9b7423",
+    urls = [_RAW + "oci/cmd/registry/regions.json"],
+)
+
+http_file(
+    name = "distroless_registry_service",
+    sha256 = "387da90f6f3a37a595677d6ff35cbab8f8fb6cd934276a00ce3ec513f051dccc",
+    urls = [_RAW + "oci/cmd/registry/service.yaml"],
+)
+
+http_file(
+    name = "distroless_web_regions",
+    sha256 = "fa8a33e6418a0aabbe22618f62f98586e292b87cdcfe8d7fa11f19b12e9b7423",
+    urls = [_RAW + "web/cmd/server/regions.json"],
+)
+
+http_file(
+    name = "distroless_web_service",
+    sha256 = "3bb51ae0af3f1f905ee2cad64eea31de1910dffc1131e6853818b7ccd8b53a90",
+    urls = [_RAW + "web/cmd/server/service.yaml"],
+)

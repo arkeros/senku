@@ -55,20 +55,41 @@ BUCKET_LOCATION = "EU"
 # in a backend service, a bucket through a backend bucket, and neither
 # resource accepts the other's configuration. Collapsing them would mean a
 # descriptor whose fields are each meaningful for only half its values.
-# The registry is deployed from github.com/arkeros/distroless by that repo's
-# own CI — a Knative manifest applied with `gcloud run services replace`, not a
-# Terraform root here. So it is named by literal rather than by `ref()`: there
-# is no root in this repo to take a deploy edge on, and the service existing is
-# that repo's invariant to keep, not this one's. If it has not been deployed,
-# this LB's serverless NEG points at nothing and the plan still succeeds.
+# --- distroless.io ------------------------------------------------------------
+# Two Cloud Run services deployed from github.com/arkeros/distroless by that
+# repo's own CI — Knative manifests applied with `gcloud run services replace`,
+# not Terraform roots here. So they are named by literal rather than by `ref()`:
+# there is no root in this repo to take a deploy edge on, and the services
+# existing is that repo's invariant to keep, not this one's. If one has not
+# been deployed, its serverless NEG points at nothing and the plan still
+# succeeds — a bare 404 with no signal, which is why these literals are not
+# left to trust. //bazel/include:distroless.MODULE.bazel pins the regions.json
+# and service.yaml they are copied from, and this package's tests diff the two,
+# so a rename or a new region over there fails the build here.
+#
+# Both share one region list and one host. `registry` claims `/v2/*` — the OCI
+# pull API. `web`, the directory, declares no paths and so becomes the host's
+# `default_service`: everything that is not the registry is a page about it.
+DISTROLESS_REGIONS = [
+    "asia-northeast1",
+    "europe-west3",
+    "us-central1",
+]
+
+DISTROLESS_SERVICES = {
+    "registry": "registry",
+    "web": "web",
+}
+
 _REGISTRY_LB_BACKEND = {
     "paths": ["/v2/*"],
-    "regions": [
-        "asia-northeast1",
-        "europe-west3",
-        "us-central1",
-    ],
-    "service_name": "registry",
+    "regions": DISTROLESS_REGIONS,
+    "service_name": DISTROLESS_SERVICES["registry"],
+}
+
+_WEB_LB_BACKEND = {
+    "regions": DISTROLESS_REGIONS,
+    "service_name": DISTROLESS_SERVICES["web"],
 }
 
 DRIVER_CLOUDRUN = "cloudrun"
@@ -124,6 +145,7 @@ BACKENDS = {
     "pasta": _normalize(_PASTA_LB_BACKEND),
     "registry": _normalize(_REGISTRY_LB_BACKEND),
     "table": _normalize(_TABLE_LB_BACKEND),
+    "web": _normalize(_WEB_LB_BACKEND),
 }
 
 # No deploy-edge list here. Each backend names its origin with a `ref()` in
