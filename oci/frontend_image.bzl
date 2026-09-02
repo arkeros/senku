@@ -94,6 +94,15 @@ def frontend_image(
         # Wrap in Label() so the default resolves to @senku regardless of the
         # caller's repo.
         base = base or image("distroless_nginx"),
+        # The pulled base contributes no package metadata to the build graph,
+        # so its SBOM is supplied out of band. Only meaningful for the default
+        # base; a caller bringing its own brings its own evidence with it.
+        base_sbom = None if base else Label("//oci/base_images:nginx_stable.cdx.json"),
+        # The base's own known false positives, attached once here rather than
+        # restated by every app that sits on it.
+        vex = (kwargs.pop("vex", None) or []) +
+              ([] if base else [Label("//oci/base_images:nginx_stable_vex")]),
+        arch = arch,
         layers = layers,
         platform = ARCHITECTURE_PLATFORMS[arch],
         **kwargs

@@ -10,6 +10,8 @@ def oci_image(
         ignore_cves = None,
         vex = None,
         created = None,
+        base_sbom = None,
+        arch = None,
         **kwargs):
     """Build an OCI container image with SBOM + CVE scanning.
 
@@ -48,6 +50,8 @@ def oci_image(
         ignore_cves = ignore_cves,
         vex = vex,
         image = ":" + name,
+        base_sbom = base_sbom,
+        arch = arch,
     )
 
     image_load(

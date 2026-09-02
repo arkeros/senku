@@ -30,18 +30,17 @@ load("@supply_chain_tools//sbom:sbom.bzl", "sbom")
 #
 # The matcher list is from grype/matcher/matchers.go's NewDefaultMatchers;
 # keep in lock-step if grype gains/drops matchers (cf. //bazel/modules/grype).
-# `pkg:docker/` and `pkg:oci/` are exempt, and are the one case where an
-# unroutable component is not a silent zero. Those name the *base image*, not a
-# package inside it: senku pulls its nginx base from
-# github.com/arkeros/distroless rather than assembling it, so the base's
-# contents are enumerated and scanned there and published as an SBOM + CVE
-# attestation bound to the very digest pinned in
-# //bazel/include:oci.MODULE.bazel. Evidence composes across the two by digest.
+# `pkg:docker/` and `pkg:oci/` are exempt, and are the one unroutable component
+# that is not a silent zero. Those name a *base image*, not a package: they are
+# a container for packages that are enumerated right beside them, because
+# `image_sbom` merges the base's published CycloneDX SBOM into this one (see
+# //oci/base_images). So the base's contents are scanned here, by this build,
+# not merely asserted to have been scanned somewhere else.
 #
-# The weakening is real and worth naming: this gate can no longer tell that a
-# base was scanned, only that it was named. Pulling a base with no attestations
-# would pass here. What keeps that honest is the digest pin plus verifying the
-# base's own attestations — not this test.
+# Which is the whole point of merging rather than exempting the base wholesale:
+# the first scan after composing found a Critical in the base's nginx that a
+# blanket exemption had been hiding. It turned out to be a documented false
+# positive — but nothing here could have told you that beforehand.
 _SILENT_ZERO_FILTER = """
 .components | map(
   select(
@@ -52,7 +51,7 @@ _SILENT_ZERO_FILTER = """
 ) | map({purl, name})
 """.strip()
 
-def image_sbom(image):
+def image_sbom(image, base_sbom = None, arch = None):
     """Attach a CycloneDX SBOM to an OCI image, without CVE scanning or gating.
 
     Lighter-weight counterpart to `image_supply_chain` for cases where the SBOM
@@ -65,6 +64,16 @@ def image_sbom(image):
     Args:
       image: Label of the OCI image. Same reachability requirements as
         `image_supply_chain` — transitive deps must carry `PackageMetadataInfo`.
+      base_sbom: Optional label of a checked-in CycloneDX SBOM for a *pulled*
+        base image (see //oci/base_images). A pulled base contributes no
+        `PackageMetadataInfo` to the build graph, so without this its packages
+        are invisible: the composed SBOM would name the base and enumerate
+        nothing inside it, and grype would scan only senku's own layers.
+        Merging the published SBOM restores both.
+      arch: Architecture of `image`, used to keep only the base components that
+        belong in it. A base SBOM covers every architecture the base publishes,
+        and scanning arm64 packages against an amd64 image would fail its gate
+        on a CVE that image does not contain.
     """
     base = image.rsplit(":", 1)[-1]
     sbom(name = base + "_sbom_raw", target = image)
@@ -95,14 +104,25 @@ def image_sbom(image):
     # Note: rules_rpm tool-side Go module deps don't need filtering here —
     # `gather_metadata` is taught to skip them via
     # //bazel/patches:supply_chain_tools_rule_filters_rpm.patch.
+    normalize = '.components |= (map(if (.purl // "") | test("^pkg:(rpm|deb)/") then .name |= sub("^[^/]+/"; "") else . end) | unique_by(.purl))'
+
+    srcs = [":" + base + "_sbom_predupe"]
+    if base_sbom:
+        # `input` reads the second src. Components with no `arch=` qualifier are
+        # architecture-independent and belong in every image.
+        srcs.append(base_sbom)
+        arch_filter = ''' | select(((((.purl // "") | test("arch=")) | not)) or ((.purl // "") | test("arch=%s")))''' % arch if arch else ""
+        merge = '.components = ((.components // []) + [(input.components // [])[]%s])' % arch_filter
+        normalize = merge + " | " + normalize
+
     jq(
         name = base + "_sbom",
-        srcs = [":" + base + "_sbom_predupe"],
+        srcs = srcs,
         out = base + "_sbom.json",
-        filter = '.components |= (map(if (.purl // "") | test("^pkg:(rpm|deb)/") then .name |= sub("^[^/]+/"; "") else . end) | unique_by(.purl))',
+        filter = normalize,
     )
 
-def image_supply_chain(image, fail_on_severity = "high", ignore_cves = None, vex = None, database = "@grype_database"):
+def image_supply_chain(image, fail_on_severity = "high", ignore_cves = None, vex = None, database = "@grype_database", base_sbom = None, arch = None):
     """Attach SBOM + CVE scan + policy test to an OCI image.
 
     Generates the following targets, named after `image`'s base label:
@@ -132,7 +152,7 @@ def image_supply_chain(image, fail_on_severity = "high", ignore_cves = None, vex
     """
     base = image.rsplit(":", 1)[-1]
 
-    image_sbom(image = image)
+    image_sbom(image = image, base_sbom = base_sbom, arch = arch)
     grype_scan(
         name = base + "_cve_scan",
         database = database,
