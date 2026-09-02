@@ -71,13 +71,11 @@ require (
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/STARRY-S/zip v0.2.3 // indirect
 	github.com/ThalesIgnite/crypto11 v1.2.5 // indirect
-	github.com/a8m/envsubst v1.4.3 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/acobaugh/osrelease v0.1.0 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/agnivade/levenshtein v1.2.1 // indirect
-	github.com/alecthomas/participle/v2 v2.1.4 // indirect
 	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.4 // indirect
 	github.com/alibabacloud-go/cr-20160607 v1.0.1 // indirect
 	github.com/alibabacloud-go/cr-20181201 v1.0.10 // indirect
@@ -204,7 +202,6 @@ require (
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dylibso/observe-sdk/go v0.0.0-20240819160327-2d926c5d788a // indirect
-	github.com/elliotchance/orderedmap v1.8.0 // indirect
 	github.com/elliotchance/phpserialize v1.4.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/emicklei/proto v1.14.3 // indirect
@@ -234,7 +231,6 @@ require (
 	github.com/go-git/go-billy/v5 v5.9.1 // indirect
 	github.com/go-git/go-git/v5 v5.19.2 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
-	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -346,7 +342,6 @@ require (
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
-	github.com/magiconair/properties v1.18.11 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/masahiro331/go-mvn-version v0.0.0-20250131095131-f4974fa13b8a // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
@@ -357,7 +352,6 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/mholt/archives v0.1.5 // indirect
 	github.com/miekg/pkcs11 v1.1.2 // indirect
-	github.com/mikefarah/yq/v4 v4.53.6 // indirect
 	github.com/mikelolasagasti/xz v1.0.1 // indirect
 	github.com/minio/minlz v1.0.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
@@ -495,7 +489,6 @@ require (
 	github.com/yannh/kubeconform v0.8.0 // indirect
 	github.com/yashtewari/glob-intersection v0.2.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	github.com/yuin/gopher-lua v1.1.2 // indirect
 	github.com/zyedidia/generic v1.2.2-0.20230320175451-4410d2372cb1 // indirect
 	gitlab.com/gitlab-org/api/client-go v1.46.0 // indirect
 	go.etcd.io/bbolt v1.4.3 // indirect
@@ -514,7 +507,6 @@ require (
 	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	go.yaml.in/yaml/v4 v4.0.0-rc.6 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
@@ -575,7 +567,6 @@ tool (
 	github.com/bazelbuild/buildtools/buildifier
 	github.com/bazelbuild/buildtools/buildozer
 	github.com/google/go-containerregistry/cmd/krane
-	github.com/mikefarah/yq/v4
 	github.com/sigstore/cosign/v3/cmd/cosign
 	github.com/yannh/kubeconform/cmd/kubeconform
 	helm.sh/helm/v4/cmd/helm

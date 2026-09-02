@@ -106,6 +106,14 @@ single_version_override(
 jq_toolchains = use_extension("@jq.bzl//jq:extensions.bzl", "toolchains")
 use_repo(jq_toolchains, "jq_toolchains")
 
+# No `yq.toolchain()` tag here, on purpose: yq.bzl's own MODULE.bazel already
+# declares the default one, and a second tag with the same name makes the
+# extension generate every platform repo twice. Like jq above, the root only
+# imports the repo the module already made. dev_dependency to match the
+# bazel_dep: the sole consumer is //tools:dev.
+yq = use_extension("@yq.bzl//yq:extensions.bzl", "yq", dev_dependency = True)
+use_repo(yq, "yq_toolchains")
+
 register_toolchains(
     # Register the source-built bifrost toolchain first so in-repo edits to
     # //devtools/bifrost/cli apply to checked-in renders without needing a

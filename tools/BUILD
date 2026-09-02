@@ -19,6 +19,7 @@ lazy_bazel_env(
         "python": "@rules_python//python:current_py_toolchain",
         "nodejs": "@nodejs_toolchains//:resolved_toolchain",
         "jq": "@jq_toolchains//:resolved_toolchain",
+        "yq": "@yq_toolchains//:resolved_toolchain",
     },
     tools = {
         # Eager tools - resolved from toolchain Make variables
@@ -27,6 +28,7 @@ lazy_bazel_env(
         "node": "$(NODE_PATH)",
         "python": "$(PYTHON3)",
         "jq": "$(JQ_BIN)",
+        "yq": "$(YQ_BIN)",
         # Lazy tools - compiled on first use
         "buildifier": "@com_github_bazelbuild_buildtools//buildifier",
         "buildozer": "@com_github_bazelbuild_buildtools//buildozer",

@@ -1501,7 +1501,7 @@
     "@@yq.bzl+//yq:extensions.bzl%yq": {
       "general": {
         "bzlTransitiveDigest": "29uLhUghUHoJ97pMyo+Vqj1GlkqELqSRCj1xzttqL+0=",
-        "usagesDigest": "/MACAbKTIhDUmM6jQfLMAdPa7yP2Y4f8NdF93VzmfSk=",
+        "usagesDigest": "kRfs8pwpVMu7B+rmg67bURnGwWxxzDEW3t5jVR53ZYs=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "yq_darwin_amd64": {
