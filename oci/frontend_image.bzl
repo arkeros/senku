@@ -4,15 +4,15 @@ load("@rules_img_images.bzl//:rules_img_images.bzl", "image")
 load(":config.bzl", "ALL_ARCHITECTURES", "ARCHITECTURE_PLATFORMS", "NONROOT")
 load(":oci_image.bzl", "oci_image")
 
-# The channel the pulled base tracks. Kept as a name rather than inlined so a
-# caller can see which nginx it is getting; changing it means repinning the
-# digest in //bazel/include:oci.MODULE.bazel, not passing a different value.
-NGINX_FRONTEND_DEFAULT_CHANNEL = "stable"
+# The tag the pulled base tracks. `latest` is the only one Chainguard publishes
+# for free; changing what nginx the games run means repinning the digest in
+# //bazel/include:oci.MODULE.bazel, not passing a different value here.
+NGINX_FRONTEND_DEFAULT_CHANNEL = "latest"
 
 # Canonical on-image location and owner for the statics nginx serves. The
 # web root matches the nginx base's `root` directive
-# root directive and the UID both come from the pulled base image's own
-# contract (github.com/arkeros/distroless). Exposed so callers
+# root directive is ours — the conf layer every game ships sets it — and the
+# UID is the one Chainguard's image runs as. Exposed so callers
 # producing their own statics_layer (e.g. react_static_layer) can line up
 # on the exact same paths/owner without hardcoding them independently.
 NGINX_WEB_ROOT = "/var/www/html"
@@ -93,16 +93,12 @@ def frontend_image(
         name = name + "_" + arch,
         # Wrap in Label() so the default resolves to @senku regardless of the
         # caller's repo.
-        base = base or image("distroless_nginx"),
+        base = base or image("chainguard_nginx"),
         # The pulled base contributes no package metadata to the build graph,
-        # so its SBOM is supplied out of band. Only meaningful for the default
-        # base; a caller bringing its own brings its own evidence with it.
-        base_sbom = None if base else Label("//oci/base_images:nginx_stable.cdx.json"),
-        # The base's own known false positives, attached once here rather than
-        # restated by every app that sits on it.
-        vex = (kwargs.pop("vex", None) or []) +
-              ([] if base else [Label("//oci/base_images:nginx_stable_vex")]),
-        arch = arch,
+        # so its SBOM is supplied out of band, per architecture. Only meaningful
+        # for the default base; a caller bringing its own brings its own
+        # evidence with it.
+        base_sbom = None if base else Label("//oci/base_images:chainguard_nginx.%s.cdx.json" % arch),
         layers = layers,
         platform = ARCHITECTURE_PLATFORMS[arch],
         **kwargs

@@ -41,25 +41,32 @@ grype_db.database(
 )
 use_repo(grype_db, "grype_database")
 
-# The nginx base the games' frontend images are built on.
+# The nginx base the games' frontend images are built on: Chainguard's, from
+# Wolfi. Every package in it is `pkg:apk/wolfi/...`, which grype routes to
+# Wolfi's secdb, and Chainguard rebuilds daily — so what this buys over
+# assembling a base in-house is that a clean scan means clean, with no
+# cross-vendor false positives to justify.
 #
-# Pinned by digest — the tag is carried alongside for readability only. Bump
-# both together; `crane digest ghcr.io/arkeros/distroless/nginx:stable` gives
-# the new one.
+# Pinned by digest. `latest` is the only tag Chainguard publishes for free, so
+# a bump takes whichever nginx they ship that day; the tag is carried for
+# readability only. Bump with:
+#
+#   crane digest cgr.dev/chainguard/nginx:latest
+#   ./oci/base_images/refresh.sh chainguard_nginx cgr.dev/chainguard/nginx@sha256:<digest>
 images = use_extension("@rules_img//img:extensions.bzl", "images")
 images.pull(
-    name = "distroless_nginx",
-    digest = "sha256:b1e742c42ac58d9f6fcb88a3595e60465356609f6aaf8e03f01eccc9b632aa67",
+    name = "chainguard_nginx",
+    digest = "sha256:2015f7fa3b514c1bb8de63ed0ebe769295e6d15c5a401fcafbbe555760d42e57",
     # Not the default `shallow`: the app images produce an `oci_layout`, and a
     # layout with only metadata and no blobs is not a layout. `lazy` fetches
     # each blob the first time something actually needs it.
     layer_handling = "lazy",
-    registry = "ghcr.io",
-    repository = "arkeros/distroless/nginx",
-    tag = "stable",
+    registry = "cgr.dev",
+    repository = "chainguard/nginx",
+    tag = "latest",
 )
 
 # The hub repo, not the image repo directly: rules_img names generated repos
-# after the digest, and `image("distroless_nginx")` from the hub resolves the
+# after the digest, and `image("chainguard_nginx")` from the hub resolves the
 # friendly name to it. `bazel mod tidy` rewrites this line, so keep it as-is.
 use_repo(images, "rules_img_images.bzl")

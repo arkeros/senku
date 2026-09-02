@@ -33,14 +33,14 @@ load("@supply_chain_tools//sbom:sbom.bzl", "sbom")
 # `pkg:docker/` and `pkg:oci/` are exempt, and are the one unroutable component
 # that is not a silent zero. Those name a *base image*, not a package: they are
 # a container for packages that are enumerated right beside them, because
-# `image_sbom` merges the base's published CycloneDX SBOM into this one (see
+# `image_sbom` merges the base's published SBOM into this one (see
 # //oci/base_images). So the base's contents are scanned here, by this build,
 # not merely asserted to have been scanned somewhere else.
 #
-# Which is the whole point of merging rather than exempting the base wholesale:
-# the first scan after composing found a Critical in the base's nginx that a
-# blanket exemption had been hiding. It turned out to be a documented false
-# positive — but nothing here could have told you that beforehand.
+# That is the whole point of merging rather than exempting the base wholesale:
+# the first scan after composing found a Critical in a base that a blanket
+# exemption had been hiding. It was a documented false positive — but nothing
+# here could have told you that while the component was exempt.
 _SILENT_ZERO_FILTER = """
 .components | map(
   select(
@@ -51,7 +51,7 @@ _SILENT_ZERO_FILTER = """
 ) | map({purl, name})
 """.strip()
 
-def image_sbom(image, base_sbom = None, arch = None):
+def image_sbom(image, base_sbom = None):
     """Attach a CycloneDX SBOM to an OCI image, without CVE scanning or gating.
 
     Lighter-weight counterpart to `image_supply_chain` for cases where the SBOM
@@ -65,15 +65,12 @@ def image_sbom(image, base_sbom = None, arch = None):
       image: Label of the OCI image. Same reachability requirements as
         `image_supply_chain` — transitive deps must carry `PackageMetadataInfo`.
       base_sbom: Optional label of a checked-in CycloneDX SBOM for a *pulled*
-        base image (see //oci/base_images). A pulled base contributes no
-        `PackageMetadataInfo` to the build graph, so without this its packages
-        are invisible: the composed SBOM would name the base and enumerate
-        nothing inside it, and grype would scan only senku's own layers.
-        Merging the published SBOM restores both.
-      arch: Architecture of `image`, used to keep only the base components that
-        belong in it. A base SBOM covers every architecture the base publishes,
-        and scanning arm64 packages against an amd64 image would fail its gate
-        on a CVE that image does not contain.
+        base image, for the same architecture as `image` (see
+        //oci/base_images). A pulled base contributes no `PackageMetadataInfo`
+        to the build graph, so without this its packages are invisible: the
+        composed SBOM would name the base and enumerate nothing inside it, and
+        grype would scan only senku's own layers. Merging the published SBOM
+        restores both.
     """
     base = image.rsplit(":", 1)[-1]
     sbom(name = base + "_sbom_raw", target = image)
@@ -108,12 +105,9 @@ def image_sbom(image, base_sbom = None, arch = None):
 
     srcs = [":" + base + "_sbom_predupe"]
     if base_sbom:
-        # `input` reads the second src. Components with no `arch=` qualifier are
-        # architecture-independent and belong in every image.
+        # `input` reads the second src.
         srcs.append(base_sbom)
-        arch_filter = ''' | select(((((.purl // "") | test("arch=")) | not)) or ((.purl // "") | test("arch=%s")))''' % arch if arch else ""
-        merge = '.components = ((.components // []) + [(input.components // [])[]%s])' % arch_filter
-        normalize = merge + " | " + normalize
+        normalize = ".components = ((.components // []) + (input.components // [])) | " + normalize
 
     jq(
         name = base + "_sbom",
@@ -122,7 +116,7 @@ def image_sbom(image, base_sbom = None, arch = None):
         filter = normalize,
     )
 
-def image_supply_chain(image, fail_on_severity = "high", ignore_cves = None, vex = None, database = "@grype_database", base_sbom = None, arch = None):
+def image_supply_chain(image, fail_on_severity = "high", ignore_cves = None, database = "@grype_database", base_sbom = None):
     """Attach SBOM + CVE scan + policy test to an OCI image.
 
     Generates the following targets, named after `image`'s base label:
@@ -132,9 +126,6 @@ def image_supply_chain(image, fail_on_severity = "high", ignore_cves = None, vex
         <base>_cve_test_stale_ignores
                                   — fails when an `ignore_cves` entry no
                                     longer matches a scan CVE.
-        <base>_cve_test_stale_vex (only when `vex` is non-empty)
-                                  — fails when a VEX statement targets a
-                                    CVE the scanner doesn't flag.
 
     Args:
       image: Label of the OCI image. Must be reachable from supply_chain_tools'
@@ -142,17 +133,12 @@ def image_supply_chain(image, fail_on_severity = "high", ignore_cves = None, vex
         `PackageMetadataInfo` (Go modules via gazelle, .deb via rules_distroless's
         package_metadata patch).
       fail_on_severity: Threshold for `<base>_cve_test`. Default "high".
-      ignore_cves: List of CVE IDs to allow-list (flat). Prefer `vex` for
-        anything with a defensible justification.
-      vex: List of OpenVEX 0.2.0 document labels (see //oci:vex.bzl).
-        grype.bzl extracts each statement's CVE ID at action time and adds
-        it to the suppression set. The companion `_stale_vex` test fires
-        when a statement no longer matches a scan CVE.
+      ignore_cves: List of CVE IDs to allow-list (flat).
       database: Grype vulnerability DB target. Default `@grype_database`.
     """
     base = image.rsplit(":", 1)[-1]
 
-    image_sbom(image = image, base_sbom = base_sbom, arch = arch)
+    image_sbom(image = image, base_sbom = base_sbom)
     grype_scan(
         name = base + "_cve_scan",
         database = database,
@@ -163,7 +149,6 @@ def image_supply_chain(image, fail_on_severity = "high", ignore_cves = None, vex
         fail_on_severity = fail_on_severity,
         ignore_cves = ignore_cves,
         scan_result = ":" + base + "_cve_scan",
-        vex = vex,
     )
 
     # Silent-zero gate. Fails when the SBOM carries components that grype

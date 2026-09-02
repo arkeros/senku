@@ -20,7 +20,7 @@ def react_static_layer(
     those exact absolute paths. The stylesheets are not among them — they
     are inlined into the documents, so there is no CSS URL to serve.
 
-    Also produces a per-app `default.conf` that replaces the base nginx
+    Also produces a per-app `nginx.default.conf` that replaces the base nginx
     image's generic one — it knows which URL prefixes this app
     content-addresses (the esbuild bundle dir's chunks) and can mark
     them immutable while leaving the unhashed entry revalidatable.
@@ -29,7 +29,7 @@ def react_static_layer(
     each with its own cache-invalidation boundary):
 
       :{name}_statics — /var/www/html/*       (webroot content)
-      :{name}_conf    — /etc/nginx/conf.d/default.conf
+      :{name}_conf    — /etc/nginx/conf.d/nginx.default.conf
 
     Pass both to `frontend_image`'s `statics_layer` as a list:
 
@@ -104,17 +104,20 @@ def react_static_layer(
     # overridden back to `no-cache` so deploys are picked up. Everything
     # else (HTML, StyleX CSS, normalize) revalidates via ETag.
     #
-    # Named `_default_conf` because it ships at /etc/nginx/conf.d/default.conf
-    # — replacing the base nginx image's default.conf with this per-app one.
-    # Output at `<target>/default.conf` so the final basename matches what
-    # nginx expects; the tar's `strip_prefix` then drops the `<target>/`
-    # wrapper, landing the file at /etc/nginx/conf.d/default.conf.
+    # Ships at /etc/nginx/conf.d/nginx.default.conf — the exact path of the
+    # server block Chainguard's nginx image carries — so this per-app conf
+    # *replaces* it in the layered filesystem rather than sitting beside it.
+    # Beside it would mean two `server` blocks on :8080, with nginx picking a
+    # default by include order and the base's `server_name localhost` still
+    # answering for that host. Same path, our file wins; there is one block.
+    # Output at `<target>/nginx.default.conf` so the basename is right; the
+    # tar's `strip_prefix` then drops the `<target>/` wrapper.
     rules = webroot_cache_rules(app_name)
 
     conf_name = name + "_default_conf"
     expand_template(
         name = conf_name,
-        out = conf_name + "/default.conf",
+        out = conf_name + "/nginx.default.conf",
         substitutions = {
             # `expand_template` runs "Make" variable expansion over
             # substitution values, and the extension rules render as regexes

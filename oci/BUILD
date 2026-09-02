@@ -44,9 +44,3 @@ bzl_library(
     srcs = ["config.bzl"],
     visibility = ["//visibility:public"],
 )
-
-bzl_library(
-    name = "vex",
-    srcs = ["vex.bzl"],
-    visibility = ["//visibility:public"],
-)

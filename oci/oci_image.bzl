@@ -8,10 +8,8 @@ def oci_image(
         name,
         fail_on_severity = "high",
         ignore_cves = None,
-        vex = None,
         created = None,
         base_sbom = None,
-        arch = None,
         **kwargs):
     """Build an OCI container image with SBOM + CVE scanning.
 
@@ -24,10 +22,6 @@ def oci_image(
         fail_on_severity: CVE severity threshold for the policy test.
             Default "high".
         ignore_cves: List of CVE IDs to allow-list (flat).
-        vex: List of OpenVEX document labels (see //oci:vex.bzl). Statement
-            CVE IDs are extracted at action time and added to the
-            suppression set; a sibling `_stale_vex` test fires when a
-            statement no longer corresponds to a scan match.
         created: Optional label of a one-file target whose contents are an
             RFC 3339 timestamp; emitted into `image.config.created`.
             Use a `created_timestamp` derived from the package lockfile
@@ -48,10 +42,8 @@ def oci_image(
     image_supply_chain(
         fail_on_severity = fail_on_severity,
         ignore_cves = ignore_cves,
-        vex = vex,
         image = ":" + name,
         base_sbom = base_sbom,
-        arch = arch,
     )
 
     image_load(
