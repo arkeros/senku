@@ -92,7 +92,6 @@ use_repo(
     "com_google_cloud_go_secretmanager",
     "com_google_cloud_go_storage",
     "dev_knative_serving",
-    "in_yaml_go_yaml_v4",
     "io_k8s_api",
     "io_k8s_apimachinery",
     "io_k8s_sigs_kustomize_kustomize_v5",

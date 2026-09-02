@@ -7,12 +7,10 @@ require (
 	cloud.google.com/go/storage v1.65.0
 	github.com/anchore/grype v0.117.0
 	github.com/bazelbuild/buildtools v0.0.0-20260527145659-eb0c58a06830
-	github.com/google/go-containerregistry v0.21.9
 	github.com/google/go-github/v86 v86.0.0
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/spf13/cobra v1.10.2
 	github.com/zclconf/go-cty v1.19.0
-	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/text v0.41.0
 	google.golang.org/api v0.293.0
 	k8s.io/api v0.36.4
@@ -282,6 +280,7 @@ require (
 	github.com/google/certificate-transparency-go v1.3.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/go-containerregistry v0.21.9 // indirect
 	github.com/google/go-containerregistry/cmd/krane v0.0.0-20260429191119-2d86301800e9 // indirect
 	github.com/google/go-github/v88 v88.0.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
@@ -517,6 +516,7 @@ require (
 	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	go.yaml.in/yaml/v4 v4.0.0-rc.6 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect

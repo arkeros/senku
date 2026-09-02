@@ -42,3 +42,17 @@ NODEJS_DISTROS = ["debian"]
 NODEJS_ARCHITECTURES = {
     "debian": ["amd64", "arm64"],
 }
+
+# Architectures the frontend images are published for, and the platform each
+# one builds under. Absorbed from the old //oci/distroless tree, which built
+# the base images senku now pulls.
+ALL_ARCHITECTURES = ["amd64", "arm64"]
+
+ARCHITECTURE_PLATFORMS = {
+    "amd64": "//bazel/platforms:linux_amd64",
+    "arm64": "//bazel/platforms:linux_arm64",
+}
+
+# Owner of the served statics. Must match the UID the nginx base runs as; it
+# is part of that image's contract, not a choice made here.
+NONROOT = 65532

@@ -8,9 +8,7 @@ load("//devtools/build/react_component:react_static_layer.bzl", "react_static_la
 load("//devtools/build/tools/tf:bucket_push.bzl", "bucket_push")
 load("//devtools/build/tools/tf:render.bzl", "registry_push")
 load("//infra/cloud/gcp/gar:defs.bzl", "REGISTRY")
-load("//oci:frontend_image.bzl", "NGINX_FRONTEND_DEFAULT_CHANNEL", "frontend_images_all_arch")
-load("//oci:vex.bzl", "vex_document")
-load("//oci/distroless/common:hummingbird_fixed_vex.bzl", "NGINX_HUMMINGBIRD_FIXED_VEX_STATEMENTS")
+load("//oci:frontend_image.bzl", "frontend_images_all_arch")
 load(
     ":defs.bzl",
     "BUCKET_NAME",
@@ -74,27 +72,13 @@ react_static_layer(
     extra_srcs = ["//apps/pepper-sweeper/icons:icons"],
 )
 
-# Inherited from the nginx base: the nginx.org rpm this image serves
-# from is flagged by a cross-vendor release-tag comparison against
-# Hummingbird's own nginx rebuild. See
-# //oci/distroless/common:hummingbird_fixed_vex.bzl.
-vex_document(
-    name = "vex",
-    author = "rafael@arquero.cat",
-    id = "https://github.com/arkeros/senku/blob/main/apps/pepper-sweeper/BUILD",
-    statements = NGINX_HUMMINGBIRD_FIXED_VEX_STATEMENTS[NGINX_FRONTEND_DEFAULT_CHANNEL],
-    timestamp = "2026-08-04T00:00:00Z",
-)
-
 frontend_images_all_arch(
     name = "image",
-    distro = "hummingbird",
     statics_layer = [
         ":app_layer_statics",
         ":app_layer_conf",
         ":app_layer_extras",
     ],
-    vex = [":vex"],
 )
 
 registry_push(

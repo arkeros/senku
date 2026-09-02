@@ -27,7 +27,6 @@ bzl_library(
         "//apps/pepper-sweeper:defs",
         "//apps/spaghetti-duel:defs",
         "//apps/table-for-two:defs",
-        "//oci/cmd/registry:defs",
         "@terraform.bzl//:terraform",
     ],
 )

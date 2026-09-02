@@ -1,16 +1,18 @@
 load("@rules_img//img:image.bzl", "image_index")
 load("@tar.bzl", "mutate", "tar")
-load("//oci/distroless:platforms.bzl", "ARCHITECTURE_PLATFORMS")
-load("//oci/distroless/common:variables.bzl", "NONROOT")
+load("@rules_img_images.bzl//:rules_img_images.bzl", "image")
+load(":config.bzl", "ALL_ARCHITECTURES", "ARCHITECTURE_PLATFORMS", "NONROOT")
 load(":oci_image.bzl", "oci_image")
-load("//oci/distroless/nginx:config.bzl", "NGINX_ARCHITECTURES")
 
+# The channel the pulled base tracks. Kept as a name rather than inlined so a
+# caller can see which nginx it is getting; changing it means repinning the
+# digest in //bazel/include:oci.MODULE.bazel, not passing a different value.
 NGINX_FRONTEND_DEFAULT_CHANNEL = "stable"
 
 # Canonical on-image location and owner for the statics nginx serves. The
 # web root matches the nginx base's `root` directive
-# (see //oci/distroless/nginx:default.conf); the username matches the UID
-# in //oci/distroless/common:variables.bzl#USER_IDS. Exposed so callers
+# root directive and the UID both come from the pulled base image's own
+# contract (github.com/arkeros/distroless). Exposed so callers
 # producing their own statics_layer (e.g. react_static_layer) can line up
 # on the exact same paths/owner without hardcoding them independently.
 NGINX_WEB_ROOT = "/var/www/html"
@@ -48,7 +50,6 @@ def _statics_layer(name, srcs, owner, ownername, strip_prefix):
 def frontend_image(
         name,
         arch,
-        distro = "debian",
         srcs = None,
         statics_layer = None,
         base = None,
@@ -63,7 +64,6 @@ def frontend_image(
     Args:
         name: target name
         arch: target architecture (e.g., "amd64")
-        distro: distribution to use (default: debian)
         srcs: static files to serve
         statics_layer: pre-built tar layer label, or list of labels composed
             as multiple OCI layers (py_image_layer style). List form is
@@ -75,8 +75,6 @@ def frontend_image(
         strip_prefix: prefix to strip from file paths, only used with srcs
         **kwargs: passed to oci_image (ignore_cves, env, etc.)
     """
-    if distro not in NGINX_ARCHITECTURES:
-        fail("unknown distro %r, expected one of: %s" % (distro, ", ".join(NGINX_ARCHITECTURES.keys())))
     if srcs and statics_layer:
         fail("srcs and statics_layer are mutually exclusive")
     if not srcs and not statics_layer:
@@ -95,13 +93,13 @@ def frontend_image(
         name = name + "_" + arch,
         # Wrap in Label() so the default resolves to @senku regardless of the
         # caller's repo.
-        base = base or Label("//oci/distroless/nginx:nginx_%s_nonroot_%s_%s" % (NGINX_FRONTEND_DEFAULT_CHANNEL, arch, distro)),
+        base = base or image("distroless_nginx"),
         layers = layers,
         platform = ARCHITECTURE_PLATFORMS[arch],
         **kwargs
     )
 
-def frontend_images_all_arch(name, srcs = None, statics_layer = None, base = None, distro = "debian", **kwargs):
+def frontend_images_all_arch(name, srcs = None, statics_layer = None, base = None, **kwargs):
     """Build frontend images for all architectures serving static files with nginx.
 
     Static files are placed in /var/www/html on top of the nginx base image.
@@ -120,7 +118,6 @@ def frontend_images_all_arch(name, srcs = None, statics_layer = None, base = Non
             Mutually exclusive with srcs.
         base: base image per arch, as a dict {"amd64": "//my:image_amd64", ...}.
             Defaults to the nginx stable nonroot image.
-        distro: distribution to use (default: debian)
         **kwargs: passed to frontend_image (owner, ownername, strip_prefix, ignore_cves)
     """
     if srcs and statics_layer:
@@ -128,7 +125,7 @@ def frontend_images_all_arch(name, srcs = None, statics_layer = None, base = Non
     if not srcs and not statics_layer:
         fail("one of srcs or statics_layer is required")
 
-    architectures = NGINX_ARCHITECTURES[distro]
+    architectures = ALL_ARCHITECTURES
 
     if srcs:
         layer = _statics_layer(
@@ -144,7 +141,6 @@ def frontend_images_all_arch(name, srcs = None, statics_layer = None, base = Non
     [
         frontend_image(
             name = name,
-            distro = distro,
             arch = arch,
             statics_layer = layer,
             base = base.get(arch) if base else None,

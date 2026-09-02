@@ -5,16 +5,10 @@ bazel_dep(name = "tar.bzl", version = "0.10.8")
 bazel_dep(name = "grype.bzl", version = "0.1.0")
 bazel_dep(name = "cosign.bzl", version = "0.0.0")
 bazel_dep(name = "container_structure_test", version = "1.22.1")
-bazel_dep(name = "rules_rpm", version = "0.0.0")
 
 local_path_override(
     module_name = "cosign.bzl",
     path = "bazel/modules/cosign.bzl",
-)
-
-local_path_override(
-    module_name = "rules_rpm",
-    path = "bazel/modules/rules_rpm",
 )
 
 single_version_override(
@@ -39,328 +33,33 @@ git_override(
     remote = "https://github.com/arkeros/grype.bzl.git",
 )
 
-apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
-
-# `mergedusr = True` rewrites /bin, /sbin, /lib* under /usr to match Debian's
-# UsrMerge layout (the only one supported on bookworm+). Without it, packages
-# that ship the same path under both /bin and /usr/bin produce duplicate-path
-# errors when assembling OCI layers. https://wiki.debian.org/UsrMerge
-#
-# `package_template` overrides the upstream rules_distroless per-.deb BUILD
-# template with our own (loads `dpkg_statusd` + `package_metadata`).
-apt.install(
-    name = "debian",
-    distro = "debian-unstable",
-    lock = "//oci/distroless:debian.lock.json",
-    manifest = "//oci/distroless:debian.yaml",
-    mergedusr = True,
-    package_template = "//oci/distroless/common:package.BUILD.tmpl",
-)
-apt.install(
-    name = "nginx_stable",
-    distro = "debian-unstable",
-    lock = "//oci/distroless/nginx:nginx-stable.lock.json",
-    manifest = "//oci/distroless/nginx:nginx-stable.yaml",
-    mergedusr = True,
-    package_template = "//oci/distroless/common:package.BUILD.tmpl",
-)
-apt.install(
-    name = "nginx_mainline",
-    distro = "debian-unstable",
-    lock = "//oci/distroless/nginx:nginx-mainline.lock.json",
-    manifest = "//oci/distroless/nginx:nginx-mainline.yaml",
-    mergedusr = True,
-    package_template = "//oci/distroless/common:package.BUILD.tmpl",
-)
-use_repo(apt, "debian", "nginx_mainline", "nginx_stable")
-
-# Hummingbird RPM repository — sourced from a public Hummingbird snapshot
-# (see ADR 0007). The lockfile pins `revision` + per-rpm SHA256; refresh
-# via `bazel run @hummingbird//:pin` once the pin tool is wired (currently
-# hand-written for the tracer-bullet tzdata-only state).
-rpm = use_extension("@rules_rpm//rpm:extensions.bzl", "rpm")
-rpm.install(
-    name = "hummingbird",
-    architectures = [
-        "x86_64",
-        "aarch64",
-    ],
-    # Matches grype's `hummingbird:distro:hummingbird:1` provider — drives
-    # per-package secdb routing on SBOM scans. Without this qualifier, grype
-    # falls back to NVD-CPE matching and silently misses Hummingbird's
-    # backported advisories.
-    distro = "hummingbird-1",
-    gpg_key = "//:hummingbird-release.pgp",
-    lock_file = "//:hummingbird.lock.json",
-    # Closed manifest of *root* packages; pin walks rpm:requires and adds
-    # transitively reachable packages to the lockfile (same posture as
-    # @debian's apt resolver). Trim entries here only if you also want
-    # their transitives gone — bare-bones cc needs glibc + libgcc +
-    # libstdc++ + openssl-libs as roots; ca-certificates / mailcap /
-    # tzdata stay declared because static composes them directly even
-    # though glibc would otherwise pull ca-certificates transitively.
-    packages = [
-        "bash",
-        "busybox",
-        "ca-certificates",
-        "coreutils",
-        "glibc",
-        "grep",
-        "libacl",
-        "libatomic",
-        "libattr",
-        "libcap",
-        "libgcc",
-        "libselinux",
-        "libsepol",
-        "libstdc++",
-        "mailcap",
-        "mawk",
-        "ncurses-libs",
-        "openssl-libs",
-        "pcre2",
-        "sed",
-        "tzdata",
-    ],
-    # Per-arch subtrees (x86_64/, aarch64/) live under this base. Each
-    # lockfile entry's `path` prefixes the right subtree (noarch entries
-    # use either subtree — same bytes).
-    repo_url = "https://koji-s3-cache.hummingbird-project.io/packages.redhat.com/api/pulp-content/public-hummingbird",
-    # Hummingbird's RHPG snapshot publishes per-RPM GPG signatures and
-    # sigstore attestations under `metadata/attestations/`, but no
-    # detached signature over `repomd.xml` (verified empirically —
-    # repodata listing contains only `repomd.xml`, `*-primary.xml.gz`,
-    # `*-filelists.xml.gz`, `*-other.xml.gz`). Lock-time trust degrades
-    # to TLS; build-time per-RPM verification in rpm-extract remains the
-    # binary-integrity anchor. See ADR 0007's 2026-05-19 amendment.
-    repomd_signature = "optional",
-)
-
-# nginx.org's own RPM repositories, mirroring how we already use their apt
-# repos on the Debian side. Stable and mainline are first-class separate
-# repos (no version-constraint pinning needed); each ships a single
-# self-contained `nginx` rpm — no nginx/nginx-core/nginx-filesystem
-# decomposition and none of Hummingbird's gperftools / libunwind /
-# libxcrypt linkage. Lockfiles live alongside the consuming BUILD in
-# //oci/distroless/nginx/ — same convention as the apt-side
-# nginx-{stable,mainline}.lock.json. rhel/10 binaries match Hummingbird's
-# glibc/openssl baseline at runtime.
-rpm.install(
-    name = "nginx_stable_rpm",
-    architectures = [
-        "x86_64",
-        "aarch64",
-    ],
-    # Routes via Hummingbird's secdb even though the binary came from
-    # nginx.org. RHEL-10's secdb has CVE entries for nginx but no fix
-    # data (RHEL doesn't ship nginx) — every flag would be a no-fix
-    # false positive. Hummingbird's secdb has accurate version-range
-    # data and all current advisories are rpmvercmp-below the shipped
-    # nginx.org rpm, so no flags surface today. Future advisories with
-    # release-suffix-strict constraints (e.g. `< X-1.hum1`) may falsely
-    # flag nginx.org's `*.el10.ngx` releases via rpmvercmp's suffix
-    # ordering; document those in //oci/distroless/nginx/BUILD under
-    # `NGINX_HUMMINGBIRD_*_VEX_STATEMENTS` when they arise.
-    distro = "hummingbird-1",
-    gpg_key = "//oci/distroless/nginx:nginx_signing.key",
-    lock_file = "//oci/distroless/nginx:nginx-stable.hummingbird.lock.json",
-    packages = ["nginx"],
-    # Surfaces `pkg:rpm/nginx.org/nginx@...` in the image SBOM so grype
-    # routes lookups to NVD-CPE rather than `pkg:rpm/nginx_stable_rpm/...`
-    # (no provider matches). Crucially decouples nginx from the
-    # `ID=hummingbird` image-scan routing, sidestepping false positives
-    # from any Hummingbird advisory whose release-suffix-strict
-    # `< X-1.hum1` constraint would match nginx.org's `el10.ngx` rpms
-    # under rpmvercmp even when the upstream fix is in shared source.
-    # With this namespace, grype's SBOM-scan correctly treats nginx as
-    # an nginx.org-provided package and applies NVD's upstream
-    # version-range matching.
-    purl_namespace = "nginx.org",
-    repo_url = "https://nginx.org/packages/rhel/10",
-)
-rpm.install(
-    name = "nginx_mainline_rpm",
-    architectures = [
-        "x86_64",
-        "aarch64",
-    ],
-    distro = "hummingbird-1",
-    gpg_key = "//oci/distroless/nginx:nginx_signing.key",
-    lock_file = "//oci/distroless/nginx:nginx-mainline.hummingbird.lock.json",
-    packages = ["nginx"],
-    purl_namespace = "nginx.org",
-    repo_url = "https://nginx.org/packages/mainline/rhel/10",
-)
-use_repo(rpm, "hummingbird", "nginx_mainline_rpm", "nginx_stable_rpm")
-
-http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
-
-http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-# Node.js runtime tarballs from nodejs.org. Consumed by //oci/distroless/nodejs
-# (ADR 0007 step 6, the "marquee demo" distroless node on Hummingbird's glibc).
-# Only `bin/node` is shipped in the image; npm/npx/corepack/headers/docs are
-# left in the bazel-out tree and never make it into the layer.
-#
-# To refresh:
-#   curl -fsSL https://nodejs.org/dist/index.json | jq '.[] | select(.version | startswith("v26."))[0]'
-#   curl -fsSL https://nodejs.org/dist/v<version>/SHASUMS256.txt | grep linux
-_NODEJS_TARBALL_BUILD_FILE_CONTENT = """\
-package(default_visibility = ["//visibility:public"])
-exports_files(["bin/node"])
-"""
-
-[
-    http_archive(
-        name = "nodejs_{}_{}".format(major, arch),
-        build_file_content = _NODEJS_TARBALL_BUILD_FILE_CONTENT,
-        sha256 = sha,
-        strip_prefix = "node-v{}-linux-{}".format(
-            full_version,
-            "x64" if arch == "amd64" else "arm64",
-        ),
-        url = "https://nodejs.org/dist/v{}/node-v{}-linux-{}.tar.xz".format(
-            full_version,
-            full_version,
-            "x64" if arch == "amd64" else "arm64",
-        ),
-    )
-    for major, full_version, sha_by_arch in [
-        (
-            "24",
-            "24.19.0",
-            {
-                "amd64": "14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647",
-                "arm64": "01443c1e1a29e531ccad5a46fefa6df490d2189c49f7955904aecdbb0fe86fdc",
-            },
-        ),
-        (
-            "26",
-            "26.6.0",
-            {
-                "amd64": "e53a8c8ca2ee7135de38e63859bd4f43002ae2d222f5b3a98ac1945db9f544bb",
-                "arm64": "974e6f0332fb26179b34d49c57f35339e089a89faf8b82a81e44c0e1164b7923",
-            },
-        ),
-    ]
-    for arch, sha in sha_by_arch.items()
-]
-
-# Eclipse Temurin JRE tarballs from Adoptium GitHub releases. Consumed by
-# //oci/distroless/java — the headless JRE ships under /jre/, mirroring
-# nodejs's /nodejs/ prefix so the host distro's PATH never resolves to it.
-# The image entrypoint is the absolute path /jre/bin/java.
-#
-# Policy: latest 3 LTS only, no non-LTS. Auto-rolls — when 29 ships in
-# 2027, 17 rolls off and 29 lands here. Adoptium's LTS list is
-# [8, 11, 17, 21, 25]; we explicitly do NOT ship 8/11 (EOL trajectory,
-# tiny incremental users on new infra — same posture as Google Distroless).
-#
-# To refresh:
-#   curl -fsSL https://api.adoptium.net/v3/info/available_releases
-#   curl -fsSL "https://api.adoptium.net/v3/assets/latest/<V>/hotspot?architecture=x64&image_type=jre&os=linux&vendor=eclipse"
-_TEMURIN_BUILD_FILE_CONTENT = """\
-package(default_visibility = ["//visibility:public"])
-filegroup(
-    name = "all",
-    srcs = glob(["**"], exclude = ["BUILD*", "REPO*", "WORKSPACE*", "MODULE*"], allow_empty = False),
-)
-"""
-
-# JRE (release variant) and JDK (debug variant) per (major, arch). The JDK
-# carries jstack/jcmd/jmap/javac for `kubectl exec`-style production
-# diagnostics — Google Distroless's `:debug` variant uses the same trick.
-# Versions are kept in lockstep across image_type because mixing build
-# numbers would shift the CPE component the SBOM declares between modes.
-[
-    http_archive(
-        name = "temurin_{}_{}_{}".format(image_type, major, arch),
-        build_file_content = _TEMURIN_BUILD_FILE_CONTENT,
-        sha256 = sha,
-        strip_prefix = "jdk-{}+{}{}".format(
-            version,
-            build,
-            "-jre" if image_type == "jre" else "",
-        ),
-        url = "https://github.com/adoptium/temurin{}-binaries/releases/download/jdk-{}%2B{}/OpenJDK{}U-{}_{}_linux_hotspot_{}_{}.tar.gz".format(
-            major,
-            version,
-            build,
-            major,
-            image_type,
-            "x64" if arch == "amd64" else "aarch64",
-            version,
-            build,
-        ),
-    )
-    for image_type, sha_by_major in [
-        (
-            "jre",
-            {
-                "17": (
-                    "17.0.20",
-                    "8",
-                    {
-                        "amd64": "ef491a51a46ef90cc47fbc4abb219fde32483ff91be5ec66ddc896df43524b27",
-                        "arm64": "9d14a95e07c44bc48666625162baf40db9da4dcb192bfc3e43047790693061a2",
-                    },
-                ),
-                "21": (
-                    "21.0.12",
-                    "8",
-                    {
-                        "amd64": "8a379a67c91a3ae61ffb33d46e0a40c7ba35e70713c4db31cfca30492f792eff",
-                        "arm64": "5f9c96b656827b9d14ebeda7739e25be554fa6d25669b03847c1df6e869c0679",
-                    },
-                ),
-                "25": (
-                    "25.0.4",
-                    "7",
-                    {
-                        "amd64": "aed3915f8facc0c80733ab2448bb0df4b494a36a2c5759e9a6e1eb979720f2b3",
-                        "arm64": "1f2644427000316bc431df3389504551ed7464fe8486bf6b4f1130af9ffc8f55",
-                    },
-                ),
-            },
-        ),
-        (
-            "jdk",
-            {
-                "17": (
-                    "17.0.20",
-                    "8",
-                    {
-                        "amd64": "be7668bc030d578b83d6d5ef9221d6d6729bbbca8cf94a7d52e16ac68b5a5a35",
-                        "arm64": "d143936f473a4cb24e3b0e247d6d0775769d55ec9775c339540e753059a8d77a",
-                    },
-                ),
-                "21": (
-                    "21.0.12",
-                    "8",
-                    {
-                        "amd64": "e4446ff06a276155697597cc0f1b15da004ff083f4964a35271ecee567177370",
-                        "arm64": "eba38e871b02d407897bfe017ea35352dfc1420ef6d2112425b0c67325ca509d",
-                    },
-                ),
-                "25": (
-                    "25.0.4",
-                    "7",
-                    {
-                        "amd64": "e58fcdcd637b25c03ca84cbbcefc70d11efb8f4b4cbd05decc9f661769d77f94",
-                        "arm64": "621f7196f0b682fb557da58bec89bd7dfe5419811fe1c0ba75c9cc8432f084c7",
-                    },
-                ),
-            },
-        ),
-    ]
-    for major, (version, build, sha_by_arch) in sha_by_major.items()
-    for arch, sha in sha_by_arch.items()
-]
-
 grype_db = use_extension("@grype.bzl//grype:extensions.bzl", "grype_database", dev_dependency = True)
 grype_db.database(
     name = "grype_database",
-    sha256 = "9372153c84a72a3a8c69b3a8f233022441abb5f548a63486bb7c52f5e74b16aa",
-    url = "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.9_2026-08-16T00:16:07Z_1786860870.tar.zst",
+    sha256 = "0c38b7025406d1b7a3041cc144ef7abb0523859d57633c6ed39578027a0676ec",
+    url = "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.9_2026-09-01T00:38:09Z_1788244329.tar.zst",
 )
 use_repo(grype_db, "grype_database")
+
+# The nginx base the games' frontend images are built on.
+#
+# Pinned by digest — the tag is carried alongside for readability only. Bump
+# both together; `crane digest ghcr.io/arkeros/distroless/nginx:stable` gives
+# the new one.
+images = use_extension("@rules_img//img:extensions.bzl", "images")
+images.pull(
+    name = "distroless_nginx",
+    digest = "sha256:b1e742c42ac58d9f6fcb88a3595e60465356609f6aaf8e03f01eccc9b632aa67",
+    # Not the default `shallow`: the app images produce an `oci_layout`, and a
+    # layout with only metadata and no blobs is not a layout. `lazy` fetches
+    # each blob the first time something actually needs it.
+    layer_handling = "lazy",
+    registry = "ghcr.io",
+    repository = "arkeros/distroless/nginx",
+    tag = "stable",
+)
+
+# The hub repo, not the image repo directly: rules_img names generated repos
+# after the digest, and `image("distroless_nginx")` from the hub resolves the
+# friendly name to it. `bazel mod tidy` rewrites this line, so keep it as-is.
+use_repo(images, "rules_img_images.bzl")

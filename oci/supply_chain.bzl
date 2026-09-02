@@ -30,10 +30,23 @@ load("@supply_chain_tools//sbom:sbom.bzl", "sbom")
 #
 # The matcher list is from grype/matcher/matchers.go's NewDefaultMatchers;
 # keep in lock-step if grype gains/drops matchers (cf. //bazel/modules/grype).
+# `pkg:docker/` and `pkg:oci/` are exempt, and are the one case where an
+# unroutable component is not a silent zero. Those name the *base image*, not a
+# package inside it: senku pulls its nginx base from
+# github.com/arkeros/distroless rather than assembling it, so the base's
+# contents are enumerated and scanned there and published as an SBOM + CVE
+# attestation bound to the very digest pinned in
+# //bazel/include:oci.MODULE.bazel. Evidence composes across the two by digest.
+#
+# The weakening is real and worth naming: this gate can no longer tell that a
+# base was scanned, only that it was named. Pulling a base with no attestations
+# would pass here. What keeps that honest is the digest pin plus verifying the
+# base's own attestations — not this test.
 _SILENT_ZERO_FILTER = """
 .components | map(
   select(
     ((.purl // "") | test("^pkg:(rpm|deb|apk|alpm|bitnami|cargo|gem|golang|hex|maven|npm|nuget|pypi)/") | not) and
+    ((.purl // "") | test("^pkg:(docker|oci)/") | not) and
     ((.cpe // "") == "")
   )
 ) | map({purl, name})

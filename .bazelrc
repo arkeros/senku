@@ -20,12 +20,6 @@ common --modify_execution_info=GrypeScan=+no-remote-exec
 
 build --workspace_status_command=bazel/workspace_status.sh
 
-# Local Bazel registry for vendored upstream packages with security patches
-# (busybox, libpq, …). BCR-shaped: source.json + overlay/ + patches/.
-# Local first so it shadows BCR for module names we maintain in-tree; BCR
-# listed explicitly because once any --registry is set, the implicit BCR
-# default is dropped.
-common --registry=file://%workspace%/bazel/registry
 common --registry=https://bcr.bazel.build
 
 # Build all Go binaries as PIE (position-independent executables). Required

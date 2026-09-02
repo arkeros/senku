@@ -15,7 +15,6 @@ load("//apps/napkin-battle:defs.bzl", _NAPKIN_LB_BACKEND = "LB_BACKEND")
 load("//apps/pepper-sweeper:defs.bzl", _PADRON_LB_BACKEND = "LB_BACKEND")
 load("//apps/spaghetti-duel:defs.bzl", _PASTA_LB_BACKEND = "LB_BACKEND")
 load("//apps/table-for-two:defs.bzl", _TABLE_LB_BACKEND = "LB_BACKEND")
-load("//oci/cmd/registry:defs.bzl", _REGISTRY_LB_BACKEND = "LB_BACKEND")
 
 PROJECT = "senku-prod"
 
@@ -56,6 +55,22 @@ BUCKET_LOCATION = "EU"
 # in a backend service, a bucket through a backend bucket, and neither
 # resource accepts the other's configuration. Collapsing them would mean a
 # descriptor whose fields are each meaningful for only half its values.
+# The registry is deployed from github.com/arkeros/distroless by that repo's
+# own CI — a Knative manifest applied with `gcloud run services replace`, not a
+# Terraform root here. So it is named by literal rather than by `ref()`: there
+# is no root in this repo to take a deploy edge on, and the service existing is
+# that repo's invariant to keep, not this one's. If it has not been deployed,
+# this LB's serverless NEG points at nothing and the plan still succeeds.
+_REGISTRY_LB_BACKEND = {
+    "paths": ["/v2/*"],
+    "regions": [
+        "asia-northeast1",
+        "europe-west3",
+        "us-central1",
+    ],
+    "service_name": "registry",
+}
+
 DRIVER_CLOUDRUN = "cloudrun"
 DRIVER_GCS_CDN = "gcs-cdn"
 

@@ -35,10 +35,6 @@ exports_files([
     # repo root re-runs `terraform providers lock` for all four platforms.
     ".terraform.lock.hcl",
     "gazelle_python.yaml",
-    # Consumed by rules_rpm via @hummingbird//... — see bazel/include/oci.MODULE.bazel.
-    "hummingbird-release.pgp",
-    "hummingbird.lock.json",
-    "hummingbird_install.json",
     "versions.tf",
 ])
 

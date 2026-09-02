@@ -5,7 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/arkeros/senku/bazel/cmd/knife/cmd/apt"
 	"github.com/arkeros/senku/bazel/cmd/knife/cmd/grype"
 	"github.com/arkeros/senku/bazel/cmd/knife/cmd/prebuilts"
 )
@@ -17,7 +16,6 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(apt.NewCmdApt())
 	rootCmd.AddCommand(grype.NewCmdGrype())
 	rootCmd.AddCommand(prebuilts.NewCmdPrebuilts())
 }

@@ -1,3 +1,0 @@
-# Mask the upstream 'build' shell script which aliases to BUILD on
-# case-insensitive filesystems (macOS APFS default) and trips Bazel's
-# package detector when queries recurse into @busybox//...
