@@ -16,10 +16,10 @@ importers:
         version: 0.4.0(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@pothos/core':
         specifier: ^4.12.0
-        version: 4.13.1(graphql@17.0.2)
+        version: 4.14.0(graphql@17.0.2)
       '@pothos/plugin-relay':
         specifier: ^4.7.0
-        version: 4.7.1(@pothos/core@4.13.1(graphql@17.0.2))(graphql@17.0.2)
+        version: 4.7.2(@pothos/core@4.14.0(graphql@17.0.2))(graphql@17.0.2)
       cookie:
         specifier: ^1.1.1
         version: 1.1.1
@@ -498,13 +498,13 @@ packages:
   '@nicolo-ribaudo/chokidar-2@2.1.8-no-fsevents.3':
     resolution: {integrity: sha512-s88O1aVtXftvp5bCPB7WnmXc5IwOZZ7YPuwNPt+GtOOXpPvad1LfbmjYv+qII7zP6RU2QGnqve27dnLycEnyEQ==}
 
-  '@pothos/core@4.13.1':
-    resolution: {integrity: sha512-2hkLxmvrT7VnbiWAfYhfF09PjaHeflZ5HrBHYzU6Tn/P9tDviuZS7IS5xO4k/KnK5GkRo3YxDzXyn+HnkEkVNw==}
+  '@pothos/core@4.14.0':
+    resolution: {integrity: sha512-NvwqdxeWFahfHUvA4xBAMt+v+Fh8R+vlSvGfg3v8T/nO6aneyYguqIB6dxaloAQk6IsuP4gMQKmybDvVKVQbRw==}
     peerDependencies:
       graphql: ^16.10.0 || ^17.0.0
 
-  '@pothos/plugin-relay@4.7.1':
-    resolution: {integrity: sha512-aj0xgdcvktx0k6iOvtkfJvb6FYdoWnlQkDMumr1WQm7uTXsJOASYQndytfnS0/0wsctCF/UTTK6Y53+F0UIeMw==}
+  '@pothos/plugin-relay@4.7.2':
+    resolution: {integrity: sha512-5MCYA/m3PKlzYHGjbI2PJSDUHVSWEJ6riFJyAe5i09Ttyb7qagW1HNIsbDHE0L8bXUw8ZUoOp89O93GaEFrqKw==}
     peerDependencies:
       '@pothos/core': '*'
       graphql: ^16.10.0 || ^17.0.0
@@ -1411,13 +1411,13 @@ snapshots:
   '@nicolo-ribaudo/chokidar-2@2.1.8-no-fsevents.3':
     optional: true
 
-  '@pothos/core@4.13.1(graphql@17.0.2)':
+  '@pothos/core@4.14.0(graphql@17.0.2)':
     dependencies:
       graphql: 17.0.2
 
-  '@pothos/plugin-relay@4.7.1(@pothos/core@4.13.1(graphql@17.0.2))(graphql@17.0.2)':
+  '@pothos/plugin-relay@4.7.2(@pothos/core@4.14.0(graphql@17.0.2))(graphql@17.0.2)':
     dependencies:
-      '@pothos/core': 4.13.1(graphql@17.0.2)
+      '@pothos/core': 4.14.0(graphql@17.0.2)
       graphql: 17.0.2
 
   '@resvg/resvg-wasm@2.6.2': {}
