@@ -36,8 +36,8 @@ git_override(
 grype_db = use_extension("@grype.bzl//grype:extensions.bzl", "grype_database", dev_dependency = True)
 grype_db.database(
     name = "grype_database",
-    sha256 = "6f9b99caa58155e0d544a896075e57f51e9ead7386d227f0686ba73d29329428",
-    url = "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.9_2026-09-12T00:30:35Z_1789194445.tar.zst",
+    sha256 = "d574583126b3b0eb72bf49ea72ee382bbfb3adff4358105540a303e9f41b874c",
+    url = "https://grype.anchore.io/databases/v6/vulnerability-db_v6.1.10_2026-10-31T00:20:28Z_1793427497.tar.zst",
 )
 use_repo(grype_db, "grype_database")
 
